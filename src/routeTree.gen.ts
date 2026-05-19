@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as ImportsRouteImport } from './routes/imports'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TemplatesIndexRouteImport } from './routes/templates.index'
 import { Route as TemplatesMachineRouteImport } from './routes/templates.$machine'
 
 const TemplatesRoute = TemplatesRouteImport.update({
@@ -29,6 +30,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TemplatesIndexRoute = TemplatesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => TemplatesRoute,
+} as any)
 const TemplatesMachineRoute = TemplatesMachineRouteImport.update({
   id: '/$machine',
   path: '/$machine',
@@ -40,12 +46,13 @@ export interface FileRoutesByFullPath {
   '/imports': typeof ImportsRoute
   '/templates': typeof TemplatesRouteWithChildren
   '/templates/$machine': typeof TemplatesMachineRoute
+  '/templates/': typeof TemplatesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/imports': typeof ImportsRoute
-  '/templates': typeof TemplatesRouteWithChildren
   '/templates/$machine': typeof TemplatesMachineRoute
+  '/templates': typeof TemplatesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +60,25 @@ export interface FileRoutesById {
   '/imports': typeof ImportsRoute
   '/templates': typeof TemplatesRouteWithChildren
   '/templates/$machine': typeof TemplatesMachineRoute
+  '/templates/': typeof TemplatesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/imports' | '/templates' | '/templates/$machine'
+  fullPaths:
+    | '/'
+    | '/imports'
+    | '/templates'
+    | '/templates/$machine'
+    | '/templates/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/imports' | '/templates' | '/templates/$machine'
-  id: '__root__' | '/' | '/imports' | '/templates' | '/templates/$machine'
+  to: '/' | '/imports' | '/templates/$machine' | '/templates'
+  id:
+    | '__root__'
+    | '/'
+    | '/imports'
+    | '/templates'
+    | '/templates/$machine'
+    | '/templates/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -91,6 +110,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/templates/': {
+      id: '/templates/'
+      path: '/'
+      fullPath: '/templates/'
+      preLoaderRoute: typeof TemplatesIndexRouteImport
+      parentRoute: typeof TemplatesRoute
+    }
     '/templates/$machine': {
       id: '/templates/$machine'
       path: '/$machine'
@@ -103,10 +129,12 @@ declare module '@tanstack/react-router' {
 
 interface TemplatesRouteChildren {
   TemplatesMachineRoute: typeof TemplatesMachineRoute
+  TemplatesIndexRoute: typeof TemplatesIndexRoute
 }
 
 const TemplatesRouteChildren: TemplatesRouteChildren = {
   TemplatesMachineRoute: TemplatesMachineRoute,
+  TemplatesIndexRoute: TemplatesIndexRoute,
 }
 
 const TemplatesRouteWithChildren = TemplatesRoute._addFileChildren(
