@@ -17,7 +17,6 @@ import { Trash2, Plus, Save, Upload, Wand2, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { CellPicker } from "@/components/qa/CellPicker";
 import {
-  getTemplate,
   listTemplates,
   saveTemplate,
   setActiveTemplate,
