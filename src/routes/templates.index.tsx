@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { listMachines, listTemplates, saveTemplate, setActiveTemplate } from "@/lib/qa/db";
+import { listMachines, listTemplates, saveTemplate, setActiveTemplate, deleteTemplate } from "@/lib/qa/db";
 import { MACHINES, type MachineId } from "@/lib/qa/types";
 import { buildSeedTemplate } from "@/lib/qa/seed";
 import { toast } from "sonner";
