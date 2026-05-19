@@ -94,6 +94,13 @@ function TemplatesIndex() {
                               <Pencil className="size-4" />
                             </Link>
                           </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDelete(m.id, t.id, machine?.activeTemplateId === t.id)}
+                          >
+                            <Trash2 className="size-4 text-destructive" />
+                          </Button>
                         </div>
                       </li>
                     ))}
