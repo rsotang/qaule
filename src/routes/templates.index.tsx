@@ -6,7 +6,7 @@ import { listMachines, listTemplates, saveTemplate, setActiveTemplate, deleteTem
 import { MACHINES, type MachineId } from "@/lib/qa/types";
 import { buildSeedTemplate } from "@/lib/qa/seed";
 import { toast } from "sonner";
-import { Plus, Pencil, CheckCircle2 } from "lucide-react";
+import { Plus, Pencil, CheckCircle2, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/templates/")({ component: TemplatesIndex });
 
