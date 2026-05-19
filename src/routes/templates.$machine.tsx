@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, Save, Upload } from "lucide-react";
+import { Trash2, Plus, Save, Upload, Wand2, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { CellPicker } from "@/components/qa/CellPicker";
 import {
@@ -23,7 +23,8 @@ import {
   setActiveTemplate,
 } from "@/lib/qa/db";
 import { readFile, type ParsedWorkbook } from "@/lib/qa/excel";
-import { buildSeedTemplate } from "@/lib/qa/seed";
+import { autoBuildTemplate, buildSeedTemplate, cloneTemplateForMachine } from "@/lib/qa/seed";
+import { MACHINES } from "@/lib/qa/types";
 import {
   CATEGORY_LABELS,
   type Category,
