@@ -1,150 +1,186 @@
-import type { MachineId, Template, TestDef } from "./types";
+import * as XLSX from "xlsx";
+import type { Category, MachineId, Template, TestDef } from "./types";
+import type { ParsedSheet, ParsedWorkbook } from "./excel";
 
-/** Seed a starter template based on the sample TB2 March-26 workbook layout. */
+/** Pattern for QA test codes: "MLC 10.12", "CMU 1.1", "CDH 2.3.1", etc. */
+const TEST_CODE_RE = /\b([A-ZÁÉÍÓÚÑ]{2,6})\s+(\d+(?:\.\d+){1,3})\b/;
+
+/** Map sheet name keywords -> category. */
+function inferCategory(sheetName: string): Category {
+  const n = sheetName.toLowerCase();
+  if (n.includes("mecanico") && n.includes("mesa")) return "mechanical_table";
+  if (n.includes("mecanico") || n.includes("mecánico")) return "mechanical_unit";
+  if (n.includes("mlc")) return "mlc";
+  if (n.includes("monitor")) return "monitor_system";
+  if (n.includes("electr")) return "dosimetric_electron";
+  if (n.includes("fot") || n.includes("dosim") || n.includes("haz") || n.includes("cuba"))
+    return "dosimetric_photon";
+  if (n.includes("geom")) return "geometric";
+  return "mechanical_unit";
+}
+
+/** Try to detect an energy hint (6 MV, 10 MV, 6 MeV...) in adjacent cells or in the label itself. */
+function inferEnergy(sheet: ParsedSheet, r: number, c: number, label: string): string | undefined {
+  const energyRe = /(\d{1,2})\s*(MV|MeV)/i;
+  const m = label.match(energyRe);
+  if (m) return `${m[1]} ${m[2].toUpperCase().replace("MEV", "MeV")}`;
+  // Look up to 6 rows above same column for energy header
+  for (let rr = r - 1; rr >= Math.max(0, r - 6); rr--) {
+    const v = sheet.cells[rr]?.[c];
+    if (typeof v === "string") {
+      const mm = v.match(energyRe);
+      if (mm) return `${mm[1]} ${mm[2].toUpperCase().replace("MEV", "MeV")}`;
+    }
+  }
+  return undefined;
+}
+
+/** Find numeric "value" cells associated with a test-code label, scanning right then down. */
+function findValueCells(
+  sheet: ParsedSheet,
+  r: number,
+  c: number,
+): { address: string; label: string }[] {
+  const found: { address: string; label: string }[] = [];
+  // Same row, scan right up to 12 cols
+  for (let cc = c + 1; cc < Math.min(sheet.cols, c + 13); cc++) {
+    const v = sheet.cells[r]?.[cc];
+    if (typeof v === "number") {
+      const header = findColumnHeader(sheet, r, cc);
+      found.push({ address: XLSX.utils.encode_cell({ r, c: cc }), label: header ?? `c${found.length + 1}` });
+    }
+  }
+  if (found.length > 0) return found;
+  // Otherwise scan the next 3 rows in same column for a single value
+  for (let rr = r + 1; rr < Math.min(sheet.rows, r + 4); rr++) {
+    const v = sheet.cells[rr]?.[c];
+    if (typeof v === "number") {
+      found.push({ address: XLSX.utils.encode_cell({ r: rr, c }), label: "valor" });
+      break;
+    }
+    // Also same row +1 to the right
+    for (let cc = c + 1; cc < Math.min(sheet.cols, c + 6); cc++) {
+      const v2 = sheet.cells[rr]?.[cc];
+      if (typeof v2 === "number") {
+        const header = findColumnHeader(sheet, rr, cc);
+        found.push({
+          address: XLSX.utils.encode_cell({ r: rr, c: cc }),
+          label: header ?? `c${found.length + 1}`,
+        });
+      }
+    }
+    if (found.length > 0) return found;
+  }
+  return found;
+}
+
+/** Look upward for a string header above a value column. */
+function findColumnHeader(sheet: ParsedSheet, r: number, c: number): string | null {
+  for (let rr = r - 1; rr >= Math.max(0, r - 8); rr--) {
+    const v = sheet.cells[rr]?.[c];
+    if (typeof v === "string" && v.trim() && !TEST_CODE_RE.test(v)) {
+      return v.trim().slice(0, 24);
+    }
+  }
+  return null;
+}
+
+/**
+ * Scan a parsed workbook for cells whose text contains QA test codes (e.g., "MLC 10.12")
+ * and build a Template with one TestDef per code, linked to nearby numeric value cells.
+ */
+export function autoBuildTemplate(parsed: ParsedWorkbook, machineId: MachineId): Template {
+  const tests: TestDef[] = [];
+  const seen = new Set<string>();
+
+  for (const sheet of parsed.sheets) {
+    const category = inferCategory(sheet.name);
+    for (let r = 0; r < sheet.rows; r++) {
+      for (let c = 0; c < sheet.cols; c++) {
+        const v = sheet.cells[r][c];
+        if (typeof v !== "string") continue;
+        const m = v.match(TEST_CODE_RE);
+        if (!m) continue;
+        const code = `${m[1]} ${m[2]}`;
+        const key = `${sheet.name}::${code}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        const cells = findValueCells(sheet, r, c);
+        const energy = inferEnergy(sheet, r, c, v);
+        const cleanName = v.replace(/\s+/g, " ").trim().slice(0, 120);
+
+        tests.push({
+          id: `test-${machineId}-${tests.length}-${code.replace(/\s+/g, "_")}`,
+          name: cleanName,
+          category,
+          energy,
+          frequency: "monthly",
+          unit: "",
+          tolerance: { type: "none" },
+          cells: cells.map((cc) => ({ sheet: sheet.name, address: cc.address, label: cc.label })),
+        });
+      }
+    }
+  }
+
+  // Detect a default date cell (first sheet with "Fecha:" label)
+  let defaultDateCell: Template["defaultDateCell"];
+  for (const sheet of parsed.sheets) {
+    for (let r = 0; r < sheet.rows; r++) {
+      for (let c = 0; c < sheet.cols; c++) {
+        const v = sheet.cells[r][c];
+        if (typeof v === "string" && /fecha/i.test(v)) {
+          for (let cc = c + 1; cc < Math.min(sheet.cols, c + 5); cc++) {
+            if (sheet.cells[r][cc] != null) {
+              defaultDateCell = { sheet: sheet.name, address: XLSX.utils.encode_cell({ r, c: cc }) };
+              break;
+            }
+          }
+        }
+        if (defaultDateCell) break;
+      }
+      if (defaultDateCell) break;
+    }
+    if (defaultDateCell) break;
+  }
+
+  return {
+    id: `tpl-${machineId}-${Date.now()}`,
+    machineId,
+    name: `Plantilla auto-detectada (${tests.length} tests)`,
+    version: 1,
+    createdAt: new Date().toISOString(),
+    defaultDateCell,
+    tests,
+  };
+}
+
+/** Minimal empty starter (kept for fallback). */
 export function buildSeedTemplate(machineId: MachineId): Template {
-  const tests: TestDef[] = [
-    // === Gantry angle indicator (row 16 of "C. Mecanico Unidad (m)") ===
-    {
-      id: "gantry_angle_indicator",
-      name: "Gantry — Error indicador angular",
-      category: "mechanical_unit",
-      frequency: "monthly",
-      unit: "°",
-      tolerance: { type: "abs", delta: 0.5 },
-      cells: [
-        { sheet: "C. Mecanico Unidad (m)", address: "C16", label: "0°" },
-        { sheet: "C. Mecanico Unidad (m)", address: "D16", label: "90°" },
-        { sheet: "C. Mecanico Unidad (m)", address: "E16", label: "180°" },
-        { sheet: "C. Mecanico Unidad (m)", address: "F16", label: "270°" },
-      ],
-    },
-    {
-      id: "laser_reticle_g90",
-      name: "Láser vs retículo — Gantry 90°",
-      category: "mechanical_unit",
-      frequency: "monthly",
-      unit: "mm",
-      tolerance: { type: "abs", delta: 1 },
-      cells: [
-        { sheet: "C. Mecanico Unidad (m)", address: "C35", label: "vert láser" },
-        { sheet: "C. Mecanico Unidad (m)", address: "E35", label: "horiz láser" },
-      ],
-    },
-    {
-      id: "laser_reticle_g270",
-      name: "Láser vs retículo — Gantry 270°",
-      category: "mechanical_unit",
-      frequency: "monthly",
-      unit: "mm",
-      tolerance: { type: "abs", delta: 1 },
-      cells: [
-        { sheet: "C. Mecanico Unidad (m)", address: "C36", label: "vert láser" },
-        { sheet: "C. Mecanico Unidad (m)", address: "E36", label: "horiz láser" },
-      ],
-    },
-
-    // === Dosimetric photons — 6 MV / 10 MV from "C.Dosim Haz Cuba(FOT)" ===
-    {
-      id: "pdd_zmax_6mv",
-      name: "PDD Zmax — 6 MV (20×20)",
-      category: "dosimetric_photon",
-      energy: "6 MV",
-      frequency: "monthly",
-      unit: "mm",
-      tolerance: { type: "pm", nominal: 13, delta: 2 },
-      cells: [{ sheet: "C.Dosim Haz Cuba(FOT)", address: "C14", label: "Zmax" }],
-    },
-    {
-      id: "tpr2010_6mv",
-      name: "TPR20/10 — 6 MV",
-      category: "dosimetric_photon",
-      energy: "6 MV",
-      frequency: "monthly",
-      unit: "",
-      tolerance: { type: "pm", nominal: 0.706, delta: 0.005 },
-      cells: [{ sheet: "C.Dosim Haz Cuba(FOT)", address: "C15", label: "TPR20/10" }],
-    },
-    {
-      id: "campo_x_6mv_20",
-      name: "Campo X — 6 MV (20×20)",
-      category: "dosimetric_photon",
-      energy: "6 MV",
-      frequency: "monthly",
-      unit: "cm",
-      tolerance: { type: "pm", nominal: 20, delta: 0.2 },
-      cells: [{ sheet: "C.Dosim Haz Cuba(FOT)", address: "C17", label: "CampoX" }],
-    },
-    {
-      id: "sim_x_6mv",
-      name: "Simetría X — 6 MV (20×20)",
-      category: "dosimetric_photon",
-      energy: "6 MV",
-      frequency: "monthly",
-      unit: "%",
-      tolerance: { type: "abs", delta: 3 },
-      cells: [{ sheet: "C.Dosim Haz Cuba(FOT)", address: "C22", label: "SimX" }],
-    },
-    {
-      id: "hom_x_6mv",
-      name: "Homogeneidad X — 6 MV (20×20)",
-      category: "dosimetric_photon",
-      energy: "6 MV",
-      frequency: "monthly",
-      unit: "%",
-      tolerance: { type: "abs", delta: 3 },
-      cells: [{ sheet: "C.Dosim Haz Cuba(FOT)", address: "C24", label: "HomX" }],
-    },
-    {
-      id: "pdd_zmax_10mv",
-      name: "PDD Zmax — 10 MV (20×20)",
-      category: "dosimetric_photon",
-      energy: "10 MV",
-      frequency: "monthly",
-      unit: "mm",
-      tolerance: { type: "pm", nominal: 20, delta: 2 },
-      cells: [{ sheet: "C.Dosim Haz Cuba(FOT)", address: "I14", label: "Zmax" }],
-    },
-    {
-      id: "tpr2010_10mv",
-      name: "TPR20/10 — 10 MV",
-      category: "dosimetric_photon",
-      energy: "10 MV",
-      frequency: "monthly",
-      unit: "",
-      tolerance: { type: "pm", nominal: 0.7665, delta: 0.005 },
-      cells: [{ sheet: "C.Dosim Haz Cuba(FOT)", address: "I15", label: "TPR20/10" }],
-    },
-    {
-      id: "sim_x_10mv",
-      name: "Simetría X — 10 MV (20×20)",
-      category: "dosimetric_photon",
-      energy: "10 MV",
-      frequency: "monthly",
-      unit: "%",
-      tolerance: { type: "abs", delta: 3 },
-      cells: [{ sheet: "C.Dosim Haz Cuba(FOT)", address: "I22", label: "SimX" }],
-    },
-
-    // === Monitor system output ===
-    {
-      id: "monitor_output_6mv",
-      name: "Constancia salida — 6 MV (100 UM)",
-      category: "monitor_system",
-      energy: "6 MV",
-      frequency: "monthly",
-      unit: "UM",
-      tolerance: { type: "pm", nominal: 100, delta: 2 },
-      cells: [{ sheet: "Caract Sistema Monitor Fot", address: "C16", label: "100 UM" }],
-    },
-  ];
-
   return {
     id: `seed-${machineId}`,
     machineId,
-    name: "Plantilla inicial",
+    name: "Plantilla vacía",
     version: 1,
     createdAt: new Date().toISOString(),
-    defaultDateCell: { sheet: "C. Mecanico Unidad (m)", address: "H4" },
-    tests,
+    tests: [],
+  };
+}
+
+/** Clone a template's tests for another machine, generating fresh ids. */
+export function cloneTemplateForMachine(src: Template, machineId: MachineId): Template {
+  return {
+    id: `tpl-${machineId}-${Date.now()}`,
+    machineId,
+    name: src.name,
+    version: 1,
+    createdAt: new Date().toISOString(),
+    defaultDateCell: src.defaultDateCell,
+    tests: src.tests.map((t, i) => ({
+      ...t,
+      id: `test-${machineId}-${i}-${t.id.split("-").slice(-1)[0]}`,
+      cells: t.cells.map((c) => ({ ...c })),
+    })),
   };
 }
