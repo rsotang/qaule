@@ -58,6 +58,14 @@ export async function setActiveTemplate(machineId: string, templateId: string) {
   const m = await db.get("machines", machineId);
   if (m) await db.put("machines", { ...m, activeTemplateId: templateId });
 }
+export async function clearActiveTemplate(machineId: string) {
+  const db = await getDB();
+  const m = await db.get("machines", machineId);
+  if (m) {
+    const { activeTemplateId: _, ...rest } = m;
+    await db.put("machines", rest);
+  }
+}
 
 export async function listTemplates(machineId?: string): Promise<Template[]> {
   const db = await getDB();

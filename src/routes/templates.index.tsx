@@ -2,11 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { listMachines, listTemplates, saveTemplate, setActiveTemplate } from "@/lib/qa/db";
+import { listMachines, listTemplates, saveTemplate, setActiveTemplate, deleteTemplate, clearActiveTemplate } from "@/lib/qa/db";
 import { MACHINES, type MachineId } from "@/lib/qa/types";
 import { buildSeedTemplate } from "@/lib/qa/seed";
 import { toast } from "sonner";
-import { Plus, Pencil, CheckCircle2 } from "lucide-react";
+import { Plus, Pencil, CheckCircle2, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/templates/")({ component: TemplatesIndex });
 
@@ -27,6 +27,14 @@ function TemplatesIndex() {
   async function activate(machineId: string, templateId: string) {
     await setActiveTemplate(machineId, templateId);
     toast.success("Plantilla activada");
+    qc.invalidateQueries();
+  }
+
+  async function handleDelete(machineId: string, templateId: string, isActive: boolean) {
+    if (!window.confirm("¿Eliminar esta plantilla? Los datos ya importados no se borran.")) return;
+    await deleteTemplate(templateId);
+    if (isActive) await clearActiveTemplate(machineId);
+    toast.success("Plantilla eliminada");
     qc.invalidateQueries();
   }
 
@@ -85,6 +93,13 @@ function TemplatesIndex() {
                             <Link to="/templates/$machine" params={{ machine: m.id }}>
                               <Pencil className="size-4" />
                             </Link>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDelete(m.id, t.id, machine?.activeTemplateId === t.id)}
+                          >
+                            <Trash2 className="size-4 text-destructive" />
                           </Button>
                         </div>
                       </li>
