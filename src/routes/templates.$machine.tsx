@@ -214,6 +214,12 @@ function TemplateEditor() {
               </span>
             </Button>
           </label>
+          <Button variant="outline" onClick={handleAutoDetect} disabled={!parsed}>
+            <Wand2 className="size-4" /> Auto-detectar tests
+          </Button>
+          <Button variant="outline" onClick={handleApplyToAll}>
+            <Copy className="size-4" /> Aplicar a TB1/TB2/TB3
+          </Button>
           <Button onClick={handleSave}>
             <Save className="size-4" /> Guardar y activar
           </Button>
