@@ -30,6 +30,14 @@ function TemplatesIndex() {
     qc.invalidateQueries();
   }
 
+  async function handleDelete(machineId: string, templateId: string, isActive: boolean) {
+    if (!window.confirm("¿Eliminar esta plantilla? Los datos ya importados no se borran.")) return;
+    await deleteTemplate(templateId);
+    if (isActive) await clearActiveTemplate(machineId);
+    toast.success("Plantilla eliminada");
+    qc.invalidateQueries();
+  }
+
   return (
     <div className="space-y-6">
       <div>
