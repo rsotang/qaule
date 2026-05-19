@@ -68,10 +68,25 @@ function TemplateEditor() {
     try {
       const { parsed } = await readFile(file);
       setParsed(parsed);
-      toast.success("Archivo de referencia cargado. Ya puedes elegir celdas.");
+      toast.success("Archivo de referencia cargado. Ya puedes elegir celdas o auto-detectar tests.");
     } catch (e) {
       toast.error(`Error: ${(e as Error).message}`);
     }
+  }
+
+  function handleAutoDetect() {
+    if (!parsed) {
+      toast.error("Carga primero un archivo de referencia");
+      return;
+    }
+    const auto = autoBuildTemplate(parsed, machineId);
+    if (auto.tests.length === 0) {
+      toast.error("No se detectó ningún código de test (formato esperado: 'MLC 10.12')");
+      return;
+    }
+    setTemplate(auto);
+    setEditingTestIdx(null);
+    toast.success(`Detectados ${auto.tests.length} tests. Revisa y guarda.`);
   }
 
   async function handleSave() {
@@ -81,6 +96,23 @@ function TemplateEditor() {
     toast.success("Plantilla guardada y activada");
     qc.invalidateQueries();
   }
+
+  async function handleApplyToAll() {
+    if (!template) return;
+    const others = MACHINES.filter((m) => m.id !== machineId);
+    for (const m of others) {
+      const clone = cloneTemplateForMachine(template, m.id);
+      clone.name = template.name;
+      await saveTemplate(clone);
+      await setActiveTemplate(m.id, clone.id);
+    }
+    // also save current machine
+    await saveTemplate(template);
+    await setActiveTemplate(machineId, template.id);
+    toast.success(`Plantilla aplicada a ${others.map((m) => m.id).join(", ")} y ${machineId}`);
+    qc.invalidateQueries();
+  }
+
 
   function loadTemplate(id: string) {
     const t = templates.data?.find((x) => x.id === id);
