@@ -382,7 +382,11 @@ function TestEditor({
                 value={test.tolerance.nominal}
                 onChange={(e) =>
                   onChange({
-                    tolerance: { ...test.tolerance, type: "pm", nominal: parseFloat(e.target.value) || 0 },
+                    tolerance: {
+                      type: "pm",
+                      nominal: parseFloat(e.target.value) || 0,
+                      delta: test.tolerance.type === "pm" ? test.tolerance.delta : 1,
+                    },
                   })
                 }
               />
@@ -394,7 +398,11 @@ function TestEditor({
                 value={test.tolerance.delta}
                 onChange={(e) =>
                   onChange({
-                    tolerance: { ...test.tolerance, type: "pm", delta: parseFloat(e.target.value) || 0 },
+                    tolerance: {
+                      type: "pm",
+                      nominal: test.tolerance.type === "pm" ? test.tolerance.nominal : 0,
+                      delta: parseFloat(e.target.value) || 0,
+                    },
                   })
                 }
               />
@@ -422,7 +430,11 @@ function TestEditor({
                 value={test.tolerance.min}
                 onChange={(e) =>
                   onChange({
-                    tolerance: { ...test.tolerance, type: "range", min: parseFloat(e.target.value) || 0 },
+                    tolerance: {
+                      type: "range",
+                      min: parseFloat(e.target.value) || 0,
+                      max: test.tolerance.type === "range" ? test.tolerance.max : 0,
+                    },
                   })
                 }
               />
@@ -434,13 +446,18 @@ function TestEditor({
                 value={test.tolerance.max}
                 onChange={(e) =>
                   onChange({
-                    tolerance: { ...test.tolerance, type: "range", max: parseFloat(e.target.value) || 0 },
+                    tolerance: {
+                      type: "range",
+                      min: test.tolerance.type === "range" ? test.tolerance.min : 0,
+                      max: parseFloat(e.target.value) || 0,
+                    },
                   })
                 }
               />
             </Field>
           </div>
         )}
+
 
         <div>
           <Label className="text-xs">Celdas mapeadas ({test.cells.length})</Label>
