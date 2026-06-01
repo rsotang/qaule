@@ -5,7 +5,7 @@ export function AppShell() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b bg-card">
-        <div className="mx-auto flex max-w-7xl items-center gap-6 px-4 py-3">
+        <div className="flex w-full items-center gap-6 px-4 py-3 sm:px-6 lg:px-8">
           <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight">
             <Activity className="size-5 text-primary" />
             <span>QA Linac</span>
@@ -17,7 +17,7 @@ export function AppShell() {
           </nav>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-4 py-6">
+      <main className="w-full px-4 py-6 sm:px-6 lg:px-8">
         <Outlet />
       </main>
     </div>
