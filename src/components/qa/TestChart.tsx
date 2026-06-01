@@ -11,7 +11,7 @@ import {
   Legend,
 } from "recharts";
 import type { Measurement, TestDef } from "@/lib/qa/types";
-import { toleranceBand, evaluateTolerance } from "@/lib/qa/types";
+import { toleranceBand, evaluateTolerance, walkDataPoints, dpSeriesLabel } from "@/lib/qa/types";
 
 interface Props {
   test: TestDef;
@@ -21,8 +21,12 @@ interface Props {
 const SERIES_COLORS = ["#2563eb", "#dc2626", "#16a34a", "#ca8a04", "#9333ea", "#0891b2"];
 
 export function TestChart({ test, measurements }: Props) {
-  const { data, seriesKeys, band, hasOOT } = useMemo(() => {
-    const seriesKeys = test.cells.map((c, i) => c.label ?? `c${i}`);
+  const { data, series, band, hasOOT } = useMemo(() => {
+    const walked = walkDataPoints(test);
+    const series = walked.map((w) => ({
+      key: dpSeriesLabel(w),
+      tol: w.dp.parsedTolerance,
+    }));
     const byDate = new Map<string, Record<string, number | string>>();
     for (const m of measurements) {
       if (m.testId !== test.id) continue;
@@ -33,13 +37,14 @@ export function TestChart({ test, measurements }: Props) {
     const data = [...byDate.values()].sort((a, b) =>
       String(a.date).localeCompare(String(b.date)),
     );
-    const band = toleranceBand(test.tolerance);
+    const band = toleranceBand(series[0]?.tol);
     let hasOOT = false;
     for (const m of measurements) {
       if (m.testId !== test.id) continue;
-      if (!evaluateTolerance(test.tolerance, m.value).inTolerance) hasOOT = true;
+      const s = series.find((x) => x.key === m.cellLabel);
+      if (s && !evaluateTolerance(s.tol, m.value).inTolerance) hasOOT = true;
     }
-    return { data, seriesKeys, band, hasOOT };
+    return { data, series, band, hasOOT };
   }, [test, measurements]);
 
   if (data.length === 0) {
@@ -51,7 +56,7 @@ export function TestChart({ test, measurements }: Props) {
   }
 
   const allValues = data.flatMap((r) =>
-    seriesKeys.map((k) => (typeof r[k] === "number" ? (r[k] as number) : null)).filter((v): v is number => v != null),
+    series.map((s) => (typeof r[s.key] === "number" ? (r[s.key] as number) : null)).filter((v): v is number => v != null),
   );
   let yMin = Math.min(...allValues);
   let yMax = Math.max(...allValues);
@@ -96,18 +101,18 @@ export function TestChart({ test, measurements }: Props) {
               strokeOpacity={0.3}
             />
           )}
-          {seriesKeys.map((k, i) => (
+          {series.map((s, i) => (
             <Line
-              key={k}
+              key={s.key}
               type="monotone"
-              dataKey={k}
+              dataKey={s.key}
               stroke={SERIES_COLORS[i % SERIES_COLORS.length]}
               strokeWidth={2}
               dot={(props) => {
                 const { cx, cy, payload, key } = props as { cx?: number; cy?: number; payload: Record<string, unknown>; key?: string };
-                const v = payload[k];
+                const v = payload[s.key];
                 if (cx == null || cy == null || typeof v !== "number") return <g key={key} />;
-                const ok = evaluateTolerance(test.tolerance, v).inTolerance;
+                const ok = evaluateTolerance(s.tol, v).inTolerance;
                 return (
                   <circle
                     key={key}
@@ -123,7 +128,7 @@ export function TestChart({ test, measurements }: Props) {
               isAnimationActive={false}
             />
           ))}
-          {seriesKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 10 }} />}
+          {series.length > 1 && <Legend wrapperStyle={{ fontSize: 10 }} />}
         </LineChart>
       </ResponsiveContainer>
       {hasOOT && (
