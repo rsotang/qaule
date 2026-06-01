@@ -131,15 +131,6 @@ function Dashboard() {
                   </div>
                   <div className="flex flex-wrap gap-1 text-[10px] text-muted-foreground">
                     <span>{CATEGORY_LABELS[t.category]}</span>
-                    {t.energy && <span>• {t.energy}</span>}
-                    {t.unit && <span>• {t.unit}</span>}
-                    {t.tolerance.type === "pm" && (
-                      <span>• tol. {t.tolerance.nominal} ± {t.tolerance.delta}</span>
-                    )}
-                    {t.tolerance.type === "abs" && <span>• tol. ±{t.tolerance.delta}</span>}
-                    {t.tolerance.type === "range" && (
-                      <span>• {t.tolerance.min}..{t.tolerance.max}</span>
-                    )}
                   </div>
                 </CardHeader>
                 <CardContent>
