@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { listMachines, listTemplates, saveTemplate, setActiveTemplate, deleteTemplate, clearActiveTemplate } from "@/lib/qa/db";
-import { MACHINES, type MachineId } from "@/lib/qa/types";
+import { listMachines, listTemplates, saveTemplate, setActiveTemplate, deleteTemplate, clearActiveTemplate, getTemplate } from "@/lib/qa/db";
+import { MACHINES, type MachineId, type Template } from "@/lib/qa/types";
 import { buildSeedTemplate } from "@/lib/qa/seed";
 import { toast } from "sonner";
-import { Plus, Pencil, CheckCircle2, Trash2 } from "lucide-react";
+import { Plus, Pencil, CheckCircle2, Trash2, Download, Upload } from "lucide-react";
 
 export const Route = createFileRoute("/templates/")({ component: TemplatesIndex });
 
@@ -14,6 +15,7 @@ function TemplatesIndex() {
   const qc = useQueryClient();
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
   const templates = useQuery({ queryKey: ["templates-all"], queryFn: () => listTemplates() });
+  const importInputs = useRef<Record<string, HTMLInputElement | null>>({});
 
   async function seedOne(machineId: MachineId) {
     const t = buildSeedTemplate(machineId);
@@ -36,6 +38,39 @@ function TemplatesIndex() {
     if (isActive) await clearActiveTemplate(machineId);
     toast.success("Plantilla eliminada");
     qc.invalidateQueries();
+  }
+
+  async function handleExport(templateId: string) {
+    const t = await getTemplate(templateId);
+    if (!t) return;
+    const blob = new Blob([JSON.stringify(t, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${t.machineId}-${t.name.replace(/\s+/g, "_")}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Plantilla exportada");
+  }
+
+  async function handleImport(machineId: MachineId, file: File) {
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as Template;
+      if (!parsed || !Array.isArray(parsed.tests)) throw new Error("Formato inválido");
+      const imported: Template = {
+        ...parsed,
+        id: `tpl-${machineId}-${Date.now()}`,
+        machineId,
+        createdAt: new Date().toISOString(),
+        name: parsed.name ? `${parsed.name} (importada)` : "Plantilla importada",
+      };
+      await saveTemplate(imported);
+      toast.success(`Plantilla importada para ${machineId}`);
+      qc.invalidateQueries();
+    } catch (e) {
+      toast.error(`No se pudo importar: ${(e as Error).message}`);
+    }
   }
 
   return (
@@ -89,6 +124,14 @@ function TemplatesIndex() {
                               Activar
                             </Button>
                           )}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Exportar"
+                            onClick={() => handleExport(t.id)}
+                          >
+                            <Download className="size-4" />
+                          </Button>
                           <Button asChild size="sm" variant="ghost">
                             <Link to="/templates/$machine" params={{ machine: m.id }}>
                               <Pencil className="size-4" />
@@ -114,6 +157,29 @@ function TemplatesIndex() {
                     <Link to="/templates/$machine" params={{ machine: m.id }}>
                       Editar
                     </Link>
+                  </Button>
+                </div>
+                <div>
+                  <input
+                    ref={(el) => {
+                      importInputs.current[m.id] = el;
+                    }}
+                    type="file"
+                    accept="application/json,.json"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) void handleImport(m.id, f);
+                      e.target.value = "";
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => importInputs.current[m.id]?.click()}
+                  >
+                    <Upload className="size-4" /> Importar JSON
                   </Button>
                 </div>
               </CardContent>
