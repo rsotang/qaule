@@ -1,6 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import type { ImportRecord, MachineRecord, Measurement, Template } from "./types";
-import { MACHINES } from "./types";
+import type { ImportRecord, MachineRecord, Measurement, Template, TestDef } from "./types";
+import { MACHINES, emptyNest } from "./types";
 
 interface QASchema extends DBSchema {
   machines: { key: string; value: MachineRecord };
@@ -15,22 +15,65 @@ interface QASchema extends DBSchema {
 
 let dbPromise: Promise<IDBPDatabase<QASchema>> | null = null;
 
+/** Convert a legacy test (flat cells[]) into the new nested shape. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function migrateLegacyTest(t: any): TestDef {
+  if (t && t.root && t.admin) return t as TestDef; // already migrated
+  const root = emptyNest("raíz");
+  const cells: { sheet: string; address: string; label?: string }[] = t.cells ?? [];
+  root.children = cells.map((c, i) => ({
+    id: `dp-mig-${i}-${Math.random().toString(36).slice(2, 6)}`,
+    kind: "data" as const,
+    name: c.label || `dato ${i + 1}`,
+    cell: { sheet: c.sheet, address: c.address },
+    unit: t.unit || undefined,
+    tolerance: undefined,
+    parsedTolerance: t.tolerance,
+  }));
+  return {
+    id: t.id,
+    name: t.name,
+    category: t.category,
+    frequency: t.frequency,
+    admin: { date: t.dateCell ?? undefined },
+    root,
+  };
+}
+
 export function getDB() {
   if (typeof indexedDB === "undefined") {
     throw new Error("IndexedDB unavailable (SSR)");
   }
   if (!dbPromise) {
-    dbPromise = openDB<QASchema>("qa-dashboard", 1, {
-      upgrade(db) {
-        db.createObjectStore("machines", { keyPath: "id" });
-        const t = db.createObjectStore("templates", { keyPath: "id" });
-        t.createIndex("byMachine", "machineId");
-        const i = db.createObjectStore("imports", { keyPath: "id" });
-        i.createIndex("byMachine", "machineId");
-        const m = db.createObjectStore("measurements", { keyPath: "id" });
-        m.createIndex("byMachine", "machineId");
-        m.createIndex("byImport", "importId");
-        m.createIndex("byTest", "testId");
+    dbPromise = openDB<QASchema>("qa-dashboard", 2, {
+      upgrade(db, oldVersion, _newVersion, tx) {
+        if (oldVersion < 1) {
+          db.createObjectStore("machines", { keyPath: "id" });
+          const t = db.createObjectStore("templates", { keyPath: "id" });
+          t.createIndex("byMachine", "machineId");
+          const i = db.createObjectStore("imports", { keyPath: "id" });
+          i.createIndex("byMachine", "machineId");
+          const m = db.createObjectStore("measurements", { keyPath: "id" });
+          m.createIndex("byMachine", "machineId");
+          m.createIndex("byImport", "importId");
+          m.createIndex("byTest", "testId");
+        }
+        if (oldVersion < 2) {
+          // Migrate templates: flat cells[] -> nested root
+          const store = tx.objectStore("templates");
+          void store.openCursor().then(async function next(cursor) {
+            while (cursor) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const tpl: any = cursor.value;
+              const migrated: Template = {
+                ...tpl,
+                tests: (tpl.tests ?? []).map(migrateLegacyTest),
+              };
+              await cursor.update(migrated);
+              cursor = await cursor.continue();
+            }
+          });
+        }
       },
     }).then(async (db) => {
       const tx = db.transaction("machines", "readwrite");
@@ -95,7 +138,6 @@ export async function listImports(machineId?: string): Promise<ImportRecord[]> {
 export async function saveImport(rec: ImportRecord, measurements: Measurement[]) {
   const db = await getDB();
   const tx = db.transaction(["imports", "measurements"], "readwrite");
-  // remove previous measurements for this import id, if re-importing
   const prev = await tx.objectStore("measurements").index("byImport").getAllKeys(rec.id);
   for (const k of prev) await tx.objectStore("measurements").delete(k);
   await tx.objectStore("imports").put(rec);

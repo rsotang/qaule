@@ -72,7 +72,7 @@ function ImportsPage() {
           name: test.name,
           cellLabel: v.cellLabel,
           value: v.value,
-          inTol: v.value != null ? evaluateTolerance(test.tolerance, v.value).inTolerance : null,
+          inTol: v.value != null ? evaluateTolerance(v.parsedTolerance, v.value).inTolerance : null,
         };
       });
       setPreview({ machineId, fileName: file.name, fileHash: hash, sourceDate: date, rows });

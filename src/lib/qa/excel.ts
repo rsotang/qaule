@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
-import type { CellRef, Template } from "./types";
+import type { CellRef, Template, ToleranceValue, Tolerance } from "./types";
+import { walkDataPoints, dpSeriesLabel, parseToleranceText } from "./types";
 
 export interface ParsedWorkbook {
   sheets: ParsedSheet[];
@@ -9,7 +10,7 @@ export interface ParsedSheet {
   name: string;
   rows: number;
   cols: number;
-  cells: (string | number | null)[][]; // [row][col] 0-indexed
+  cells: (string | number | null)[][];
 }
 
 export async function readFile(file: File): Promise<{ wb: XLSX.WorkBook; parsed: ParsedWorkbook; hash: string }> {
@@ -60,10 +61,8 @@ export function readDate(parsed: ParsedWorkbook, ref: CellRef): string | null {
   const v = readCell(parsed, ref);
   if (v == null) return null;
   if (typeof v === "string") {
-    // Try ISO first
     const iso = new Date(v);
     if (!isNaN(iso.getTime())) return iso.toISOString().slice(0, 10);
-    // Try DD/MM/YY or DD/MM/YYYY
     const m = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
     if (m) {
       let [, d, mo, y] = m;
@@ -73,7 +72,6 @@ export function readDate(parsed: ParsedWorkbook, ref: CellRef): string | null {
     return null;
   }
   if (typeof v === "number") {
-    // Excel serial date
     const epoch = new Date(Date.UTC(1899, 11, 30));
     const d = new Date(epoch.getTime() + v * 86400000);
     return d.toISOString().slice(0, 10);
@@ -81,13 +79,11 @@ export function readDate(parsed: ParsedWorkbook, ref: CellRef): string | null {
   return null;
 }
 
-/** Look for "Fecha:" label in a sheet and return the cell with its value (adjacent right). */
 export function autoDetectDateCell(sheet: ParsedSheet): { address: string; sheet: string } | null {
   for (let r = 0; r < sheet.rows; r++) {
     for (let c = 0; c < sheet.cols; c++) {
       const v = sheet.cells[r][c];
       if (typeof v === "string" && /fecha/i.test(v)) {
-        // Look right within next 4 cols
         for (let cc = c + 1; cc < Math.min(c + 5, sheet.cols); cc++) {
           if (sheet.cells[r][cc] != null) {
             return { sheet: sheet.name, address: XLSX.utils.encode_cell({ r, c: cc }) };
@@ -118,30 +114,52 @@ async function sha256(buf: ArrayBuffer): Promise<string> {
 
 export interface ExtractedValue {
   testId: string;
+  dataPointId: string;
   cellLabel: string;
   value: number | null;
+  parsedTolerance?: Tolerance;
+}
+
+function resolveTolerance(
+  tol: ToleranceValue | undefined,
+  parsed: ParsedWorkbook,
+): Tolerance | undefined {
+  if (!tol) return undefined;
+  if (tol.kind === "literal") return parseToleranceText(tol.text);
+  const v = readCell(parsed, { sheet: tol.sheet, address: tol.address });
+  if (v == null) return undefined;
+  return parseToleranceText(String(v));
 }
 
 export function extractFromTemplate(template: Template, parsed: ParsedWorkbook): ExtractedValue[] {
   const out: ExtractedValue[] = [];
   for (const t of template.tests) {
-    t.cells.forEach((ref, idx) => {
+    for (const w of walkDataPoints(t)) {
+      const value = w.dp.cell ? readNumber(parsed, w.dp.cell) : null;
       out.push({
         testId: t.id,
-        cellLabel: ref.label ?? `c${idx}`,
-        value: readNumber(parsed, ref),
+        dataPointId: w.dp.id,
+        cellLabel: dpSeriesLabel(w),
+        value,
+        parsedTolerance: resolveTolerance(w.dp.tolerance, parsed) ?? w.dp.parsedTolerance,
       });
-    });
+    }
   }
   return out;
 }
 
 export function resolveImportDate(template: Template, parsed: ParsedWorkbook): string | null {
+  // Per-test admin date wins if any test has it
+  for (const t of template.tests) {
+    if (t.admin?.date) {
+      const d = readDate(parsed, t.admin.date);
+      if (d) return d;
+    }
+  }
   if (template.defaultDateCell) {
     const d = readDate(parsed, template.defaultDateCell);
     if (d) return d;
   }
-  // Try a few common sheets
   for (const name of Object.keys(parsed.sheetMap)) {
     const detected = autoDetectDateCell(parsed.sheetMap[name]);
     if (detected) {

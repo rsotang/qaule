@@ -1,82 +1,94 @@
+# Plan: Nested Template Editor
+
 ## Goal
+Replace the flat `cells[]` per test with a tree of **nests** that can contain other nests or **data points**. Each test also gets **admin cells** (performers, date). Each data point has its own cell ref, tolerance, and unit.
 
-A browser-only QA dashboard for three linacs (TB1, TB2, TB3) that ingests monthly `.xlsm` files and shows time-series of numeric QA parameters with tolerance bands. All data, parsed values, and mapping templates live in the browser (IndexedDB). No backend, no login.
+## New data model (`src/lib/qa/types.ts`)
 
-## How import works
+```ts
+type ToleranceValue =
+  | { kind: "literal"; text: string }      // free text, e.g. "±2 mm"
+  | { kind: "cellRef"; sheet: string; address: string };
 
-1. User picks a machine (TB1/TB2/TB3) and uploads its monthly `.xlsm`.
-2. App parses the workbook with `xlsx` (SheetJS) entirely in the browser.
-3. App applies the **active mapping template** for that machine: each test definition says "read cell `E15` on sheet `C. Mecanico Unidad (m)`", and the value plus an auto-detected date (from the standard `Fecha:` cell on each sheet, falling back to a date input on upload) becomes one data point.
-4. App stores measurements in IndexedDB, keyed by `(machine, testId, date)`. Re-importing the same file updates instead of duplicating.
+interface DataPoint {
+  id: string;
+  kind: "data";
+  name: string;                // e.g. "Beam center"
+  cell: CellRef;               // single cell with the value
+  unit?: string;
+  tolerance?: ToleranceValue;  // optional
+  // optional structured tolerance preserved for charting
+  parsedTolerance?: Tolerance;
+}
 
-## Mapping template editor (the visual cell-picker)
+interface Nest {
+  id: string;
+  kind: "nest";
+  name: string;                // e.g. "Energy 6 MV" / "Profile" / "PDD"
+  children: Array<Nest | DataPoint>;
+}
 
-A dedicated `/templates` page lets the user define what tests exist and where their values live, without code changes.
+interface TestDef {
+  id: string;
+  name: string;                // e.g. "Sistema Monitor Starcheck"
+  category: Category;
+  frequency: Frequency;
+  admin: {
+    performers?: CellRef[];    // one or more name cells
+    date?: CellRef;
+  };
+  root: Nest;                  // top-level container; children are nests or data points
+}
+```
 
-- Upload a reference `.xlsm` (e.g. the March file you provided) once.
-- Browse it sheet-by-sheet in a spreadsheet-like grid (`react-data-grid` or a lightweight custom grid). Frozen headers, scroll, click a cell to select it.
-- For each test entry, fill: name, category (mechanical, geometric, dosimetric, monitor system, MLC...), energy/modality tag (6MV, 10MV, 6FFF, electron 6/9/12/15/18 MeV, N/A), frequency (monthly / quarterly / annual), unit, tolerance (± value or min/max), and one or more cell references picked by clicking.
-- Multi-cell tests supported (e.g. gantry 0/90/180/270 → 4 cells under one test, plotted as 4 series).
-- Templates are versioned per machine. TB1, TB2, TB3 can share a base template or diverge. Export/import template as JSON for backup or to share between machines.
-- A "Detect Fecha" helper scans each sheet for the `Fecha:` label and remembers the date cell location so monthly imports auto-date themselves.
+Keep `evaluateTolerance` / `toleranceBand` working off `parsedTolerance` when present (parse simple `±X`, `X-Y`, or cell-ref-resolved numbers later in the import pipeline).
 
-To seed the work, I'll pre-build an initial template from your March TB2 file covering the obvious numeric tests I already see:
+## UI: `templates.$machine.tsx` rewrite
 
-- `C. Mecanico Unidad (m)`: gantry angle indicator errors (4 angles), laser-vs-reticle distances, ceiling laser deviations
-- `C.Dosim Haz Cuba(FOT)` for 6/10 MV: Zmax, TPR20/10, field size X/Y, penumbra ±, flatness/homogeneity, symmetry X/Y, IU X/Y
-- `C.Dosim Haz Cuba(ELEC)` for electron energies: equivalent dosimetric params
-- `Caract Sistema Monitor Fot/Elect`: output (UM2 per 100 MU), repeatability, P,T correction
-- `Param Geom Haz Rad y sist colim`: Winston-Lutz components, field-light vs radiation coincidence
-- `MLC PD (m)`: MLC picket-fence / leaf position deviations
+A tree editor on the left, a cell picker on the right.
 
-You can edit, delete, or add to any of these in the template editor.
+```text
+[ + Add test ]
+▾ Sistema Monitor Starcheck     [✎ name] [🗑]
+   Admin:
+     Performers: [+ add cell] (B3) (B4)
+     Date:       (B2)               [pick]
+   ▾ Energy 6 MV                [+ nest] [+ data] [🗑]
+      ▾ Profile                 [+ nest] [+ data] [🗑]
+         • Beam center  C10  unit:[mm]  tol:[±2]      [🗑]
+         • Homogeneity  D10   unit:[%]  tol:[ref H2]  [🗑]
+      ▸ PDD
+   ▸ Energy 10 MV
+```
 
-## Dashboard
+Interactions:
+- **+ nest** / **+ data** buttons on each Nest add a child.
+- A data row shows: name input, cell ref chip (click to pick), unit input, tolerance input with a toggle "text ↔ cell ref".
+- Clicking any chip activates that slot; next cell click in the right-side `CellPicker` fills it. A small "Active target" indicator shows what's being assigned (e.g. "Filling: Beam center → value cell").
+- Admin cells use the same picker flow.
 
-`/` route — main view:
+Reuse existing `CellPicker`; extend `selected` to highlight all addresses currently bound across the active test.
 
-- Machine selector (TB1 / TB2 / TB3) and a multi-select for energies.
-- Category filter and frequency filter (monthly / quarterly / annual) so quarterly and annual tests don't get squashed against the monthly density.
-- Grid of small-multiple line charts (Recharts), one per test. Each chart:
-  - X axis = date, Y axis = value with unit.
-  - Tolerance band shown as a translucent green region; out-of-tolerance points highlighted red.
-  - Hover tooltip shows date, value, deviation, and the source file name.
-  - Multi-series tests (e.g. 4 gantry angles, or 6/10 MV) plotted as overlaid lines.
-- A "click a chart → detail" view with the full history table, CSV export of that test, and the ability to delete a bad import.
-- A small status header: per-machine last-import date and count of out-of-tolerance points in the last 12 months.
+## Migration
+- Bump IndexedDB `qa-dashboard` from v1 → v2; on upgrade, convert old `Template.tests[].cells[]` into a single `root` nest with each cell as a `DataPoint`, leaving `admin` empty. Old `defaultDateCell` becomes each test's `admin.date` if not set.
+- Drop `autoBuildTemplate`'s assumption of flat cells; reshape its output to use the new model (each detected code → test with `root` containing detected value cells as data points). Keep behavior so existing seeded templates still load.
 
-## Imports page
+## Import pipeline (`imports.tsx`, `seed.ts` consumers)
+- Replace flat `test.cells` traversal with a recursive walk over `root` that yields `{ testId, path: string[], dataPoint }` and produces `Measurement` rows. `cellLabel` becomes the joined nest path + data point name.
+- Tolerance parsing: if `tolerance.kind === "literal"`, regex `±N`, `N-M`, or plain number → `parsedTolerance`. If `cellRef`, resolve from the workbook at import time.
 
-`/imports` route — manages uploaded files:
+## Files touched
+- `src/lib/qa/types.ts` — new model + tolerance parser helper.
+- `src/lib/qa/db.ts` — schema v2 + migration.
+- `src/lib/qa/seed.ts` — emit new shape.
+- `src/lib/qa/excel.ts` — (if needed) helper to resolve a `CellRef` to a value.
+- `src/routes/templates.$machine.tsx` — full editor rewrite.
+- `src/routes/imports.tsx` — recursive measurement extraction.
+- `src/components/qa/TestChart.tsx` — read from data points instead of cells.
 
-- Drag-and-drop one or several `.xlsm` files; each is assigned to a machine (auto-detected from the `Equipo:` cell when possible, otherwise asked).
-- Shows a preview: which tests were extracted, with values; user confirms before committing to IndexedDB.
-- Lists past imports with file name, machine, date, count of values; delete reverses the import.
+## Out of scope (for this iteration)
+- Reordering nests via drag & drop (use simple up/down buttons).
+- Sharing nests across tests.
+- Importing tolerances from the workbook automatically.
 
-## Technical details
-
-- **Stack:** TanStack Start (already set up), Tailwind, shadcn/ui, Recharts, `xlsx` (SheetJS) for parsing, `idb` for typed IndexedDB access, `zod` for template schema validation. Everything client-side — no server functions, no Lovable Cloud.
-- **Routes:** `src/routes/index.tsx` (dashboard), `src/routes/imports.tsx`, `src/routes/templates.tsx`, `src/routes/templates.$machine.tsx` (per-machine editor).
-- **Data model (IndexedDB):**
-  - `machines`: `{ id: 'TB1'|'TB2'|'TB3', name, activeTemplateId }`
-  - `templates`: `{ id, machineId, version, createdAt, tests: TestDef[] }` where `TestDef = { id, name, category, energy, frequency, unit, tolerance: {type:'pm'|'range', ...}, cells: [{sheet, address, label?}], dateCell?: {sheet, address} }`
-  - `imports`: `{ id, machineId, fileName, importedAt, sourceDate, fileHash }`
-  - `measurements`: `{ id, importId, machineId, testId, cellLabel, date, value, inTolerance }`
-- **Parsing:** `xlsx` reads cells by A1 address. Empty/non-numeric cells become null (skipped). Dates parsed from Excel serial or string. Re-importing the same `(machineId, fileHash)` overwrites previous measurements from that file.
-- **Tolerance evaluation:** done at render time from `TestDef.tolerance`, not stored, so editing a tolerance updates the chart immediately.
-- **Backup:** Settings page button to export all IndexedDB contents (templates + measurements) as a single JSON file, and re-import. Critical because data is browser-local.
-
-## Out of scope (for this first build)
-
-- The qualitative `Resultados` sheet (can be added later).
-- Frequency due-date reminders and out-of-tolerance email alerts.
-- Multi-user sync — you chose local-only.
-
-## Build order
-
-1. Project shell: routes, IndexedDB wrapper, machine seed (TB1/TB2/TB3), shared layout with nav.
-2. Excel parser utility + `Fecha:` auto-detect, with unit tests against your sample file.
-3. Template editor with cell picker; seed an initial TB2 template from your March file.
-4. Imports page (upload → preview → commit).
-5. Dashboard with filters, small-multiple charts, tolerance bands, detail view.
-6. Backup export/import.
+Ready to implement on approval.
