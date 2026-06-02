@@ -236,7 +236,7 @@ function TemplateEditor() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
+      <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
         {/* Tests list */}
         <Card className="lg:max-h-[78vh] lg:overflow-auto">
           <CardHeader className="pb-3">
