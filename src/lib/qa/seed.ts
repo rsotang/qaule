@@ -67,7 +67,7 @@ export function autoBuildTemplate(parsed: ParsedWorkbook, machineId: MachineId):
         root.children = valueCells.map((cc, i): DataPoint => ({
           id: `dp-${counter}-${i}-${Math.random().toString(36).slice(2, 6)}`,
           kind: "data",
-          name: cc.label,
+          name: textValue(cc.label),
           cell: { sheet: sheet.name, address: cc.address },
         }));
         counter++;
