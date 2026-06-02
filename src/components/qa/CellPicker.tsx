@@ -12,7 +12,8 @@ interface Props {
   maxRows?: number;
 }
 
-export function CellPicker({ parsed, initialSheet, selected = [], onPick, maxRows = 60 }: Props) {
+export function CellPicker({ parsed, initialSheet, selected = [], onPick, maxRows }: Props) {
+
   const sheetNames = parsed.sheets.map((s) => s.name);
   const [active, setActive] = useState(initialSheet ?? sheetNames[0] ?? "");
 
