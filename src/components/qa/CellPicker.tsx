@@ -27,8 +27,9 @@ export function CellPicker({ parsed, initialSheet, selected = [], onPick, maxRow
 
   if (!sheet) return null;
 
-  const rows = Math.min(sheet.rows, maxRows);
-  const cols = Math.min(sheet.cols, 26);
+  const rows = maxRows ? Math.min(sheet.rows, maxRows) : sheet.rows;
+  const cols = sheet.cols;
+
 
   return (
     <div className="space-y-2">
