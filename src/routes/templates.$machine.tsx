@@ -284,7 +284,8 @@ function TemplateEditor() {
         </Card>
 
         {/* Editor + picker */}
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
+
           {editingTest ? (
             <TestEditor
               test={editingTest}
