@@ -236,7 +236,7 @@ function TemplateEditor() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
+      <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
         {/* Tests list */}
         <Card className="lg:max-h-[78vh] lg:overflow-auto">
           <CardHeader className="pb-3">
@@ -284,7 +284,8 @@ function TemplateEditor() {
         </Card>
 
         {/* Editor + picker */}
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
+
           {editingTest ? (
             <TestEditor
               test={editingTest}

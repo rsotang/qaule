@@ -12,7 +12,8 @@ interface Props {
   maxRows?: number;
 }
 
-export function CellPicker({ parsed, initialSheet, selected = [], onPick, maxRows = 60 }: Props) {
+export function CellPicker({ parsed, initialSheet, selected = [], onPick, maxRows }: Props) {
+
   const sheetNames = parsed.sheets.map((s) => s.name);
   const [active, setActive] = useState(initialSheet ?? sheetNames[0] ?? "");
 
@@ -26,8 +27,9 @@ export function CellPicker({ parsed, initialSheet, selected = [], onPick, maxRow
 
   if (!sheet) return null;
 
-  const rows = Math.min(sheet.rows, maxRows);
-  const cols = Math.min(sheet.cols, 26);
+  const rows = maxRows ? Math.min(sheet.rows, maxRows) : sheet.rows;
+  const cols = sheet.cols;
+
 
   return (
     <div className="space-y-2">
