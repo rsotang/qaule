@@ -38,18 +38,42 @@ export interface CellRef {
   label?: string;
 }
 
-/** Tolerance entered by the user — either literal text or a workbook cell reference */
-export type ToleranceValue =
-  | { kind: "literal"; text: string }
+/** A user-supplied value: either typed text or a workbook cell reference. */
+export type TextOrRef =
+  | { kind: "text"; text: string }
   | { kind: "cellRef"; sheet: string; address: string };
+
+/** Back-compat alias used by older code paths. */
+export type ToleranceValue = TextOrRef;
+
+export function textValue(text: string): TextOrRef {
+  return { kind: "text", text };
+}
+export function refValue(sheet: string, address: string): TextOrRef {
+  return { kind: "cellRef", sheet, address };
+}
+export function isCellRefValue(v: TextOrRef | undefined): v is { kind: "cellRef"; sheet: string; address: string } {
+  return !!v && v.kind === "cellRef";
+}
+/** Human display of a TextOrRef without resolving the workbook. */
+export function displayTextOrRef(v: TextOrRef | undefined, placeholder = ""): string {
+  if (!v) return placeholder;
+  if (v.kind === "text") return v.text || placeholder;
+  if (!v.sheet || !v.address) return placeholder;
+  return `[${v.sheet}!${v.address}]`;
+}
 
 export interface DataPoint {
   id: string;
   kind: "data";
-  name: string;
+  /** Display name — typed text or cell reference */
+  name: TextOrRef;
+  /** Value cell (where the measured number lives) */
   cell?: CellRef;
-  unit?: string;
-  tolerance?: ToleranceValue;
+  /** Optional add-ins (user toggles them on) */
+  unit?: TextOrRef;
+  tolerance?: TextOrRef;
+  reference?: TextOrRef;
   /** parsed/derived for plotting; recomputed at import time */
   parsedTolerance?: Tolerance;
 }
@@ -57,7 +81,7 @@ export interface DataPoint {
 export interface Nest {
   id: string;
   kind: "nest";
-  name: string;
+  name: TextOrRef;
   children: TreeNode[];
 }
 
@@ -114,43 +138,56 @@ export interface Measurement {
 // ---------- tree helpers ----------
 
 export function emptyNest(name = "raíz"): Nest {
-  return { id: `nest-${Math.random().toString(36).slice(2, 9)}`, kind: "nest", name, children: [] };
+  return { id: `nest-${Math.random().toString(36).slice(2, 9)}`, kind: "nest", name: textValue(name), children: [] };
 }
 
 export function newNest(name = "Nuevo grupo"): Nest {
-  return { id: `nest-${Math.random().toString(36).slice(2, 9)}`, kind: "nest", name, children: [] };
+  return { id: `nest-${Math.random().toString(36).slice(2, 9)}`, kind: "nest", name: textValue(name), children: [] };
 }
 
 export function newDataPoint(name = "Nuevo dato"): DataPoint {
-  return { id: `dp-${Math.random().toString(36).slice(2, 9)}`, kind: "data", name };
+  return { id: `dp-${Math.random().toString(36).slice(2, 9)}`, kind: "data", name: textValue(name) };
 }
 
 export interface WalkedDataPoint {
   dp: DataPoint;
-  path: string[]; // names of ancestor nests excluding root
+  path: TextOrRef[]; // names of ancestor nests excluding root
 }
 
 export function walkDataPoints(test: TestDef): WalkedDataPoint[] {
   const out: WalkedDataPoint[] = [];
-  const walk = (node: TreeNode, path: string[]) => {
+  const walk = (node: TreeNode, path: TextOrRef[]) => {
     if (node.kind === "data") {
       out.push({ dp: node, path });
     } else {
       for (const c of node.children) walk(c, [...path, node.name]);
     }
   };
-  // Skip root name in path
   for (const c of test.root.children) walk(c, []);
   return out;
 }
 
 export function dpSeriesLabel(walked: WalkedDataPoint): string {
-  return [...walked.path, walked.dp.name].filter(Boolean).join(" / ");
+  return [...walked.path.map((p) => displayTextOrRef(p, "?")), displayTextOrRef(walked.dp.name, "?")]
+    .filter(Boolean)
+    .join(" / ");
 }
 
 export function allBoundCells(test: TestDef): CellRef[] {
   const refs: CellRef[] = [];
-  for (const w of walkDataPoints(test)) if (w.dp.cell) refs.push(w.dp.cell);
+  const visit = (node: TreeNode) => {
+    if (node.kind === "data") {
+      if (node.cell) refs.push(node.cell);
+      for (const v of [node.name, node.unit, node.tolerance, node.reference]) {
+        if (isCellRefValue(v) && v.sheet && v.address) refs.push({ sheet: v.sheet, address: v.address });
+      }
+    } else {
+      if (isCellRefValue(node.name) && node.name.sheet && node.name.address)
+        refs.push({ sheet: node.name.sheet, address: node.name.address });
+      for (const c of node.children) visit(c);
+    }
+  };
+  for (const c of test.root.children) visit(c);
   if (test.admin.date) refs.push(test.admin.date);
   if (test.admin.performers) for (const p of test.admin.performers) refs.push(p);
   return refs;
@@ -182,7 +219,6 @@ export function removeNode(root: Nest, id: string): Nest {
 
 // ---------- tolerance helpers ----------
 
-/** Parse literal tolerance text such as "±2", "2", "1.5 - 3", "≤0.5" into a Tolerance. */
 export function parseToleranceText(text: string): Tolerance {
   const t = text.trim().replace(",", ".");
   if (!t) return { type: "none" };

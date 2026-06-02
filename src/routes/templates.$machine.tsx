@@ -13,7 +13,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, Save, Upload, Wand2, Copy, FolderPlus, FilePlus, ChevronRight, ChevronDown, X, Target } from "lucide-react";
+import {
+  Trash2, Plus, Save, Upload, Wand2, Copy, FolderPlus, FilePlus,
+  ChevronRight, ChevronDown, X, Target, Type, Hash,
+} from "lucide-react";
 import { toast } from "sonner";
 import { CellPicker } from "@/components/qa/CellPicker";
 import { listTemplates, saveTemplate, setActiveTemplate } from "@/lib/qa/db";
@@ -30,6 +33,9 @@ import {
   updateNode,
   walkDataPoints,
   allBoundCells,
+  textValue,
+  refValue,
+  displayTextOrRef,
   type CellRef,
   type Category,
   type DataPoint,
@@ -38,15 +44,19 @@ import {
   type Nest,
   type Template,
   type TestDef,
-  type ToleranceValue,
+  type TextOrRef,
   type TreeNode,
 } from "@/lib/qa/types";
 
 export const Route = createFileRoute("/templates/$machine")({ component: TemplateEditor });
 
+/** A field on a tree node that accepts TextOrRef. */
+type NodeField = "name" | "unit" | "tolerance" | "reference";
+
 /** What the user is about to fill from a click in the cell picker. */
 type TargetSlot =
-  | { kind: "dp"; testId: string; dpId: string; field: "cell" | "tolerance" }
+  | { kind: "node"; testId: string; nodeId: string; field: NodeField } // sets a TextOrRef field
+  | { kind: "cell"; testId: string; nodeId: string }                    // sets DataPoint.cell
   | { kind: "admin"; testId: string; field: "date" }
   | { kind: "admin-performer"; testId: string; index: number };
 
@@ -162,16 +172,23 @@ function TemplateEditor() {
       toast.info("Activa un destino (📍) antes de elegir celda");
       return;
     }
-    if (target.kind === "dp" && target.testId === editingTest.id) {
+    if (target.kind === "cell" && target.testId === editingTest.id) {
       patchTest(target.testId, (t) => ({
         ...t,
-        root: updateNode(t.root, target.dpId, (n) =>
-          n.kind === "data"
-            ? target.field === "cell"
-              ? { ...n, cell: ref }
-              : { ...n, tolerance: { kind: "cellRef", sheet: ref.sheet, address: ref.address } }
-            : n,
+        root: updateNode(t.root, target.nodeId, (n) =>
+          n.kind === "data" ? { ...n, cell: ref } : n,
         ),
+      }));
+    } else if (target.kind === "node" && target.testId === editingTest.id) {
+      patchTest(target.testId, (t) => ({
+        ...t,
+        root: updateNode(t.root, target.nodeId, (n) => {
+          if (n.kind === "nest") {
+            return target.field === "name" ? { ...n, name: refValue(ref.sheet, ref.address) } : n;
+          }
+          const key = target.field;
+          return { ...(n as DataPoint), [key]: refValue(ref.sheet, ref.address) } as DataPoint;
+        }),
       }));
     } else if (target.kind === "admin" && target.field === "date") {
       patchTest(target.testId, (t) => ({ ...t, admin: { ...t.admin, date: ref } }));
@@ -285,7 +302,6 @@ function TemplateEditor() {
 
         {/* Editor + picker */}
         <div className="min-w-0 space-y-4">
-
           {editingTest ? (
             <TestEditor
               test={editingTest}
@@ -347,10 +363,22 @@ function describeTarget(target: TargetSlot, test: TestDef | null): string {
   if (!test) return "—";
   if (target.kind === "admin") return `${test.name} → fecha`;
   if (target.kind === "admin-performer") return `${test.name} → operador #${target.index + 1}`;
-  // dp
-  const walk = walkDataPoints(test).find((w) => w.dp.id === target.dpId);
-  const name = walk ? [...walk.path, walk.dp.name].join(" / ") : "?";
-  return `${name} → ${target.field === "cell" ? "celda valor" : "tolerancia (ref)"}`;
+  // node or cell
+  const walked = walkDataPoints(test);
+  const w = walked.find((x) => x.dp.id === target.nodeId);
+  const labelFromNode = (() => {
+    if (w) return [...w.path.map((p) => displayTextOrRef(p, "?")), displayTextOrRef(w.dp.name, "?")].join(" / ");
+    // search nests
+    const findNest = (n: Nest): Nest | null => {
+      if (n.id === target.nodeId) return n;
+      for (const c of n.children) if (c.kind === "nest") { const r = findNest(c); if (r) return r; }
+      return null;
+    };
+    const nest = findNest(test.root);
+    return nest ? displayTextOrRef(nest.name, "(grupo)") : "?";
+  })();
+  if (target.kind === "cell") return `${labelFromNode} → celda valor`;
+  return `${labelFromNode} → ${target.field}`;
 }
 
 // ---------------- TestEditor ----------------
@@ -529,16 +557,23 @@ function TreeNodeView({
   const pad = { paddingLeft: `${depth * 16}px` };
 
   if (node.kind === "nest") {
+    const nameActive =
+      target?.kind === "node" && target.nodeId === node.id && target.field === "name";
     return (
       <div>
         <div className="flex items-center gap-1 rounded-md border bg-card p-1.5" style={pad}>
           <button onClick={() => setOpen(!open)} className="text-muted-foreground">
             {open ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
           </button>
-          <Input
+          <TextOrRefField
             value={node.name}
-            onChange={(e) => onUpdate(node.id, (n) => ({ ...n, name: e.target.value }))}
-            className="h-7 flex-1 text-xs font-medium"
+            placeholder="nombre del grupo"
+            active={nameActive}
+            onChange={(v) => onUpdate(node.id, (n) => ({ ...(n as Nest), name: v }))}
+            onActivate={() =>
+              setTarget({ kind: "node", testId: test.id, nodeId: node.id, field: "name" })
+            }
+            className="flex-1"
           />
           <Button size="sm" variant="ghost" className="h-7 px-2 text-[10px]" onClick={() => onAddChild(node.id, "nest")}>
             <FolderPlus className="size-3" /> nest
@@ -573,77 +608,79 @@ function TreeNodeView({
 
   // Data point row
   const dp = node;
-  const cellActive = target?.kind === "dp" && target.dpId === dp.id && target.field === "cell";
-  const tolActive = target?.kind === "dp" && target.dpId === dp.id && target.field === "tolerance";
-  const tolKind = dp.tolerance?.kind ?? "literal";
+  const isActive = (field: NodeField) =>
+    target?.kind === "node" && target.nodeId === dp.id && target.field === field;
+  const cellActive = target?.kind === "cell" && target.nodeId === dp.id;
+
+  const setField = (field: NodeField, v: TextOrRef | undefined) =>
+    onUpdate(dp.id, (n) => ({ ...(n as DataPoint), [field]: v }) as DataPoint);
+
+  const addOns: { key: "unit" | "tolerance" | "reference"; label: string }[] = [
+    { key: "unit", label: "unidad" },
+    { key: "tolerance", label: "tolerancia" },
+    { key: "reference", label: "referencia" },
+  ];
+  const missing = addOns.filter((a) => dp[a.key] == null);
 
   return (
     <div className="rounded-md border bg-muted/20 p-1.5" style={pad}>
       <div className="flex flex-wrap items-center gap-1">
-        <Input
+        <TextOrRefField
           value={dp.name}
-          onChange={(e) => onUpdate(dp.id, (n) => ({ ...(n as DataPoint), name: e.target.value }))}
-          placeholder="Nombre del dato"
-          className="h-7 w-48 text-xs"
+          placeholder="nombre del dato"
+          active={isActive("name")}
+          onChange={(v) => setField("name", v)}
+          onActivate={() =>
+            setTarget({ kind: "node", testId: test.id, nodeId: dp.id, field: "name" })
+          }
+          className="w-56"
         />
         <CellChip
           cell={dp.cell}
           active={cellActive}
-          onActivate={() => setTarget({ kind: "dp", testId: test.id, dpId: dp.id, field: "cell" })}
+          label="celda valor"
+          onActivate={() => setTarget({ kind: "cell", testId: test.id, nodeId: dp.id })}
           onClear={() => onUpdate(dp.id, (n) => ({ ...(n as DataPoint), cell: undefined }))}
         />
-        <Input
-          value={dp.unit ?? ""}
-          onChange={(e) => onUpdate(dp.id, (n) => ({ ...(n as DataPoint), unit: e.target.value }))}
-          placeholder="unidad"
-          className="h-7 w-20 text-xs"
-        />
-        <Select
-          value={tolKind}
-          onValueChange={(v) => {
-            const next: ToleranceValue =
-              v === "literal"
-                ? { kind: "literal", text: dp.tolerance?.kind === "literal" ? dp.tolerance.text : "" }
-                : dp.tolerance?.kind === "cellRef"
-                  ? dp.tolerance
-                  : { kind: "cellRef", sheet: "", address: "" };
-            onUpdate(dp.id, (n) => ({ ...(n as DataPoint), tolerance: next }));
-          }}
-        >
-          <SelectTrigger className="h-7 w-[90px] text-xs"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="literal">tol. texto</SelectItem>
-            <SelectItem value="cellRef">tol. celda</SelectItem>
-          </SelectContent>
-        </Select>
-        {tolKind === "literal" ? (
-          <Input
-            value={dp.tolerance?.kind === "literal" ? dp.tolerance.text : ""}
-            onChange={(e) =>
-              onUpdate(dp.id, (n) => ({
-                ...(n as DataPoint),
-                tolerance: { kind: "literal", text: e.target.value },
-              }))
-            }
-            placeholder="±2, 1-3, ≤0.5…"
-            className="h-7 w-32 text-xs"
-          />
-        ) : (
-          <CellChip
-            cell={
-              dp.tolerance?.kind === "cellRef"
-                ? { sheet: dp.tolerance.sheet, address: dp.tolerance.address }
-                : undefined
-            }
-            active={tolActive}
-            onActivate={() => setTarget({ kind: "dp", testId: test.id, dpId: dp.id, field: "tolerance" })}
-            onClear={() =>
-              onUpdate(dp.id, (n) => ({
-                ...(n as DataPoint),
-                tolerance: { kind: "cellRef", sheet: "", address: "" },
-              }))
-            }
-          />
+        {addOns
+          .filter((a) => dp[a.key] != null)
+          .map((a) => (
+            <div key={a.key} className="flex items-center gap-1 rounded border bg-card px-1 py-0.5">
+              <span className="text-[9px] uppercase text-muted-foreground">{a.label}</span>
+              <TextOrRefField
+                value={dp[a.key]}
+                placeholder={a.label}
+                active={isActive(a.key)}
+                onChange={(v) => setField(a.key, v)}
+                onActivate={() =>
+                  setTarget({ kind: "node", testId: test.id, nodeId: dp.id, field: a.key })
+                }
+                className="w-32"
+              />
+              <button
+                onClick={() => setField(a.key, undefined)}
+                className="text-muted-foreground hover:text-destructive"
+                title={`quitar ${a.label}`}
+              >
+                <X className="size-3" />
+              </button>
+            </div>
+          ))}
+        {missing.length > 0 && (
+          <Select
+            value=""
+            onValueChange={(v) => setField(v as NodeField, textValue(""))}
+          >
+            <SelectTrigger className="h-7 w-[110px] text-[10px]">
+              <Plus className="size-3" />
+              <SelectValue placeholder="añadir" />
+            </SelectTrigger>
+            <SelectContent>
+              {missing.map((a) => (
+                <SelectItem key={a.key} value={a.key} className="text-xs">+ {a.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         )}
         <Button size="icon" variant="ghost" className="size-7" onClick={() => onRemove(dp.id)}>
           <Trash2 className="size-3 text-destructive" />
@@ -655,14 +692,71 @@ function TreeNodeView({
 
 // ---------------- bits ----------------
 
+/** Edits a TextOrRef: toggle between typed text and a cell reference. */
+function TextOrRefField({
+  value,
+  placeholder,
+  active,
+  onChange,
+  onActivate,
+  className,
+}: {
+  value: TextOrRef | undefined;
+  placeholder?: string;
+  active: boolean;
+  onChange: (v: TextOrRef) => void;
+  onActivate: () => void;
+  className?: string;
+}) {
+  const v: TextOrRef = value ?? textValue("");
+  const isText = v.kind === "text";
+
+  return (
+    <div className={`flex items-center gap-1 ${className ?? ""}`}>
+      <button
+        type="button"
+        onClick={() =>
+          onChange(isText ? { kind: "cellRef", sheet: "", address: "" } : textValue(""))
+        }
+        className="rounded border bg-card p-1 text-muted-foreground hover:text-foreground"
+        title={isText ? "Cambiar a celda" : "Cambiar a texto"}
+      >
+        {isText ? <Type className="size-3" /> : <Hash className="size-3" />}
+      </button>
+      {isText ? (
+        <Input
+          value={v.text}
+          onChange={(e) => onChange(textValue(e.target.value))}
+          placeholder={placeholder}
+          className="h-7 flex-1 text-xs"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={onActivate}
+          className={`inline-flex h-7 flex-1 items-center gap-1 rounded border px-2 text-[10px] font-mono ${
+            active ? "border-primary text-primary" : "text-muted-foreground hover:text-foreground"
+          }`}
+          title={v.sheet ? `${v.sheet}!${v.address}` : "Activar y seleccionar celda"}
+        >
+          <Target className={`size-3 ${active ? "text-primary" : ""}`} />
+          {v.sheet && v.address ? `${truncate(v.sheet, 10)}!${v.address}` : "sin asignar"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function CellChip({
   cell,
   active,
+  label,
   onActivate,
   onClear,
 }: {
   cell?: CellRef;
   active: boolean;
+  label?: string;
   onActivate: () => void;
   onClear: () => void;
 }) {
@@ -672,10 +766,10 @@ function CellChip({
       <button
         onClick={onActivate}
         className={`inline-flex items-center gap-1 ${active ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-        title={hasCell ? `${cell!.sheet}!${cell!.address}` : "Activar para seleccionar"}
+        title={hasCell ? `${cell!.sheet}!${cell!.address}` : label ?? "Activar para seleccionar"}
       >
         <Target className={`size-3 ${active ? "text-primary" : ""}`} />
-        {hasCell ? `${truncate(cell!.sheet, 10)}!${cell!.address}` : "sin asignar"}
+        {hasCell ? `${truncate(cell!.sheet, 10)}!${cell!.address}` : label ?? "sin asignar"}
       </button>
       {hasCell && (
         <button onClick={onClear} className="text-muted-foreground hover:text-destructive">

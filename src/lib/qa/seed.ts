@@ -1,7 +1,8 @@
 import * as XLSX from "xlsx";
 import type { Category, MachineId, Template, TestDef, Nest, DataPoint } from "./types";
-import { emptyNest } from "./types";
+import { emptyNest, textValue } from "./types";
 import type { ParsedSheet, ParsedWorkbook } from "./excel";
+
 
 const TEST_CODE_RE = /\b([A-ZÁÉÍÓÚÑ]{2,6})\s+(\d+(?:\.\d+){1,3})\b/;
 
@@ -66,7 +67,7 @@ export function autoBuildTemplate(parsed: ParsedWorkbook, machineId: MachineId):
         root.children = valueCells.map((cc, i): DataPoint => ({
           id: `dp-${counter}-${i}-${Math.random().toString(36).slice(2, 6)}`,
           kind: "data",
-          name: cc.label,
+          name: textValue(cc.label),
           cell: { sheet: sheet.name, address: cc.address },
         }));
         counter++;
