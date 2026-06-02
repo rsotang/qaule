@@ -1,6 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import type { ImportRecord, MachineRecord, Measurement, Template, TestDef } from "./types";
-import { MACHINES, emptyNest } from "./types";
+import type { ImportRecord, MachineRecord, Measurement, Template, TestDef, Nest, TreeNode, TextOrRef } from "./types";
+import { MACHINES, emptyNest, textValue } from "./types";
 
 interface QASchema extends DBSchema {
   machines: { key: string; value: MachineRecord };
@@ -15,19 +15,69 @@ interface QASchema extends DBSchema {
 
 let dbPromise: Promise<IDBPDatabase<QASchema>> | null = null;
 
-/** Convert a legacy test (flat cells[]) into the new nested shape. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toTextOrRef(v: any): TextOrRef | undefined {
+  if (v == null) return undefined;
+  if (typeof v === "string") return textValue(v);
+  if (typeof v === "object") {
+    if (v.kind === "text" || v.kind === "literal") return { kind: "text", text: v.text ?? "" };
+    if (v.kind === "cellRef") return { kind: "cellRef", sheet: v.sheet ?? "", address: v.address ?? "" };
+  }
+  return undefined;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function migrateNode(n: any): TreeNode {
+  if (n && n.kind === "nest") {
+    return {
+      id: n.id,
+      kind: "nest",
+      name: toTextOrRef(n.name) ?? textValue(""),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      children: (n.children ?? []).map((c: any) => migrateNode(c)),
+    } as Nest;
+  }
+  return {
+    id: n.id,
+    kind: "data",
+    name: toTextOrRef(n.name) ?? textValue(""),
+    cell: n.cell,
+    unit: toTextOrRef(n.unit),
+    tolerance: toTextOrRef(n.tolerance),
+    reference: toTextOrRef(n.reference),
+    parsedTolerance: n.parsedTolerance,
+  };
+}
+
+/** Convert any legacy test into the current shape. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function migrateLegacyTest(t: any): TestDef {
-  if (t && t.root && t.admin) return t as TestDef; // already migrated
+  if (t && t.root) {
+    const root: Nest = {
+      id: t.root.id,
+      kind: "nest",
+      name: toTextOrRef(t.root.name) ?? textValue("raíz"),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      children: (t.root.children ?? []).map((c: any) => migrateNode(c)),
+    };
+    return {
+      id: t.id,
+      name: t.name,
+      category: t.category,
+      frequency: t.frequency,
+      admin: t.admin ?? {},
+      root,
+    };
+  }
+  // v1 flat -> current
   const root = emptyNest("raíz");
   const cells: { sheet: string; address: string; label?: string }[] = t.cells ?? [];
   root.children = cells.map((c, i) => ({
     id: `dp-mig-${i}-${Math.random().toString(36).slice(2, 6)}`,
     kind: "data" as const,
-    name: c.label || `dato ${i + 1}`,
+    name: textValue(c.label || `dato ${i + 1}`),
     cell: { sheet: c.sheet, address: c.address },
-    unit: t.unit || undefined,
-    tolerance: undefined,
+    unit: t.unit ? textValue(t.unit) : undefined,
     parsedTolerance: t.tolerance,
   }));
   return {
@@ -45,7 +95,7 @@ export function getDB() {
     throw new Error("IndexedDB unavailable (SSR)");
   }
   if (!dbPromise) {
-    dbPromise = openDB<QASchema>("qa-dashboard", 2, {
+    dbPromise = openDB<QASchema>("qa-dashboard", 3, {
       upgrade(db, oldVersion, _newVersion, tx) {
         if (oldVersion < 1) {
           db.createObjectStore("machines", { keyPath: "id" });
@@ -58,8 +108,7 @@ export function getDB() {
           m.createIndex("byImport", "importId");
           m.createIndex("byTest", "testId");
         }
-        if (oldVersion < 2) {
-          // Migrate templates: flat cells[] -> nested root
+        if (oldVersion < 3) {
           const store = tx.objectStore("templates");
           void store.openCursor().then(async function next(cursor) {
             while (cursor) {
