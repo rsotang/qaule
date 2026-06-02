@@ -125,7 +125,7 @@ function resolveTolerance(
   parsed: ParsedWorkbook,
 ): Tolerance | undefined {
   if (!tol) return undefined;
-  if (tol.kind === "literal") return parseToleranceText(tol.text);
+  if (tol.kind === "text") return parseToleranceText(tol.text);
   const v = readCell(parsed, { sheet: tol.sheet, address: tol.address });
   if (v == null) return undefined;
   return parseToleranceText(String(v));
