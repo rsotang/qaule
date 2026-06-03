@@ -205,8 +205,8 @@ function VisualizationPage() {
           </CardContent>
         </Card>
 
-        {/* Parameter selectors — horizontally to the right */}
-        <div className="flex min-w-0 flex-1 flex-wrap items-start gap-3">
+        {/* Parameter selectors — each row stacks vertically; dropdowns inside flow horizontally */}
+        <div className="flex min-w-0 flex-1 flex-col gap-3">
           {series.map((s, idx) => {
             const tpl = templateFor(s.machineId);
             const test = tpl?.tests.find((t) => t.id === s.testId) ?? null;
@@ -229,7 +229,7 @@ function VisualizationPage() {
             }
 
             return (
-              <Card key={s.id} className="w-[280px] shrink-0" style={{ borderLeft: `4px solid ${COLORS[idx % COLORS.length]}` }}>
+              <Card key={s.id} style={{ borderLeft: `4px solid ${COLORS[idx % COLORS.length]}` }}>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm">Parámetro {idx + 1}</CardTitle>
                   {series.length > 1 && (
@@ -238,73 +238,75 @@ function VisualizationPage() {
                     </Button>
                   )}
                 </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="space-y-1">
-                    <Label className="text-[10px] uppercase text-muted-foreground">Máquina</Label>
-                    <Select
-                      value={s.machineId || undefined}
-                      onValueChange={(v) =>
-                        updateSeries(s.id, { machineId: v as MachineId, testId: "", path: [] })
-                      }
-                    >
-                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecciona máquina" /></SelectTrigger>
-                      <SelectContent>
-                        {MACHINES.map((m) => (
-                          <SelectItem key={m.id} value={m.id}>{m.id} — {m.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {tpl && (
-                    <div className="space-y-1">
-                      <Label className="text-[10px] uppercase text-muted-foreground">Test</Label>
+                <CardContent>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="w-[180px] space-y-1">
+                      <Label className="text-[10px] uppercase text-muted-foreground">Máquina</Label>
                       <Select
-                        value={s.testId || undefined}
-                        onValueChange={(v) => updateSeries(s.id, { testId: v, path: [] })}
+                        value={s.machineId || undefined}
+                        onValueChange={(v) =>
+                          updateSeries(s.id, { machineId: v as MachineId, testId: "", path: [] })
+                        }
                       >
-                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecciona test" /></SelectTrigger>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecciona máquina" /></SelectTrigger>
                         <SelectContent>
-                          {tpl.tests.map((t) => (
-                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                          {MACHINES.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>{m.id} — {m.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
-                  )}
 
-                  {levels.map(({ current, selectedId, depth }) => {
-                    if (current.children.length === 0) return null;
-                    return (
-                      <div key={depth} className="space-y-1">
-                        <Label className="text-[10px] uppercase text-muted-foreground">
-                          Nivel {depth + 1}
-                        </Label>
+                    {tpl && (
+                      <div className="w-[200px] space-y-1">
+                        <Label className="text-[10px] uppercase text-muted-foreground">Test</Label>
                         <Select
-                          value={selectedId}
-                          onValueChange={(v) => {
-                            const nextPath = [...s.path.slice(0, depth), v];
-                            updateSeries(s.id, { path: nextPath });
-                          }}
+                          value={s.testId || undefined}
+                          onValueChange={(v) => updateSeries(s.id, { testId: v, path: [] })}
                         >
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder="Selecciona..." />
-                          </SelectTrigger>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecciona test" /></SelectTrigger>
                           <SelectContent>
-                            {current.children.map((c) => (
-                              <SelectItem key={c.id} value={c.id}>
-                                {nodeName(c)}
-                                {c.kind === "data" ? " ●" : ""}
-                              </SelectItem>
+                            {tpl.tests.map((t) => (
+                              <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
-                    );
-                  })}
+                    )}
+
+                    {levels.map(({ current, selectedId, depth }) => {
+                      if (current.children.length === 0) return null;
+                      return (
+                        <div key={depth} className="w-[180px] space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground">
+                            Nivel {depth + 1}
+                          </Label>
+                          <Select
+                            value={selectedId}
+                            onValueChange={(v) => {
+                              const nextPath = [...s.path.slice(0, depth), v];
+                              updateSeries(s.id, { path: nextPath });
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Selecciona..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {current.children.map((c) => (
+                                <SelectItem key={c.id} value={c.id}>
+                                  {nodeName(c)}
+                                  {c.kind === "data" ? " ●" : ""}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      );
+                    })}
+                  </div>
 
                   {leaf && (
-                    <div className="rounded border border-dashed bg-muted/30 p-2 text-[10px] text-muted-foreground">
+                    <div className="mt-2 rounded border border-dashed bg-muted/30 p-2 text-[10px] text-muted-foreground">
                       <div className="font-medium text-foreground">{chainSeriesKey(chain)}</div>
                       {leaf.parsedTolerance && leaf.parsedTolerance.type !== "none" && (
                         <div>Tolerancia: {displayTextOrRef(leaf.tolerance, "—")}</div>
@@ -319,7 +321,7 @@ function VisualizationPage() {
 
           <Button
             variant="outline"
-            className="h-[60px] w-[180px] shrink-0 border-dashed"
+            className="h-10 w-full border-dashed"
             onClick={() => setSeries((p) => [...p, newSeries()])}
           >
             <Plus className="mr-2 size-4" />
