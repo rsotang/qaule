@@ -11,41 +11,102 @@ import {
   Legend,
 } from "recharts";
 import type { Measurement, TestDef } from "@/lib/qa/types";
-import { toleranceBand, evaluateTolerance, walkDataPoints, dpSeriesLabel } from "@/lib/qa/types";
+import { toleranceBand, evaluateTolerance, walkDataPoints } from "@/lib/qa/types";
 
 interface Props {
   test: TestDef;
   measurements: Measurement[];
+  height?: number;
+  seriesFilter?: string[];
+  dateFrom?: string;
+  dateTo?: string;
+  ootOnly?: boolean;
+  groupByNest?: boolean;
+  showLegend?: boolean;
 }
 
-const SERIES_COLORS = ["#2563eb", "#dc2626", "#16a34a", "#ca8a04", "#9333ea", "#0891b2"];
+const SERIES_COLORS = ["#2563eb", "#dc2626", "#16a34a", "#ca8a04", "#9333ea", "#0891b2", "#db2777", "#0d9488"];
 
-export function TestChart({ test, measurements }: Props) {
+export function TestChart({
+  test,
+  measurements,
+  height = 220,
+  seriesFilter,
+  dateFrom,
+  dateTo,
+  ootOnly,
+  groupByNest,
+  showLegend,
+}: Props) {
   const { data, series, band, hasOOT } = useMemo(() => {
     const walked = walkDataPoints(test);
-    const series = walked.map((w) => ({
-      key: dpSeriesLabel(w),
-      tol: w.dp.parsedTolerance,
-    }));
-    const byDate = new Map<string, Record<string, number | string>>();
+    // Map original cellLabel -> displayed series key (collapsed if grouping)
+    const keyFor = (label: string) => {
+      if (!groupByNest) return label;
+      const parts = label.split(" / ");
+      return parts.length > 1 ? parts.slice(0, -1).join(" / ") : label;
+    };
+    const tolFor = new Map<string, typeof walked[number]["dp"]["parsedTolerance"]>();
+    for (const w of walked) {
+      const fullKey = [...w.path.map((p) => p), w.dp.name]
+        .map((v) => (v.kind === "text" ? v.text : `[${v.sheet}!${v.address}]`))
+        .join(" / ");
+      tolFor.set(keyFor(fullKey), w.dp.parsedTolerance);
+    }
+    const allKeys = [...new Set(walked.map((w) => {
+      const full = [...w.path, w.dp.name]
+        .map((v) => (v.kind === "text" ? v.text : `[${v.sheet}!${v.address}]`))
+        .join(" / ");
+      return keyFor(full);
+    }))];
+    const activeKeys = seriesFilter ? allKeys.filter((k) => seriesFilter.includes(k)) : allKeys;
+    const series = activeKeys.map((key) => ({ key, tol: tolFor.get(key) }));
+
+    // Aggregate by date -> key -> values[]
+    const byDate = new Map<string, Map<string, number[]>>();
     for (const m of measurements) {
       if (m.testId !== test.id) continue;
-      const row = byDate.get(m.date) ?? { date: m.date };
-      row[m.cellLabel] = m.value;
-      byDate.set(m.date, row);
+      if (dateFrom && m.date < dateFrom) continue;
+      if (dateTo && m.date > dateTo) continue;
+      const key = keyFor(m.cellLabel);
+      if (!activeKeys.includes(key)) continue;
+      let dayMap = byDate.get(m.date);
+      if (!dayMap) {
+        dayMap = new Map();
+        byDate.set(m.date, dayMap);
+      }
+      const arr = dayMap.get(key) ?? [];
+      arr.push(m.value);
+      dayMap.set(key, arr);
     }
-    const data = [...byDate.values()].sort((a, b) =>
-      String(a.date).localeCompare(String(b.date)),
-    );
+    const data = [...byDate.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, kmap]) => {
+        const row: Record<string, number | string> = { date };
+        for (const [k, arr] of kmap) {
+          row[k] = arr.reduce((a, b) => a + b, 0) / arr.length;
+        }
+        return row;
+      });
+
     const band = toleranceBand(series[0]?.tol);
     let hasOOT = false;
-    for (const m of measurements) {
-      if (m.testId !== test.id) continue;
-      const s = series.find((x) => x.key === m.cellLabel);
-      if (s && !evaluateTolerance(s.tol, m.value).inTolerance) hasOOT = true;
+    const filteredData = ootOnly
+      ? data.filter((row) =>
+          series.some((s) => {
+            const v = row[s.key];
+            return typeof v === "number" && !evaluateTolerance(s.tol, v).inTolerance;
+          }),
+        )
+      : data;
+    for (const row of data) {
+      for (const s of series) {
+        const v = row[s.key];
+        if (typeof v === "number" && !evaluateTolerance(s.tol, v).inTolerance) hasOOT = true;
+      }
     }
-    return { data, series, band, hasOOT };
-  }, [test, measurements]);
+    return { data: filteredData, series, band, hasOOT };
+  }, [test, measurements, seriesFilter, dateFrom, dateTo, ootOnly, groupByNest]);
 
   if (data.length === 0) {
     return (
@@ -69,7 +130,7 @@ export function TestChart({ test, measurements }: Props) {
   yMax += pad;
 
   return (
-    <div className="h-[220px] w-full">
+    <div className="w-full" style={{ height }}>
       <ResponsiveContainer>
         <LineChart data={data} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
@@ -128,7 +189,7 @@ export function TestChart({ test, measurements }: Props) {
               isAnimationActive={false}
             />
           ))}
-          {series.length > 1 && <Legend wrapperStyle={{ fontSize: 10 }} />}
+          {(showLegend || series.length > 1) && <Legend wrapperStyle={{ fontSize: 10 }} />}
         </LineChart>
       </ResponsiveContainer>
       {hasOOT && (
