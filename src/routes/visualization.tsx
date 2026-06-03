@@ -222,7 +222,7 @@ function VisualizationPage() {
                 const selectedId = s.path[depth];
                 levels.push({ current: nest, selectedId, depth });
                 if (!selectedId) break;
-                const child = nest.children.find((c) => c.id === selectedId);
+                const child: TreeNode | undefined = nest.children.find((c) => c.id === selectedId);
                 if (!child || child.kind !== "nest") break;
                 nest = child;
                 depth += 1;
