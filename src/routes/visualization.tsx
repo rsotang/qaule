@@ -360,42 +360,45 @@ function VisualizationPage() {
                         }}
                       />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
-                      {resolved.map((r) => {
-                        if (!r.leaf) return null;
+                      {resolved.flatMap((r) => {
+                        if (!r.leaf) return [];
                         const band = toleranceBand(r.leaf.parsedTolerance);
                         const refVal = parseRefNumber(r.leaf.reference);
-                        return (
-                          <g key={r.sel.id}>
-                            {band && (
-                              <ReferenceLine
-                                y={band.min}
-                                stroke={r.color}
-                                strokeWidth={1.5}
-                                ifOverflow="extendDomain"
-                                label={{ value: `Tol min`, fill: r.color, fontSize: 9, position: "insideBottomRight" }}
-                              />
-                            )}
-                            {band && (
-                              <ReferenceLine
-                                y={band.max}
-                                stroke={r.color}
-                                strokeWidth={1.5}
-                                ifOverflow="extendDomain"
-                                label={{ value: `Tol max`, fill: r.color, fontSize: 9, position: "insideTopRight" }}
-                              />
-                            )}
-                            {refVal != null && (
-                              <ReferenceLine
-                                y={refVal}
-                                stroke={r.color}
-                                strokeDasharray="6 4"
-                                strokeWidth={1.5}
-                                ifOverflow="extendDomain"
-                                label={{ value: `Ref`, fill: r.color, fontSize: 9, position: "insideTopLeft" }}
-                              />
-                            )}
-                          </g>
-                        );
+                        const lines = [];
+                        if (band) {
+                          lines.push(
+                            <ReferenceLine
+                              key={`${r.sel.id}-tmin`}
+                              y={band.min}
+                              stroke={r.color}
+                              strokeWidth={1.5}
+                              ifOverflow="extendDomain"
+                              label={{ value: "Tol min", fill: r.color, fontSize: 9, position: "insideBottomRight" }}
+                            />,
+                            <ReferenceLine
+                              key={`${r.sel.id}-tmax`}
+                              y={band.max}
+                              stroke={r.color}
+                              strokeWidth={1.5}
+                              ifOverflow="extendDomain"
+                              label={{ value: "Tol max", fill: r.color, fontSize: 9, position: "insideTopRight" }}
+                            />,
+                          );
+                        }
+                        if (refVal != null) {
+                          lines.push(
+                            <ReferenceLine
+                              key={`${r.sel.id}-ref`}
+                              y={refVal}
+                              stroke={r.color}
+                              strokeDasharray="6 4"
+                              strokeWidth={1.5}
+                              ifOverflow="extendDomain"
+                              label={{ value: "Ref", fill: r.color, fontSize: 9, position: "insideTopLeft" }}
+                            />,
+                          );
+                        }
+                        return lines;
                       })}
                       {resolved.map((r, i) => {
                         if (!r.leaf) return null;
