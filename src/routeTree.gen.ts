@@ -9,12 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VisualizationRouteImport } from './routes/visualization'
 import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as ImportsRouteImport } from './routes/imports'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TemplatesIndexRouteImport } from './routes/templates.index'
 import { Route as TemplatesMachineRouteImport } from './routes/templates.$machine'
 
+const VisualizationRoute = VisualizationRouteImport.update({
+  id: '/visualization',
+  path: '/visualization',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TemplatesRoute = TemplatesRouteImport.update({
   id: '/templates',
   path: '/templates',
@@ -45,12 +51,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/imports': typeof ImportsRoute
   '/templates': typeof TemplatesRouteWithChildren
+  '/visualization': typeof VisualizationRoute
   '/templates/$machine': typeof TemplatesMachineRoute
   '/templates/': typeof TemplatesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/imports': typeof ImportsRoute
+  '/visualization': typeof VisualizationRoute
   '/templates/$machine': typeof TemplatesMachineRoute
   '/templates': typeof TemplatesIndexRoute
 }
@@ -59,6 +67,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/imports': typeof ImportsRoute
   '/templates': typeof TemplatesRouteWithChildren
+  '/visualization': typeof VisualizationRoute
   '/templates/$machine': typeof TemplatesMachineRoute
   '/templates/': typeof TemplatesIndexRoute
 }
@@ -68,15 +77,17 @@ export interface FileRouteTypes {
     | '/'
     | '/imports'
     | '/templates'
+    | '/visualization'
     | '/templates/$machine'
     | '/templates/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/imports' | '/templates/$machine' | '/templates'
+  to: '/' | '/imports' | '/visualization' | '/templates/$machine' | '/templates'
   id:
     | '__root__'
     | '/'
     | '/imports'
     | '/templates'
+    | '/visualization'
     | '/templates/$machine'
     | '/templates/'
   fileRoutesById: FileRoutesById
@@ -85,10 +96,18 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ImportsRoute: typeof ImportsRoute
   TemplatesRoute: typeof TemplatesRouteWithChildren
+  VisualizationRoute: typeof VisualizationRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/visualization': {
+      id: '/visualization'
+      path: '/visualization'
+      fullPath: '/visualization'
+      preLoaderRoute: typeof VisualizationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/templates': {
       id: '/templates'
       path: '/templates'
@@ -145,7 +164,18 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ImportsRoute: ImportsRoute,
   TemplatesRoute: TemplatesRouteWithChildren,
+  VisualizationRoute: VisualizationRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
