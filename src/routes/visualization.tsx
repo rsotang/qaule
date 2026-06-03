@@ -64,7 +64,7 @@ function resolveChain(root: Nest, path: string[]): TreeNode[] {
   let current: TreeNode = root;
   for (const id of path) {
     if (current.kind !== "nest") break;
-    const next = current.children.find((c) => c.id === id);
+    const next: TreeNode | undefined = current.children.find((c) => c.id === id);
     if (!next) break;
     chain.push(next);
     current = next;
