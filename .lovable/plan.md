@@ -1,94 +1,59 @@
-# Plan: Nested Template Editor
+# Dashboard refactor + new Visualization tab
 
-## Goal
-Replace the flat `cells[]` per test with a tree of **nests** that can contain other nests or **data points**. Each test also gets **admin cells** (performers, date). Each data point has its own cell ref, tolerance, and unit.
+## 1. Navigation
+- Update `src/components/qa/AppShell.tsx` to add a new nav link **Visualización** between Dashboard and Importaciones, using a `LineChart` icon.
 
-## New data model (`src/lib/qa/types.ts`)
+## 2. Data model (small additions)
+- Extend `MachineRecord` in `src/lib/qa/types.ts` with an optional `state: "ok" | "warning" | "critical"` and `stateNote?: string`.
+- Add `updateMachineState(id, state, note)` to `src/lib/qa/db.ts` (writes the existing `machines` store, bumping cache version is not needed).
 
-```ts
-type ToleranceValue =
-  | { kind: "literal"; text: string }      // free text, e.g. "±2 mm"
-  | { kind: "cellRef"; sheet: string; address: string };
+## 3. Dashboard (`src/routes/index.tsx`) — simplified summary only
+Replace the current per-test chart grid with a high-level overview:
 
-interface DataPoint {
-  id: string;
-  kind: "data";
-  name: string;                // e.g. "Beam center"
-  cell: CellRef;               // single cell with the value
-  unit?: string;
-  tolerance?: ToleranceValue;  // optional
-  // optional structured tolerance preserved for charting
-  parsedTolerance?: Tolerance;
-}
+- **Per-machine cards** (one card per machine in `MACHINES`):
+  - Machine name + manual **state badge** (OK / Warning / Critical) with an inline `Select` so the user can change it; persists via `updateMachineState`.
+  - Counts of tests in the active template, broken down by frequency (M / T / A) and totals.
+  - Last import: date + file name (or "Sin importaciones").
+  - "Última importación: OK / N puntos fuera de tolerancia" derived from the most recent import's measurements via `evaluateTolerance`.
+- **Global OOT alerts panel** below the cards: list of `{machine, test, dataPoint, date, value}` for any out-of-tolerance measurement in the latest import per machine, with a link to open it in the new Visualization tab pre-filtered.
 
-interface Nest {
-  id: string;
-  kind: "nest";
-  name: string;                // e.g. "Energy 6 MV" / "Profile" / "PDD"
-  children: Array<Nest | DataPoint>;
-}
+Remove all `TestChart` rendering, category/frequency filters, and the machine `Tabs` switcher from this page — they move to the Visualization tab.
 
-interface TestDef {
-  id: string;
-  name: string;                // e.g. "Sistema Monitor Starcheck"
-  category: Category;
-  frequency: Frequency;
-  admin: {
-    performers?: CellRef[];    // one or more name cells
-    date?: CellRef;
-  };
-  root: Nest;                  // top-level container; children are nests or data points
-}
-```
+## 4. New Visualization tab
+Add route `src/routes/visualization.tsx` (file becomes `/visualization`).
 
-Keep `evaluateTolerance` / `toleranceBand` working off `parsedTolerance` when present (parse simple `±X`, `X-Y`, or cell-ref-resolved numbers later in the import pipeline).
+Layout: two-column on `lg`, stacked on smaller screens, full viewport width via existing `AppShell`.
 
-## UI: `templates.$machine.tsx` rewrite
+### Left column — Selection panel
+1. **Machines**: multi-select (checkbox list of `MACHINES`).
+2. **Tests**: multi-select. Source = union of tests across the selected machines' active templates, grouped by machine. Search box on top.
+3. **Series tree**: for each selected test, render the nest tree (`walkDataPoints`) with checkboxes per data point and per nest (toggling a nest toggles its descendants). Default = all on.
+4. **Filters**:
+   - Date range (from / to) — uses `<input type="date">`.
+   - "Solo fuera de tolerancia" toggle.
+   - "Agrupar por nest" toggle — when on, sums/averages siblings under each nest into a single series (default = off, show individual points).
 
-A tree editor on the left, a cell picker on the right.
+All selection state is mirrored in URL search params via `validateSearch` + `zodValidator` so views are shareable. Keys: `machines[]`, `tests[]`, `points[]`, `from`, `to`, `ootOnly`, `groupByNest`.
 
-```text
-[ + Add test ]
-▾ Sistema Monitor Starcheck     [✎ name] [🗑]
-   Admin:
-     Performers: [+ add cell] (B3) (B4)
-     Date:       (B2)               [pick]
-   ▾ Energy 6 MV                [+ nest] [+ data] [🗑]
-      ▾ Profile                 [+ nest] [+ data] [🗑]
-         • Beam center  C10  unit:[mm]  tol:[±2]      [🗑]
-         • Homogeneity  D10   unit:[%]  tol:[ref H2]  [🗑]
-      ▸ PDD
-   ▸ Energy 10 MV
-```
+### Right column — Charts
+- One chart card per selected test (reusing logic from `TestChart` but extended to accept an explicit series filter and date filter).
+- Refactor `TestChart` minimally: add optional props `seriesFilter?: string[]`, `dateFrom?`, `dateTo?`, `ootOnly?`, `groupByNest?`. Existing Dashboard usage is removed, so no compatibility shim needed.
+- When `groupByNest` is on, series key becomes the nest path (one less segment); values are averaged per date.
+- Tooltip + legend always on in this view; chart height larger (`h-[320px]`).
+- Empty state when no machines/tests selected: friendly hint card.
 
-Interactions:
-- **+ nest** / **+ data** buttons on each Nest add a child.
-- A data row shows: name input, cell ref chip (click to pick), unit input, tolerance input with a toggle "text ↔ cell ref".
-- Clicking any chip activates that slot; next cell click in the right-side `CellPicker` fills it. A small "Active target" indicator shows what's being assigned (e.g. "Filling: Beam center → value cell").
-- Admin cells use the same picker flow.
+## 5. Cross-linking
+- OOT alerts on the Dashboard link to `/visualization?machines=...&tests=...&ootOnly=true`.
 
-Reuse existing `CellPicker`; extend `selected` to highlight all addresses currently bound across the active test.
+## 6. Files touched
+- `src/components/qa/AppShell.tsx` — add nav link.
+- `src/lib/qa/types.ts` — add `state` to `MachineRecord`.
+- `src/lib/qa/db.ts` — `updateMachineState` helper.
+- `src/routes/index.tsx` — rewrite as summary dashboard.
+- `src/routes/visualization.tsx` — new file (selection + charts).
+- `src/components/qa/TestChart.tsx` — add filter props (series / date / OOT / groupByNest).
+- `src/components/qa/VisualizationPanel.tsx` (new) — selection sidebar UI to keep the route file lean.
 
-## Migration
-- Bump IndexedDB `qa-dashboard` from v1 → v2; on upgrade, convert old `Template.tests[].cells[]` into a single `root` nest with each cell as a `DataPoint`, leaving `admin` empty. Old `defaultDateCell` becomes each test's `admin.date` if not set.
-- Drop `autoBuildTemplate`'s assumption of flat cells; reshape its output to use the new model (each detected code → test with `root` containing detected value cells as data points). Keep behavior so existing seeded templates still load.
-
-## Import pipeline (`imports.tsx`, `seed.ts` consumers)
-- Replace flat `test.cells` traversal with a recursive walk over `root` that yields `{ testId, path: string[], dataPoint }` and produces `Measurement` rows. `cellLabel` becomes the joined nest path + data point name.
-- Tolerance parsing: if `tolerance.kind === "literal"`, regex `±N`, `N-M`, or plain number → `parsedTolerance`. If `cellRef`, resolve from the workbook at import time.
-
-## Files touched
-- `src/lib/qa/types.ts` — new model + tolerance parser helper.
-- `src/lib/qa/db.ts` — schema v2 + migration.
-- `src/lib/qa/seed.ts` — emit new shape.
-- `src/lib/qa/excel.ts` — (if needed) helper to resolve a `CellRef` to a value.
-- `src/routes/templates.$machine.tsx` — full editor rewrite.
-- `src/routes/imports.tsx` — recursive measurement extraction.
-- `src/components/qa/TestChart.tsx` — read from data points instead of cells.
-
-## Out of scope (for this iteration)
-- Reordering nests via drag & drop (use simple up/down buttons).
-- Sharing nests across tests.
-- Importing tolerances from the workbook automatically.
-
-Ready to implement on approval.
+## Out of scope
+- No changes to template editor, importer, or measurement schema.
+- No backend; everything stays in IndexedDB as today.
