@@ -130,7 +130,7 @@ export function TestChart({
   yMax += pad;
 
   return (
-    <div className="h-[220px] w-full">
+    <div className="w-full" style={{ height }}>
       <ResponsiveContainer>
         <LineChart data={data} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
@@ -189,7 +189,7 @@ export function TestChart({
               isAnimationActive={false}
             />
           ))}
-          {series.length > 1 && <Legend wrapperStyle={{ fontSize: 10 }} />}
+          {(showLegend || series.length > 1) && <Legend wrapperStyle={{ fontSize: 10 }} />}
         </LineChart>
       </ResponsiveContainer>
       {hasOOT && (
