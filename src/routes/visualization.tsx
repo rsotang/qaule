@@ -1,35 +1,97 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+  Legend,
+} from "recharts";
 import { listMachines, listMeasurements, listTemplates } from "@/lib/qa/db";
 import {
   MACHINES,
-  walkDataPoints,
-  dpSeriesLabel,
+  displayTextOrRef,
+  toleranceBand,
   type MachineId,
   type TestDef,
   type Template,
+  type Nest,
+  type TreeNode,
+  type DataPoint,
+  type TextOrRef,
 } from "@/lib/qa/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { TestChart } from "@/components/qa/TestChart";
-import { Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Plus, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/visualization")({ component: VisualizationPage });
 
+interface SeriesSel {
+  id: string;
+  machineId: MachineId | "";
+  testId: string;
+  /** ordered child node ids picked from root downward (each must exist in tree) */
+  path: string[];
+}
+
+const COLORS = ["#2563eb", "#dc2626", "#16a34a", "#ca8a04", "#9333ea", "#0891b2", "#db2777", "#0d9488"];
+
+function newSeries(): SeriesSel {
+  return { id: `s-${Math.random().toString(36).slice(2, 9)}`, machineId: "", testId: "", path: [] };
+}
+
+function nodeName(n: TreeNode): string {
+  return displayTextOrRef(n.name, "?");
+}
+
+/** Walk tree following picked child ids; returns the chain of nodes (excluding root). */
+function resolveChain(root: Nest, path: string[]): TreeNode[] {
+  const chain: TreeNode[] = [];
+  let current: TreeNode = root;
+  for (const id of path) {
+    if (current.kind !== "nest") break;
+    const next = current.children.find((c) => c.id === id);
+    if (!next) break;
+    chain.push(next);
+    current = next;
+  }
+  return chain;
+}
+
+function chainLeaf(chain: TreeNode[]): DataPoint | null {
+  const last = chain[chain.length - 1];
+  return last && last.kind === "data" ? last : null;
+}
+
+function chainSeriesKey(chain: TreeNode[]): string {
+  // matches dpSeriesLabel: join all node names (excluding root) with " / "
+  return chain.map((n) => displayTextOrRef(n.name, "?")).join(" / ");
+}
+
+function parseRefNumber(v: TextOrRef | undefined): number | null {
+  if (!v || v.kind !== "text") return null;
+  const n = parseFloat(v.text.replace(",", "."));
+  return isFinite(n) ? n : null;
+}
+
 function VisualizationPage() {
-  const [selectedMachines, setSelectedMachines] = useState<MachineId[]>(["TB1"]);
-  const [selectedTests, setSelectedTests] = useState<string[]>([]);
-  const [excludedSeries, setExcludedSeries] = useState<Record<string, Set<string>>>({});
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [ootOnly, setOotOnly] = useState(false);
-  const [groupByNest, setGroupByNest] = useState(false);
-  const [testSearch, setTestSearch] = useState("");
+  const [series, setSeries] = useState<SeriesSel[]>([newSeries()]);
 
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
   const allTemplates = useQuery({ queryKey: ["templates-all"], queryFn: () => listTemplates() });
@@ -38,242 +100,326 @@ function VisualizationPage() {
     queryFn: () => listMeasurements(),
   });
 
-  // Active template per selected machine
-  const activeTemplatesByMachine = useMemo(() => {
-    const map = new Map<MachineId, Template>();
-    if (!machines.data || !allTemplates.data) return map;
-    for (const mid of selectedMachines) {
-      const m = machines.data.find((x) => x.id === mid);
-      const tpls = allTemplates.data.filter((t) => t.machineId === mid);
-      const tpl = tpls.find((t) => t.id === m?.activeTemplateId) ?? tpls[0];
-      if (tpl) map.set(mid, tpl);
-    }
-    return map;
-  }, [machines.data, allTemplates.data, selectedMachines]);
+  const templateFor = (mid: MachineId | ""): Template | null => {
+    if (!mid || !machines.data || !allTemplates.data) return null;
+    const m = machines.data.find((x) => x.id === mid);
+    const tpls = allTemplates.data.filter((t) => t.machineId === mid);
+    return tpls.find((t) => t.id === m?.activeTemplateId) ?? tpls[0] ?? null;
+  };
 
-  // Build flat list of {machineId, template, test} for selected machines
-  const availableTests = useMemo(() => {
-    const list: { machineId: MachineId; template: Template; test: TestDef }[] = [];
-    for (const [mid, tpl] of activeTemplatesByMachine) {
-      for (const t of tpl.tests) {
-        if (testSearch && !t.name.toLowerCase().includes(testSearch.toLowerCase())) continue;
-        list.push({ machineId: mid, template: tpl, test: t });
+  function updateSeries(id: string, patch: Partial<SeriesSel>) {
+    setSeries((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  }
+  function removeSeries(id: string) {
+    setSeries((prev) => prev.filter((s) => s.id !== id));
+  }
+
+  // Resolve each series → { color, key, leaf, measurements }
+  const resolved = useMemo(() => {
+    return series.map((s, i) => {
+      const tpl = templateFor(s.machineId);
+      const test = tpl?.tests.find((t) => t.id === s.testId) ?? null;
+      const chain = test ? resolveChain(test.root, s.path) : [];
+      const leaf = chainLeaf(chain);
+      const key = test && leaf ? chainSeriesKey(chain) : "";
+      const color = COLORS[i % COLORS.length];
+      const measurements = (allMeasurements.data ?? []).filter(
+        (m) =>
+          m.machineId === s.machineId &&
+          m.testId === s.testId &&
+          m.cellLabel === key &&
+          (!dateFrom || m.date >= dateFrom) &&
+          (!dateTo || m.date <= dateTo),
+      );
+      return { sel: s, test, chain, leaf, key, color, measurements };
+    });
+  }, [series, machines.data, allTemplates.data, allMeasurements.data, dateFrom, dateTo]);
+
+  // Build chart data: one row per date, with each series key as column
+  const chartData = useMemo(() => {
+    const byDate = new Map<string, Record<string, number | string>>();
+    for (const r of resolved) {
+      if (!r.leaf) continue;
+      const seriesId = r.sel.id; // use unique selector id as column to avoid duplicate-key collisions
+      for (const m of r.measurements) {
+        let row = byDate.get(m.date);
+        if (!row) {
+          row = { date: m.date };
+          byDate.set(m.date, row);
+        }
+        // average if duplicates
+        const prev = row[seriesId];
+        row[seriesId] = typeof prev === "number" ? (prev + m.value) / 2 : m.value;
       }
     }
-    return list;
-  }, [activeTemplatesByMachine, testSearch]);
+    return [...byDate.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  }, [resolved]);
 
-  // Tests actually rendered as charts
-  const renderedTests = useMemo(
-    () =>
-      availableTests.filter((x) => selectedTests.includes(`${x.machineId}::${x.test.id}`)),
-    [availableTests, selectedTests],
-  );
-
-  function toggleMachine(id: MachineId) {
-    setSelectedMachines((prev) =>
-      prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id],
-    );
-  }
-  function toggleTest(machineId: MachineId, testId: string) {
-    const key = `${machineId}::${testId}`;
-    setSelectedTests((prev) => (prev.includes(key) ? prev.filter((t) => t !== key) : [...prev, key]));
-  }
-  function toggleSeries(testKey: string, seriesKey: string) {
-    setExcludedSeries((prev) => {
-      const next = { ...prev };
-      const s = new Set(next[testKey] ?? []);
-      if (s.has(seriesKey)) s.delete(seriesKey);
-      else s.add(seriesKey);
-      next[testKey] = s;
-      return next;
-    });
-  }
+  const yDomain = useMemo((): [number, number] | undefined => {
+    const vals: number[] = [];
+    for (const row of chartData) {
+      for (const r of resolved) {
+        const v = row[r.sel.id];
+        if (typeof v === "number") vals.push(v);
+      }
+    }
+    for (const r of resolved) {
+      const band = toleranceBand(r.leaf?.parsedTolerance);
+      if (band) vals.push(band.min, band.max);
+      const ref = parseRefNumber(r.leaf?.reference);
+      if (ref != null) vals.push(ref);
+    }
+    if (vals.length === 0) return undefined;
+    let min = Math.min(...vals);
+    let max = Math.max(...vals);
+    const pad = (max - min) * 0.15 || Math.abs(max) * 0.1 || 1;
+    return [min - pad, max + pad];
+  }, [chartData, resolved]);
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Visualización</h1>
         <p className="text-sm text-muted-foreground">
-          Selecciona máquinas, tests y parámetros para explorar los datos importados
+          Selecciona parámetros para graficarlos en función del tiempo
         </p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
-        {/* Selection panel */}
+      <div className="grid gap-4 lg:grid-cols-[380px_minmax(0,1fr)]">
+        {/* Selectors */}
         <div className="space-y-3">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Máquinas</CardTitle>
+              <CardTitle className="text-sm">Rango de fechas</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              {MACHINES.map((m) => (
-                <label key={m.id} className="flex cursor-pointer items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={selectedMachines.includes(m.id)}
-                    onCheckedChange={() => toggleMachine(m.id)}
-                  />
-                  <span>
-                    <span className="font-medium">{m.id}</span>
-                    <span className="ml-2 text-muted-foreground">{m.name}</span>
-                  </span>
-                </label>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Tests</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  className="h-8 pl-7 text-xs"
-                  placeholder="Buscar test..."
-                  value={testSearch}
-                  onChange={(e) => setTestSearch(e.target.value)}
-                />
-              </div>
-              <div className="max-h-[260px] space-y-2 overflow-auto pr-1">
-                {[...activeTemplatesByMachine.keys()].map((mid) => {
-                  const tests = availableTests.filter((x) => x.machineId === mid);
-                  if (tests.length === 0) return null;
-                  return (
-                    <div key={mid}>
-                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        {mid}
-                      </p>
-                      <div className="space-y-1">
-                        {tests.map(({ test }) => {
-                          const key = `${mid}::${test.id}`;
-                          return (
-                            <label key={key} className="flex cursor-pointer items-start gap-2 text-xs">
-                              <Checkbox
-                                checked={selectedTests.includes(key)}
-                                onCheckedChange={() => toggleTest(mid, test.id)}
-                              />
-                              <span className="leading-tight">{test.name}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-                {availableTests.length === 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Selecciona al menos una máquina con plantilla activa.
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Filtros</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent>
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <Label className="text-[10px] uppercase text-muted-foreground">Desde</Label>
-                  <Input
-                    type="date"
-                    value={dateFrom}
-                    onChange={(e) => setDateFrom(e.target.value)}
-                    className="h-8 text-xs"
-                  />
+                  <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 text-xs" />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[10px] uppercase text-muted-foreground">Hasta</Label>
-                  <Input
-                    type="date"
-                    value={dateTo}
-                    onChange={(e) => setDateTo(e.target.value)}
-                    className="h-8 text-xs"
-                  />
+                  <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 text-xs" />
                 </div>
               </div>
-              <label className="flex items-center justify-between text-xs">
-                <span>Solo fuera de tolerancia</span>
-                <Switch checked={ootOnly} onCheckedChange={setOotOnly} />
-              </label>
-              <label className="flex items-center justify-between text-xs">
-                <span>Agrupar por nest</span>
-                <Switch checked={groupByNest} onCheckedChange={setGroupByNest} />
-              </label>
             </CardContent>
           </Card>
+
+          {series.map((s, idx) => {
+            const tpl = templateFor(s.machineId);
+            const test = tpl?.tests.find((t) => t.id === s.testId) ?? null;
+            const chain = test ? resolveChain(test.root, s.path) : [];
+            const leaf = chainLeaf(chain);
+
+            // Build the cascade: each level shows current nest children to pick.
+            // Start from root, then each picked nest in chain reveals next dropdown.
+            const levels: { current: Nest; selectedId: string | undefined; depth: number }[] = [];
+            if (test) {
+              let nest: Nest | null = test.root;
+              let depth = 0;
+              while (nest) {
+                const selectedId = s.path[depth];
+                levels.push({ current: nest, selectedId, depth });
+                if (!selectedId) break;
+                const child = nest.children.find((c) => c.id === selectedId);
+                if (!child || child.kind !== "nest") break;
+                nest = child;
+                depth += 1;
+              }
+            }
+
+            return (
+              <Card key={s.id} style={{ borderLeft: `4px solid ${COLORS[idx % COLORS.length]}` }}>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm">Parámetro {idx + 1}</CardTitle>
+                  {series.length > 1 && (
+                    <Button variant="ghost" size="icon" className="size-6" onClick={() => removeSeries(s.id)}>
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  )}
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {/* Machine */}
+                  <div className="space-y-1">
+                    <Label className="text-[10px] uppercase text-muted-foreground">Máquina</Label>
+                    <Select
+                      value={s.machineId || undefined}
+                      onValueChange={(v) =>
+                        updateSeries(s.id, { machineId: v as MachineId, testId: "", path: [] })
+                      }
+                    >
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecciona máquina" /></SelectTrigger>
+                      <SelectContent>
+                        {MACHINES.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>{m.id} — {m.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Test */}
+                  {tpl && (
+                    <div className="space-y-1">
+                      <Label className="text-[10px] uppercase text-muted-foreground">Test</Label>
+                      <Select
+                        value={s.testId || undefined}
+                        onValueChange={(v) => updateSeries(s.id, { testId: v, path: [] })}
+                      >
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecciona test" /></SelectTrigger>
+                        <SelectContent>
+                          {tpl.tests.map((t) => (
+                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Cascading nest dropdowns */}
+                  {levels.map(({ current, selectedId, depth }) => {
+                    if (current.children.length === 0) return null;
+                    return (
+                      <div key={depth} className="space-y-1">
+                        <Label className="text-[10px] uppercase text-muted-foreground">
+                          {depth === 0 ? "Nivel 1" : `Nivel ${depth + 1}`}
+                        </Label>
+                        <Select
+                          value={selectedId}
+                          onValueChange={(v) => {
+                            const nextPath = [...s.path.slice(0, depth), v];
+                            updateSeries(s.id, { path: nextPath });
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Selecciona..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {current.children.map((c) => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {nodeName(c)}
+                                {c.kind === "data" ? " ●" : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    );
+                  })}
+
+                  {leaf && (
+                    <div className="rounded border border-dashed bg-muted/30 p-2 text-[10px] text-muted-foreground">
+                      <div className="font-medium text-foreground">{chainSeriesKey(chain)}</div>
+                      {leaf.parsedTolerance && leaf.parsedTolerance.type !== "none" && (
+                        <div>Tolerancia: {displayTextOrRef(leaf.tolerance, "—")}</div>
+                      )}
+                      {leaf.reference && <div>Referencia: {displayTextOrRef(leaf.reference, "—")}</div>}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+
+          <Button variant="outline" className="w-full" onClick={() => setSeries((p) => [...p, newSeries()])}>
+            <Plus className="mr-2 size-4" />
+            Añadir parámetro
+          </Button>
         </div>
 
-        {/* Charts */}
+        {/* Chart */}
         <div className="space-y-4">
-          {renderedTests.length === 0 ? (
-            <Card>
-              <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                Selecciona uno o más tests en el panel de la izquierda para visualizar las series.
-              </CardContent>
-            </Card>
-          ) : (
-            renderedTests.map(({ machineId, test }) => {
-              const testKey = `${machineId}::${test.id}`;
-              const walked = walkDataPoints(test);
-              const allKeys = [...new Set(walked.map((w) => {
-                const label = dpSeriesLabel(w);
-                if (!groupByNest) return label;
-                const parts = label.split(" / ");
-                return parts.length > 1 ? parts.slice(0, -1).join(" / ") : label;
-              }))];
-              const excluded = excludedSeries[testKey] ?? new Set<string>();
-              const seriesFilter = allKeys.filter((k) => !excluded.has(k));
-              const measurements = (allMeasurements.data ?? []).filter(
-                (m) => m.machineId === machineId,
-              );
-              return (
-                <Card key={testKey}>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <CardTitle className="text-sm">{test.name}</CardTitle>
-                        <p className="text-[10px] text-muted-foreground">{machineId}</p>
-                      </div>
-                      <Badge variant="secondary" className="shrink-0 text-[10px]">
-                        {test.frequency === "monthly" ? "Mensual" : test.frequency === "quarterly" ? "Trimestral" : "Anual"}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {allKeys.length > 1 && (
-                      <div className="flex flex-wrap gap-2 border-b pb-2">
-                        {allKeys.map((k) => (
-                          <label key={k} className="flex cursor-pointer items-center gap-1 text-[10px]">
-                            <Checkbox
-                              checked={!excluded.has(k)}
-                              onCheckedChange={() => toggleSeries(testKey, k)}
-                            />
-                            <span>{k}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                    <TestChart
-                      test={test}
-                      measurements={measurements}
-                      seriesFilter={seriesFilter}
-                      dateFrom={dateFrom || undefined}
-                      dateTo={dateTo || undefined}
-                      ootOnly={ootOnly}
-                      groupByNest={groupByNest}
-                      height={320}
-                      showLegend
-                    />
-                  </CardContent>
-                </Card>
-              );
-            })
-          )}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Evolución</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {chartData.length === 0 ? (
+                <div className="flex h-[360px] items-center justify-center text-sm text-muted-foreground">
+                  Selecciona al menos un parámetro completo para visualizar datos.
+                </div>
+              ) : (
+                <div className="h-[420px] w-full">
+                  <ResponsiveContainer>
+                    <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                      <XAxis dataKey="date" fontSize={11} tick={{ fill: "currentColor" }} />
+                      <YAxis
+                        domain={yDomain ?? ["auto", "auto"]}
+                        fontSize={11}
+                        tick={{ fill: "currentColor" }}
+                        width={56}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          background: "var(--popover)",
+                          color: "var(--popover-foreground)",
+                          border: "1px solid var(--border)",
+                          borderRadius: 6,
+                          fontSize: 12,
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      {resolved.map((r) => {
+                        if (!r.leaf) return null;
+                        const band = toleranceBand(r.leaf.parsedTolerance);
+                        const refVal = parseRefNumber(r.leaf.reference);
+                        return (
+                          <g key={r.sel.id}>
+                            {band && (
+                              <ReferenceLine
+                                y={band.min}
+                                stroke={r.color}
+                                strokeWidth={1.5}
+                                ifOverflow="extendDomain"
+                                label={{ value: `Tol min`, fill: r.color, fontSize: 9, position: "insideBottomRight" }}
+                              />
+                            )}
+                            {band && (
+                              <ReferenceLine
+                                y={band.max}
+                                stroke={r.color}
+                                strokeWidth={1.5}
+                                ifOverflow="extendDomain"
+                                label={{ value: `Tol max`, fill: r.color, fontSize: 9, position: "insideTopRight" }}
+                              />
+                            )}
+                            {refVal != null && (
+                              <ReferenceLine
+                                y={refVal}
+                                stroke={r.color}
+                                strokeDasharray="6 4"
+                                strokeWidth={1.5}
+                                ifOverflow="extendDomain"
+                                label={{ value: `Ref`, fill: r.color, fontSize: 9, position: "insideTopLeft" }}
+                              />
+                            )}
+                          </g>
+                        );
+                      })}
+                      {resolved.map((r, i) => {
+                        if (!r.leaf) return null;
+                        const name = `${r.sel.machineId} · ${r.test?.name ?? ""} · ${r.key}`;
+                        return (
+                          <Line
+                            key={r.sel.id}
+                            type="monotone"
+                            dataKey={r.sel.id}
+                            name={name}
+                            stroke={r.color}
+                            strokeWidth={2}
+                            dot={{ r: 3.5, fill: r.color, stroke: "white", strokeWidth: 1 }}
+                            connectNulls
+                            isAnimationActive={false}
+                          />
+                        );
+                      })}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
