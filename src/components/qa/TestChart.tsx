@@ -11,7 +11,7 @@ import {
   Legend,
 } from "recharts";
 import type { Measurement, TestDef } from "@/lib/qa/types";
-import { toleranceBand, evaluateTolerance, walkDataPoints, dpSeriesLabel } from "@/lib/qa/types";
+import { toleranceBand, evaluateTolerance, walkDataPoints } from "@/lib/qa/types";
 
 interface Props {
   test: TestDef;
