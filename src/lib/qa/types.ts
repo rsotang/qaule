@@ -109,10 +109,14 @@ export interface Template {
   tests: TestDef[];
 }
 
+export type MachineState = "ok" | "warning" | "critical";
+
 export interface MachineRecord {
   id: MachineId;
   name: string;
   activeTemplateId?: string;
+  state?: MachineState;
+  stateNote?: string;
 }
 
 export interface ImportRecord {

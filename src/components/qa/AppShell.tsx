@@ -1,5 +1,5 @@
 import { Link, Outlet } from "@tanstack/react-router";
-import { Activity, Upload, Settings2 } from "lucide-react";
+import { Activity, Upload, Settings2, LineChart } from "lucide-react";
 
 export function AppShell() {
   return (
@@ -12,6 +12,7 @@ export function AppShell() {
           </Link>
           <nav className="flex items-center gap-1 text-sm">
             <NavLink to="/" icon={<Activity className="size-4" />} label="Dashboard" />
+            <NavLink to="/visualization" icon={<LineChart className="size-4" />} label="Visualización" />
             <NavLink to="/imports" icon={<Upload className="size-4" />} label="Importaciones" />
             <NavLink to="/templates" icon={<Settings2 className="size-4" />} label="Plantillas" />
           </nav>

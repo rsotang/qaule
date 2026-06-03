@@ -150,6 +150,15 @@ export async function setActiveTemplate(machineId: string, templateId: string) {
   const m = await db.get("machines", machineId);
   if (m) await db.put("machines", { ...m, activeTemplateId: templateId });
 }
+export async function updateMachineState(
+  machineId: string,
+  state: import("./types").MachineState | undefined,
+  note?: string,
+) {
+  const db = await getDB();
+  const m = await db.get("machines", machineId);
+  if (m) await db.put("machines", { ...m, state, stateNote: note });
+}
 export async function clearActiveTemplate(machineId: string) {
   const db = await getDB();
   const m = await db.get("machines", machineId);
