@@ -185,35 +185,34 @@ function VisualizationPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[380px_minmax(0,1fr)]">
-        {/* Selectors */}
-        <div className="space-y-3">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Rango de fechas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label className="text-[10px] uppercase text-muted-foreground">Desde</Label>
-                  <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 text-xs" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] uppercase text-muted-foreground">Hasta</Label>
-                  <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 text-xs" />
-                </div>
+      <div className="flex flex-wrap items-start gap-4">
+        {/* Date range */}
+        <Card className="w-[260px] shrink-0">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Rango de fechas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase text-muted-foreground">Desde</Label>
+                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 text-xs" />
               </div>
-            </CardContent>
-          </Card>
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase text-muted-foreground">Hasta</Label>
+                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 text-xs" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
+        {/* Parameter selectors — horizontally to the right */}
+        <div className="flex min-w-0 flex-1 flex-wrap items-start gap-3">
           {series.map((s, idx) => {
             const tpl = templateFor(s.machineId);
             const test = tpl?.tests.find((t) => t.id === s.testId) ?? null;
             const chain = test ? resolveChain(test.root, s.path) : [];
             const leaf = chainLeaf(chain);
 
-            // Build the cascade: each level shows current nest children to pick.
-            // Start from root, then each picked nest in chain reveals next dropdown.
             const levels: { current: Nest; selectedId: string | undefined; depth: number }[] = [];
             if (test) {
               let nest: Nest | null = test.root;
@@ -230,7 +229,7 @@ function VisualizationPage() {
             }
 
             return (
-              <Card key={s.id} style={{ borderLeft: `4px solid ${COLORS[idx % COLORS.length]}` }}>
+              <Card key={s.id} className="w-[280px] shrink-0" style={{ borderLeft: `4px solid ${COLORS[idx % COLORS.length]}` }}>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm">Parámetro {idx + 1}</CardTitle>
                   {series.length > 1 && (
@@ -240,7 +239,6 @@ function VisualizationPage() {
                   )}
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {/* Machine */}
                   <div className="space-y-1">
                     <Label className="text-[10px] uppercase text-muted-foreground">Máquina</Label>
                     <Select
@@ -258,7 +256,6 @@ function VisualizationPage() {
                     </Select>
                   </div>
 
-                  {/* Test */}
                   {tpl && (
                     <div className="space-y-1">
                       <Label className="text-[10px] uppercase text-muted-foreground">Test</Label>
@@ -276,13 +273,12 @@ function VisualizationPage() {
                     </div>
                   )}
 
-                  {/* Cascading nest dropdowns */}
                   {levels.map(({ current, selectedId, depth }) => {
                     if (current.children.length === 0) return null;
                     return (
                       <div key={depth} className="space-y-1">
                         <Label className="text-[10px] uppercase text-muted-foreground">
-                          {depth === 0 ? "Nivel 1" : `Nivel ${depth + 1}`}
+                          Nivel {depth + 1}
                         </Label>
                         <Select
                           value={selectedId}
@@ -321,14 +317,20 @@ function VisualizationPage() {
             );
           })}
 
-          <Button variant="outline" className="w-full" onClick={() => setSeries((p) => [...p, newSeries()])}>
+          <Button
+            variant="outline"
+            className="h-[60px] w-[180px] shrink-0 border-dashed"
+            onClick={() => setSeries((p) => [...p, newSeries()])}
+          >
             <Plus className="mr-2 size-4" />
             Añadir parámetro
           </Button>
         </div>
+      </div>
 
-        {/* Chart */}
-        <div className="space-y-4">
+      {/* Chart below */}
+      <div>
+
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">Evolución</CardTitle>
