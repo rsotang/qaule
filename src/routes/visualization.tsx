@@ -137,22 +137,29 @@ function VisualizationPage() {
 
   // Build chart data: one row per date, with each series key as column
   const chartData = useMemo(() => {
-    const byDate = new Map<string, Record<string, number | string>>();
+    const byDate = new Map<string, { date: string; sums: Map<string, { sum: number; n: number }> }>();
     for (const r of resolved) {
       if (!r.leaf) continue;
-      const seriesId = r.sel.id; // use unique selector id as column to avoid duplicate-key collisions
+      const seriesId = r.sel.id;
       for (const m of r.measurements) {
         let row = byDate.get(m.date);
         if (!row) {
-          row = { date: m.date };
+          row = { date: m.date, sums: new Map() };
           byDate.set(m.date, row);
         }
-        // average if duplicates
-        const prev = row[seriesId];
-        row[seriesId] = typeof prev === "number" ? (prev + m.value) / 2 : m.value;
+        const agg = row.sums.get(seriesId) ?? { sum: 0, n: 0 };
+        agg.sum += m.value;
+        agg.n += 1;
+        row.sums.set(seriesId, agg);
       }
     }
-    return [...byDate.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    return [...byDate.values()]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((row) => {
+        const out: Record<string, number | string> = { date: row.date };
+        for (const [k, v] of row.sums) out[k] = v.sum / v.n;
+        return out;
+      });
   }, [resolved]);
 
   const yDomain = useMemo((): [number, number] | undefined => {
@@ -314,6 +321,16 @@ function VisualizationPage() {
                       {leaf.reference && <div>Referencia: {displayTextOrRef(leaf.reference, "—")}</div>}
                     </div>
                   )}
+                  {!leaf && test && (
+                    <div className="mt-2 rounded border border-dashed bg-muted/30 p-2 text-[10px] text-muted-foreground">
+                      Continúa eligiendo hasta llegar a un punto de dato (●) para graficar.
+                    </div>
+                  )}
+                  {leaf && resolved.find((r) => r.sel.id === s.id)?.measurements.length === 0 && (
+                    <div className="mt-2 rounded border border-dashed border-destructive/40 bg-destructive/5 p-2 text-[10px] text-destructive">
+                      Sin mediciones importadas para este punto en el rango de fechas seleccionado.
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );
@@ -339,8 +356,15 @@ function VisualizationPage() {
             </CardHeader>
             <CardContent>
               {chartData.length === 0 ? (
-                <div className="flex h-[360px] items-center justify-center text-sm text-muted-foreground">
-                  Selecciona al menos un parámetro completo para visualizar datos.
+                <div className="flex h-[360px] flex-col items-center justify-center gap-1 text-sm text-muted-foreground">
+                  {resolved.every((r) => !r.leaf) ? (
+                    <span>Selecciona al menos un parámetro completo (hasta un punto ●) para visualizar datos.</span>
+                  ) : (
+                    <>
+                      <span>No hay mediciones para la selección actual.</span>
+                      <span className="text-xs">Revisa el rango de fechas o importa datos para este parámetro.</span>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="h-[420px] w-full">
