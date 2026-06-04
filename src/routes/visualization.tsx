@@ -137,22 +137,29 @@ function VisualizationPage() {
 
   // Build chart data: one row per date, with each series key as column
   const chartData = useMemo(() => {
-    const byDate = new Map<string, Record<string, number | string>>();
+    const byDate = new Map<string, { date: string; sums: Map<string, { sum: number; n: number }> }>();
     for (const r of resolved) {
       if (!r.leaf) continue;
-      const seriesId = r.sel.id; // use unique selector id as column to avoid duplicate-key collisions
+      const seriesId = r.sel.id;
       for (const m of r.measurements) {
         let row = byDate.get(m.date);
         if (!row) {
-          row = { date: m.date };
+          row = { date: m.date, sums: new Map() };
           byDate.set(m.date, row);
         }
-        // average if duplicates
-        const prev = row[seriesId];
-        row[seriesId] = typeof prev === "number" ? (prev + m.value) / 2 : m.value;
+        const agg = row.sums.get(seriesId) ?? { sum: 0, n: 0 };
+        agg.sum += m.value;
+        agg.n += 1;
+        row.sums.set(seriesId, agg);
       }
     }
-    return [...byDate.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    return [...byDate.values()]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((row) => {
+        const out: Record<string, number | string> = { date: row.date };
+        for (const [k, v] of row.sums) out[k] = v.sum / v.n;
+        return out;
+      });
   }, [resolved]);
 
   const yDomain = useMemo((): [number, number] | undefined => {
