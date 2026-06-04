@@ -1,5 +1,6 @@
 import { Link, Outlet } from "@tanstack/react-router";
 import { Activity, Upload, Settings2, LineChart } from "lucide-react";
+import { SettingsMenu } from "./SettingsMenu";
 
 export function AppShell() {
   return (
@@ -16,6 +17,9 @@ export function AppShell() {
             <NavLink to="/imports" icon={<Upload className="size-4" />} label="Importaciones" />
             <NavLink to="/templates" icon={<Settings2 className="size-4" />} label="Plantillas" />
           </nav>
+          <div className="ml-auto">
+            <SettingsMenu />
+          </div>
         </div>
       </header>
       <main className="w-full px-4 py-6 sm:px-6 lg:px-8">

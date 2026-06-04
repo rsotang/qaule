@@ -217,6 +217,29 @@ export async function listMeasurements(machineId?: string): Promise<Measurement[
   return db.getAll("measurements");
 }
 
+export async function updateMeasurement(m: Measurement) {
+  const db = await getDB();
+  await db.put("measurements", m);
+}
+
+export async function deleteMeasurement(id: string) {
+  const db = await getDB();
+  await db.delete("measurements", id);
+}
+
+export async function clearAllData() {
+  const db = await getDB();
+  const tx = db.transaction(["machines", "templates", "imports", "measurements"], "readwrite");
+  for (const s of ["templates", "imports", "measurements"] as const) {
+    await tx.objectStore(s).clear();
+  }
+  const machines = await tx.objectStore("machines").getAll();
+  for (const m of machines) {
+    await tx.objectStore("machines").put({ id: m.id, name: m.name });
+  }
+  await tx.done;
+}
+
 export async function exportAll() {
   const db = await getDB();
   return {
