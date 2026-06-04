@@ -321,6 +321,16 @@ function VisualizationPage() {
                       {leaf.reference && <div>Referencia: {displayTextOrRef(leaf.reference, "—")}</div>}
                     </div>
                   )}
+                  {!leaf && test && (
+                    <div className="mt-2 rounded border border-dashed bg-muted/30 p-2 text-[10px] text-muted-foreground">
+                      Continúa eligiendo hasta llegar a un punto de dato (●) para graficar.
+                    </div>
+                  )}
+                  {leaf && resolved.find((r) => r.sel.id === s.id)?.measurements.length === 0 && (
+                    <div className="mt-2 rounded border border-dashed border-destructive/40 bg-destructive/5 p-2 text-[10px] text-destructive">
+                      Sin mediciones importadas para este punto en el rango de fechas seleccionado.
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );
