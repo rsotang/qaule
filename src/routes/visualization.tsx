@@ -346,8 +346,15 @@ function VisualizationPage() {
             </CardHeader>
             <CardContent>
               {chartData.length === 0 ? (
-                <div className="flex h-[360px] items-center justify-center text-sm text-muted-foreground">
-                  Selecciona al menos un parámetro completo para visualizar datos.
+                <div className="flex h-[360px] flex-col items-center justify-center gap-1 text-sm text-muted-foreground">
+                  {resolved.every((r) => !r.leaf) ? (
+                    <span>Selecciona al menos un parámetro completo (hasta un punto ●) para visualizar datos.</span>
+                  ) : (
+                    <>
+                      <span>No hay mediciones para la selección actual.</span>
+                      <span className="text-xs">Revisa el rango de fechas o importa datos para este parámetro.</span>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="h-[420px] w-full">
