@@ -600,6 +600,15 @@ function TreeNodeView({
           <Button size="sm" variant="ghost" className="h-7 px-2 text-[10px]" onClick={() => onAddChild(node.id, "data")}>
             <FilePlus className="size-3" /> dato
           </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-7"
+            onClick={() => onDuplicate(node.id)}
+            title="Duplicar grupo"
+          >
+            <CopyPlus className="size-3" />
+          </Button>
           <Button size="icon" variant="ghost" className="size-7" onClick={() => onRemove(node.id)}>
             <Trash2 className="size-3 text-destructive" />
           </Button>
