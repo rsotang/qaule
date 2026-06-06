@@ -31,6 +31,8 @@ import {
   addChild,
   removeNode,
   updateNode,
+  cloneNodeDeep,
+  insertAfter,
   walkDataPoints,
   allBoundCells,
   textValue,
