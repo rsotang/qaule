@@ -626,6 +626,7 @@ function TreeNodeView({
                 onUpdate={onUpdate}
                 onAddChild={onAddChild}
                 onRemove={onRemove}
+                onDuplicate={onDuplicate}
               />
             ))}
           </div>
