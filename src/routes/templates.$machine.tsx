@@ -525,6 +525,21 @@ function TestEditor({
                   )
                 }
                 onRemove={(id) => onTreeChange(removeNode(test.root, id))}
+                onDuplicate={(id) => {
+                  const find = (n: TreeNode): TreeNode | null => {
+                    if (n.id === id) return n;
+                    if (n.kind === "nest") {
+                      for (const c of n.children) {
+                        const r = find(c);
+                        if (r) return r;
+                      }
+                    }
+                    return null;
+                  };
+                  const original = find(test.root);
+                  if (!original) return;
+                  onTreeChange(insertAfter(test.root, id, cloneNodeDeep(original)));
+                }}
               />
             ))}
           </div>
