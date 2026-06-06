@@ -15,7 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import {
   Trash2, Plus, Save, Upload, Wand2, Copy, FolderPlus, FilePlus,
-  ChevronRight, ChevronDown, X, Target, Type, Hash,
+  ChevronRight, ChevronDown, X, Target, Type, Hash, CopyPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { CellPicker } from "@/components/qa/CellPicker";
