@@ -560,6 +560,7 @@ function TreeNodeView({
   onUpdate,
   onAddChild,
   onRemove,
+  onDuplicate,
 }: {
   node: TreeNode;
   depth: number;
@@ -569,6 +570,7 @@ function TreeNodeView({
   onUpdate: (id: string, patch: (n: TreeNode) => TreeNode) => void;
   onAddChild: (parentId: string, kind: "nest" | "data") => void;
   onRemove: (id: string) => void;
+  onDuplicate: (id: string) => void;
 }) {
   const [open, setOpen] = useState(true);
   const pad = { paddingLeft: `${depth * 16}px` };
