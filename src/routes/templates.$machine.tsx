@@ -711,6 +711,15 @@ function TreeNodeView({
             </SelectContent>
           </Select>
         )}
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-7"
+          onClick={() => onDuplicate(dp.id)}
+          title="Duplicar dato"
+        >
+          <CopyPlus className="size-3" />
+        </Button>
         <Button size="icon" variant="ghost" className="size-7" onClick={() => onRemove(dp.id)}>
           <Trash2 className="size-3 text-destructive" />
         </Button>
