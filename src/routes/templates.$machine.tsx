@@ -15,7 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import {
   Trash2, Plus, Save, Upload, Wand2, Copy, FolderPlus, FilePlus,
-  ChevronRight, ChevronDown, X, Target, Type, Hash,
+  ChevronRight, ChevronDown, X, Target, Type, Hash, CopyPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { CellPicker } from "@/components/qa/CellPicker";
@@ -31,6 +31,8 @@ import {
   addChild,
   removeNode,
   updateNode,
+  cloneNodeDeep,
+  insertAfter,
   walkDataPoints,
   allBoundCells,
   textValue,
@@ -523,6 +525,21 @@ function TestEditor({
                   )
                 }
                 onRemove={(id) => onTreeChange(removeNode(test.root, id))}
+                onDuplicate={(id) => {
+                  const find = (n: TreeNode): TreeNode | null => {
+                    if (n.id === id) return n;
+                    if (n.kind === "nest") {
+                      for (const c of n.children) {
+                        const r = find(c);
+                        if (r) return r;
+                      }
+                    }
+                    return null;
+                  };
+                  const original = find(test.root);
+                  if (!original) return;
+                  onTreeChange(insertAfter(test.root, id, cloneNodeDeep(original)));
+                }}
               />
             ))}
           </div>
@@ -543,6 +560,7 @@ function TreeNodeView({
   onUpdate,
   onAddChild,
   onRemove,
+  onDuplicate,
 }: {
   node: TreeNode;
   depth: number;
@@ -552,6 +570,7 @@ function TreeNodeView({
   onUpdate: (id: string, patch: (n: TreeNode) => TreeNode) => void;
   onAddChild: (parentId: string, kind: "nest" | "data") => void;
   onRemove: (id: string) => void;
+  onDuplicate: (id: string) => void;
 }) {
   const [open, setOpen] = useState(true);
   const pad = { paddingLeft: `${depth * 16}px` };
@@ -581,6 +600,15 @@ function TreeNodeView({
           <Button size="sm" variant="ghost" className="h-7 px-2 text-[10px]" onClick={() => onAddChild(node.id, "data")}>
             <FilePlus className="size-3" /> dato
           </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-7"
+            onClick={() => onDuplicate(node.id)}
+            title="Duplicar grupo"
+          >
+            <CopyPlus className="size-3" />
+          </Button>
           <Button size="icon" variant="ghost" className="size-7" onClick={() => onRemove(node.id)}>
             <Trash2 className="size-3 text-destructive" />
           </Button>
@@ -598,6 +626,7 @@ function TreeNodeView({
                 onUpdate={onUpdate}
                 onAddChild={onAddChild}
                 onRemove={onRemove}
+                onDuplicate={onDuplicate}
               />
             ))}
           </div>
@@ -682,6 +711,15 @@ function TreeNodeView({
             </SelectContent>
           </Select>
         )}
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-7"
+          onClick={() => onDuplicate(dp.id)}
+          title="Duplicar dato"
+        >
+          <CopyPlus className="size-3" />
+        </Button>
         <Button size="icon" variant="ghost" className="size-7" onClick={() => onRemove(dp.id)}>
           <Trash2 className="size-3 text-destructive" />
         </Button>

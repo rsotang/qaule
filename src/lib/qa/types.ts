@@ -221,6 +221,40 @@ export function removeNode(root: Nest, id: string): Nest {
   return visit(root);
 }
 
+/** Deep-clone a node, assigning fresh ids to every nested element. */
+export function cloneNodeDeep(node: TreeNode): TreeNode {
+  if (node.kind === "nest") {
+    return {
+      id: `nest-${Math.random().toString(36).slice(2, 9)}`,
+      kind: "nest",
+      name: node.name,
+      children: node.children.map(cloneNodeDeep),
+    };
+  }
+  return {
+    ...node,
+    id: `dp-${Math.random().toString(36).slice(2, 9)}`,
+    cell: node.cell ? { ...node.cell } : undefined,
+  };
+}
+
+/** Insert `newNode` as a sibling immediately after the node with id `afterId`. */
+export function insertAfter(root: Nest, afterId: string, newNode: TreeNode): Nest {
+  const visit = (n: Nest): Nest => {
+    const idx = n.children.findIndex((c) => c.id === afterId);
+    if (idx !== -1) {
+      const next = [...n.children];
+      next.splice(idx + 1, 0, newNode);
+      return { ...n, children: next };
+    }
+    return {
+      ...n,
+      children: n.children.map((c) => (c.kind === "nest" ? visit(c) : c)),
+    };
+  };
+  return visit(root);
+}
+
 // ---------- tolerance helpers ----------
 
 export function parseToleranceText(text: string): Tolerance {
