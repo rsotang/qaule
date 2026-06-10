@@ -384,6 +384,7 @@ function VisualizationPage() {
                   {leaf && (
                     <div className="mt-2 rounded border border-dashed bg-muted/30 p-2 text-[10px] text-muted-foreground">
                       <div className="font-medium text-foreground">{chainSeriesKey(chain)}</div>
+                      {leaf.unit && <div>Unidad: {displayTextOrRef(leaf.unit, "—")}</div>}
                       {leaf.parsedTolerance && leaf.parsedTolerance.type !== "none" && (
                         <div>Tolerancia: {displayTextOrRef(leaf.tolerance, "—")}</div>
                       )}
