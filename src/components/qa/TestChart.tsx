@@ -119,15 +119,38 @@ export function TestChart({
   const allValues = data.flatMap((r) =>
     series.map((s) => (typeof r[s.key] === "number" ? (r[s.key] as number) : null)).filter((v): v is number => v != null),
   );
-  let yMin = Math.min(...allValues);
-  let yMax = Math.max(...allValues);
+  let yMin = allValues.length ? Math.min(...allValues) : 0;
+  let yMax = allValues.length ? Math.max(...allValues) : 1;
   if (band) {
-    yMin = Math.min(yMin, band.min);
-    yMax = Math.max(yMax, band.max);
+    const valSpan = Math.max(yMax - yMin, Math.abs(yMax) * 0.01, 1e-9);
+    const bandSpan = band.max - band.min;
+    // Only fold the tolerance band into the axis when it's on a comparable
+    // scale to the data; otherwise the y-axis units "go crazy" (e.g. a band
+    // of ±100 with values around 0.5 would flatten every line).
+    if (bandSpan <= valSpan * 8) {
+      yMin = Math.min(yMin, band.min);
+      yMax = Math.max(yMax, band.max);
+    }
   }
-  const pad = (yMax - yMin) * 0.15 || Math.abs(yMax) * 0.1 || 1;
-  yMin -= pad;
-  yMax += pad;
+  if (yMin === yMax) {
+    const base = Math.abs(yMin) || 1;
+    yMin -= base * 0.1;
+    yMax += base * 0.1;
+  }
+  const span = yMax - yMin;
+  yMin -= span * 0.15;
+  yMax += span * 0.15;
+
+  // Decimal precision adapts to the visible range, not the magnitude of a single value.
+  const visibleSpan = yMax - yMin;
+  const decimals =
+    visibleSpan >= 100 ? 0 : visibleSpan >= 10 ? 1 : visibleSpan >= 1 ? 2 : visibleSpan >= 0.1 ? 3 : visibleSpan >= 0.01 ? 4 : 5;
+  const fmtAxis = (v: number) => {
+    if (!isFinite(v)) return "";
+    const abs = Math.abs(v);
+    if (abs !== 0 && (abs >= 1e6 || abs < 1e-4)) return v.toExponential(1);
+    return v.toFixed(decimals);
+  };
 
   return (
     <div className="w-full" style={{ height }}>
@@ -139,8 +162,9 @@ export function TestChart({
             domain={[yMin, yMax]}
             fontSize={10}
             tick={{ fill: "currentColor" }}
-            width={48}
-            tickFormatter={(v) => formatNum(v)}
+            width={56}
+            tickFormatter={fmtAxis}
+            allowDecimals
           />
           <Tooltip
             contentStyle={{
@@ -150,8 +174,9 @@ export function TestChart({
               borderRadius: 6,
               fontSize: 12,
             }}
-            formatter={(v: number | string) => (typeof v === "number" ? formatNum(v) : v)}
+            formatter={(v: number | string) => (typeof v === "number" ? fmtAxis(v) : v)}
           />
+
           {band && (
             <ReferenceArea
               y1={band.min}
