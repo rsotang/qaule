@@ -37,6 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 export const Route = createFileRoute("/visualization")({ component: VisualizationPage });
 
@@ -92,6 +93,8 @@ function VisualizationPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [series, setSeries] = useState<SeriesSel[]>([newSeries()]);
+  const [showTolerance, setShowTolerance] = useState(true);
+  const [showReference, setShowReference] = useState(true);
 
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
   const allTemplates = useQuery({ queryKey: ["templates-all"], queryFn: () => listTemplates() });
@@ -162,26 +165,82 @@ function VisualizationPage() {
       });
   }, [resolved]);
 
-  const yDomain = useMemo((): [number, number] | undefined => {
-    const vals: number[] = [];
+  // Robust y-domain + adaptive formatting based on actual data magnitude.
+  const { yDomain, fmtAxis, unitLabel } = useMemo(() => {
+    const dataVals: number[] = [];
     for (const row of chartData) {
       for (const r of resolved) {
         const v = row[r.sel.id];
-        if (typeof v === "number") vals.push(v);
+        if (typeof v === "number" && Number.isFinite(v)) dataVals.push(v);
       }
     }
-    for (const r of resolved) {
-      const band = toleranceBand(r.leaf?.parsedTolerance);
-      if (band) vals.push(band.min, band.max);
-      const ref = parseRefNumber(r.leaf?.reference);
-      if (ref != null) vals.push(ref);
+    // Percentile range to ignore outliers (bad imports) from blowing up axis.
+    const sorted = [...dataVals].sort((a, b) => a - b);
+    const pct = (p: number) =>
+      sorted.length === 0
+        ? 0
+        : sorted[Math.min(sorted.length - 1, Math.max(0, Math.round((p / 100) * (sorted.length - 1))))];
+    let min = sorted.length <= 4 ? (sorted[0] ?? 0) : pct(5);
+    let max = sorted.length <= 4 ? (sorted[sorted.length - 1] ?? 1) : pct(95);
+    if (min === max && sorted.length > 0) {
+      min = sorted[0];
+      max = sorted[sorted.length - 1];
     }
-    if (vals.length === 0) return undefined;
-    let min = Math.min(...vals);
-    let max = Math.max(...vals);
-    const pad = (max - min) * 0.15 || Math.abs(max) * 0.1 || 1;
-    return [min - pad, max + pad];
-  }, [chartData, resolved]);
+    const baseSpan = Math.max(max - min, Math.abs(max) * 0.01, 1e-9);
+
+    // Fold tolerance bands / reference lines into the axis ONLY when on a
+    // comparable scale to the data; otherwise keep the axis tight to the data.
+    if (showTolerance) {
+      for (const r of resolved) {
+        const band = toleranceBand(r.leaf?.parsedTolerance);
+        if (!band) continue;
+        const bandSpan = band.max - band.min;
+        if (bandSpan <= baseSpan * 8) {
+          min = Math.min(min, band.min);
+          max = Math.max(max, band.max);
+        }
+      }
+    }
+    if (showReference) {
+      for (const r of resolved) {
+        const ref = parseRefNumber(r.leaf?.reference);
+        if (ref == null) continue;
+        if (Math.abs(ref - (min + max) / 2) <= baseSpan * 8) {
+          min = Math.min(min, ref);
+          max = Math.max(max, ref);
+        }
+      }
+    }
+
+    if (sorted.length === 0) return { yDomain: undefined as [number, number] | undefined, fmtAxis: (v: number) => String(v), unitLabel: "" };
+    if (min === max) {
+      const base = Math.abs(min) || 1;
+      min -= base * 0.1;
+      max += base * 0.1;
+    }
+    const span = max - min;
+    const yDomain: [number, number] = [min - span * 0.15, max + span * 0.15];
+    const visibleSpan = yDomain[1] - yDomain[0];
+    const decimals =
+      visibleSpan >= 100 ? 0 : visibleSpan >= 10 ? 1 : visibleSpan >= 1 ? 2 : visibleSpan >= 0.1 ? 3 : visibleSpan >= 0.01 ? 4 : 5;
+    const fmtAxis = (v: number) => {
+      if (!isFinite(v)) return "";
+      const abs = Math.abs(v);
+      if (abs !== 0 && (abs >= 1e6 || abs < 1e-4)) return v.toExponential(1);
+      return v.toFixed(decimals);
+    };
+
+    // Compose a unit label from active series (dedup); blank if mixed/none.
+    const units = new Set<string>();
+    for (const r of resolved) {
+      if (!r.leaf) continue;
+      const u = displayTextOrRef(r.leaf.unit, "").trim();
+      if (u) units.add(u);
+    }
+    const unitLabel = units.size === 1 ? [...units][0] : units.size > 1 ? [...units].join(" / ") : "";
+
+    return { yDomain, fmtAxis, unitLabel };
+  }, [chartData, resolved, showTolerance, showReference]);
 
   return (
     <div className="space-y-4">
@@ -198,7 +257,7 @@ function VisualizationPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Rango de fechas</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label className="text-[10px] uppercase text-muted-foreground">Desde</Label>
@@ -207,6 +266,16 @@ function VisualizationPage() {
               <div className="space-y-1">
                 <Label className="text-[10px] uppercase text-muted-foreground">Hasta</Label>
                 <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 text-xs" />
+              </div>
+            </div>
+            <div className="space-y-2 border-t pt-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="tog-tol" className="text-xs">Mostrar tolerancias</Label>
+                <Switch id="tog-tol" checked={showTolerance} onCheckedChange={setShowTolerance} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="tog-ref" className="text-xs">Mostrar referencias</Label>
+                <Switch id="tog-ref" checked={showReference} onCheckedChange={setShowReference} />
               </div>
             </div>
           </CardContent>
@@ -315,6 +384,7 @@ function VisualizationPage() {
                   {leaf && (
                     <div className="mt-2 rounded border border-dashed bg-muted/30 p-2 text-[10px] text-muted-foreground">
                       <div className="font-medium text-foreground">{chainSeriesKey(chain)}</div>
+                      {leaf.unit && <div>Unidad: {displayTextOrRef(leaf.unit, "—")}</div>}
                       {leaf.parsedTolerance && leaf.parsedTolerance.type !== "none" && (
                         <div>Tolerancia: {displayTextOrRef(leaf.tolerance, "—")}</div>
                       )}
@@ -376,7 +446,14 @@ function VisualizationPage() {
                         domain={yDomain ?? ["auto", "auto"]}
                         fontSize={11}
                         tick={{ fill: "currentColor" }}
-                        width={56}
+                        width={64}
+                        tickFormatter={fmtAxis}
+                        allowDecimals
+                        label={
+                          unitLabel
+                            ? { value: unitLabel, angle: -90, position: "insideLeft", style: { fill: "currentColor", fontSize: 11 } }
+                            : undefined
+                        }
                       />
                       <Tooltip
                         contentStyle={{
@@ -386,12 +463,16 @@ function VisualizationPage() {
                           borderRadius: 6,
                           fontSize: 12,
                         }}
+                        formatter={(v: number | string) => {
+                          if (typeof v !== "number") return v;
+                          return unitLabel ? `${fmtAxis(v)} ${unitLabel}` : fmtAxis(v);
+                        }}
                       />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
                       {resolved.flatMap((r) => {
                         if (!r.leaf) return [];
-                        const band = toleranceBand(r.leaf.parsedTolerance);
-                        const refVal = parseRefNumber(r.leaf.reference);
+                        const band = showTolerance ? toleranceBand(r.leaf.parsedTolerance) : null;
+                        const refVal = showReference ? parseRefNumber(r.leaf.reference) : null;
                         const lines = [];
                         if (band) {
                           lines.push(
