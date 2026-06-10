@@ -108,7 +108,7 @@ function MachineCard({
   const lastImport = myImports[myImports.length - 1];
 
   const freq = useMemo(() => {
-    const c = { monthly: 0, quarterly: 0, annual: 0, total: 0 };
+    const c = { monthly: 0, quarterly: 0, semiannual: 0, annual: 0, total: 0 };
     if (!tpl) return c;
     for (const t of tpl.tests) {
       c[t.frequency]++;
@@ -153,7 +153,7 @@ function MachineCard({
           <p className="text-sm font-medium">{tpl?.name ?? "—"}</p>
           {tpl ? (
             <p className="text-[11px] text-muted-foreground">
-              {freq.total} tests · M:{freq.monthly} · T:{freq.quarterly} · A:{freq.annual}
+              {freq.total} tests · M:{freq.monthly} · T:{freq.quarterly} · S:{freq.semiannual} · A:{freq.annual}
             </p>
           ) : (
             <Link to="/templates" className="text-[11px] text-primary underline">

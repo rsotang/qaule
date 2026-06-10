@@ -6,7 +6,7 @@ export const MACHINES: { id: MachineId; name: string }[] = [
   { id: "TB3", name: "TrueBeam 3" },
 ];
 
-export type Frequency = "monthly" | "quarterly" | "annual";
+export type Frequency = "monthly" | "quarterly" | "semiannual" | "annual";
 export type Category =
   | "mechanical_unit"
   | "mechanical_table"

@@ -293,7 +293,7 @@ function TemplateEditor() {
                   <div className="mt-1 flex flex-wrap gap-1">
                     <Badge variant="secondary" className="text-[9px]">{CATEGORY_LABELS[t.category]}</Badge>
                     <Badge variant="outline" className="text-[9px]">
-                      {t.frequency === "monthly" ? "M" : t.frequency === "quarterly" ? "T" : "A"}
+                      {t.frequency === "monthly" ? "M" : t.frequency === "quarterly" ? "T" : t.frequency === "semiannual" ? "S" : "A"}
                     </Badge>
                   </div>
                 </button>
@@ -432,6 +432,7 @@ function TestEditor({
               <SelectContent>
                 <SelectItem value="monthly">Mensual</SelectItem>
                 <SelectItem value="quarterly">Trimestral</SelectItem>
+                <SelectItem value="semiannual">Semestral</SelectItem>
                 <SelectItem value="annual">Anual</SelectItem>
               </SelectContent>
             </Select>
