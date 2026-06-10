@@ -165,26 +165,82 @@ function VisualizationPage() {
       });
   }, [resolved]);
 
-  const yDomain = useMemo((): [number, number] | undefined => {
-    const vals: number[] = [];
+  // Robust y-domain + adaptive formatting based on actual data magnitude.
+  const { yDomain, fmtAxis, unitLabel } = useMemo(() => {
+    const dataVals: number[] = [];
     for (const row of chartData) {
       for (const r of resolved) {
         const v = row[r.sel.id];
-        if (typeof v === "number") vals.push(v);
+        if (typeof v === "number" && Number.isFinite(v)) dataVals.push(v);
       }
     }
-    for (const r of resolved) {
-      const band = toleranceBand(r.leaf?.parsedTolerance);
-      if (band) vals.push(band.min, band.max);
-      const ref = parseRefNumber(r.leaf?.reference);
-      if (ref != null) vals.push(ref);
+    // Percentile range to ignore outliers (bad imports) from blowing up axis.
+    const sorted = [...dataVals].sort((a, b) => a - b);
+    const pct = (p: number) =>
+      sorted.length === 0
+        ? 0
+        : sorted[Math.min(sorted.length - 1, Math.max(0, Math.round((p / 100) * (sorted.length - 1))))];
+    let min = sorted.length <= 4 ? (sorted[0] ?? 0) : pct(5);
+    let max = sorted.length <= 4 ? (sorted[sorted.length - 1] ?? 1) : pct(95);
+    if (min === max && sorted.length > 0) {
+      min = sorted[0];
+      max = sorted[sorted.length - 1];
     }
-    if (vals.length === 0) return undefined;
-    let min = Math.min(...vals);
-    let max = Math.max(...vals);
-    const pad = (max - min) * 0.15 || Math.abs(max) * 0.1 || 1;
-    return [min - pad, max + pad];
-  }, [chartData, resolved]);
+    const baseSpan = Math.max(max - min, Math.abs(max) * 0.01, 1e-9);
+
+    // Fold tolerance bands / reference lines into the axis ONLY when on a
+    // comparable scale to the data; otherwise keep the axis tight to the data.
+    if (showTolerance) {
+      for (const r of resolved) {
+        const band = toleranceBand(r.leaf?.parsedTolerance);
+        if (!band) continue;
+        const bandSpan = band.max - band.min;
+        if (bandSpan <= baseSpan * 8) {
+          min = Math.min(min, band.min);
+          max = Math.max(max, band.max);
+        }
+      }
+    }
+    if (showReference) {
+      for (const r of resolved) {
+        const ref = parseRefNumber(r.leaf?.reference);
+        if (ref == null) continue;
+        if (Math.abs(ref - (min + max) / 2) <= baseSpan * 8) {
+          min = Math.min(min, ref);
+          max = Math.max(max, ref);
+        }
+      }
+    }
+
+    if (sorted.length === 0) return { yDomain: undefined as [number, number] | undefined, fmtAxis: (v: number) => String(v), unitLabel: "" };
+    if (min === max) {
+      const base = Math.abs(min) || 1;
+      min -= base * 0.1;
+      max += base * 0.1;
+    }
+    const span = max - min;
+    const yDomain: [number, number] = [min - span * 0.15, max + span * 0.15];
+    const visibleSpan = yDomain[1] - yDomain[0];
+    const decimals =
+      visibleSpan >= 100 ? 0 : visibleSpan >= 10 ? 1 : visibleSpan >= 1 ? 2 : visibleSpan >= 0.1 ? 3 : visibleSpan >= 0.01 ? 4 : 5;
+    const fmtAxis = (v: number) => {
+      if (!isFinite(v)) return "";
+      const abs = Math.abs(v);
+      if (abs !== 0 && (abs >= 1e6 || abs < 1e-4)) return v.toExponential(1);
+      return v.toFixed(decimals);
+    };
+
+    // Compose a unit label from active series (dedup); blank if mixed/none.
+    const units = new Set<string>();
+    for (const r of resolved) {
+      if (!r.leaf) continue;
+      const u = displayTextOrRef(r.leaf.unit, "").trim();
+      if (u) units.add(u);
+    }
+    const unitLabel = units.size === 1 ? [...units][0] : units.size > 1 ? [...units].join(" / ") : "";
+
+    return { yDomain, fmtAxis, unitLabel };
+  }, [chartData, resolved, showTolerance, showReference]);
 
   return (
     <div className="space-y-4">
