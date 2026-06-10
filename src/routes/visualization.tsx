@@ -446,7 +446,14 @@ function VisualizationPage() {
                         domain={yDomain ?? ["auto", "auto"]}
                         fontSize={11}
                         tick={{ fill: "currentColor" }}
-                        width={56}
+                        width={64}
+                        tickFormatter={fmtAxis}
+                        allowDecimals
+                        label={
+                          unitLabel
+                            ? { value: unitLabel, angle: -90, position: "insideLeft", style: { fill: "currentColor", fontSize: 11 } }
+                            : undefined
+                        }
                       />
                       <Tooltip
                         contentStyle={{
@@ -456,12 +463,16 @@ function VisualizationPage() {
                           borderRadius: 6,
                           fontSize: 12,
                         }}
+                        formatter={(v: number | string) => {
+                          if (typeof v !== "number") return v;
+                          return unitLabel ? `${fmtAxis(v)} ${unitLabel}` : fmtAxis(v);
+                        }}
                       />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
                       {resolved.flatMap((r) => {
                         if (!r.leaf) return [];
-                        const band = toleranceBand(r.leaf.parsedTolerance);
-                        const refVal = parseRefNumber(r.leaf.reference);
+                        const band = showTolerance ? toleranceBand(r.leaf.parsedTolerance) : null;
+                        const refVal = showReference ? parseRefNumber(r.leaf.reference) : null;
                         const lines = [];
                         if (band) {
                           lines.push(
