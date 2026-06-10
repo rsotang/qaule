@@ -108,7 +108,7 @@ function MachineCard({
   const lastImport = myImports[myImports.length - 1];
 
   const freq = useMemo(() => {
-    const c = { monthly: 0, quarterly: 0, annual: 0, total: 0 };
+    const c = { monthly: 0, quarterly: 0, semiannual: 0, annual: 0, total: 0 };
     if (!tpl) return c;
     for (const t of tpl.tests) {
       c[t.frequency]++;
