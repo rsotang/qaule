@@ -162,8 +162,9 @@ export function TestChart({
             domain={[yMin, yMax]}
             fontSize={10}
             tick={{ fill: "currentColor" }}
-            width={48}
-            tickFormatter={(v) => formatNum(v)}
+            width={56}
+            tickFormatter={fmtAxis}
+            allowDecimals
           />
           <Tooltip
             contentStyle={{
@@ -173,8 +174,9 @@ export function TestChart({
               borderRadius: 6,
               fontSize: 12,
             }}
-            formatter={(v: number | string) => (typeof v === "number" ? formatNum(v) : v)}
+            formatter={(v: number | string) => (typeof v === "number" ? fmtAxis(v) : v)}
           />
+
           {band && (
             <ReferenceArea
               y1={band.min}
