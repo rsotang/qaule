@@ -432,6 +432,7 @@ function TestEditor({
               <SelectContent>
                 <SelectItem value="monthly">Mensual</SelectItem>
                 <SelectItem value="quarterly">Trimestral</SelectItem>
+                <SelectItem value="semiannual">Semestral</SelectItem>
                 <SelectItem value="annual">Anual</SelectItem>
               </SelectContent>
             </Select>
