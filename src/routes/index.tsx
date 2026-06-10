@@ -153,7 +153,7 @@ function MachineCard({
           <p className="text-sm font-medium">{tpl?.name ?? "—"}</p>
           {tpl ? (
             <p className="text-[11px] text-muted-foreground">
-              {freq.total} tests · M:{freq.monthly} · T:{freq.quarterly} · A:{freq.annual}
+              {freq.total} tests · M:{freq.monthly} · T:{freq.quarterly} · S:{freq.semiannual} · A:{freq.annual}
             </p>
           ) : (
             <Link to="/templates" className="text-[11px] text-primary underline">
