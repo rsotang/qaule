@@ -33,7 +33,11 @@ function parseSheet(name: string, ws: XLSX.WorkSheet): ParsedSheet {
     for (let c = 0; c < cols; c++) {
       const addr = XLSX.utils.encode_cell({ r, c });
       const cell = ws[addr];
-      if (!cell || cell.v == null) row.push(null);
+      if (!cell) row.push(null);
+      else if (cell.t === "e") row.push(null); // Excel error (#DIV/0!, #REF!, #N/A, etc.)
+      else if (cell.v == null) row.push(null);
+      else if (typeof cell.v === "string" && cell.v.trim() === "") row.push(null);
+      else if (typeof cell.v === "string" && /^#(DIV\/0!|REF!|N\/A|NAME\?|VALUE!|NULL!|NUM!|GETTING_DATA)$/i.test(cell.v.trim())) row.push(null);
       else if (cell.v instanceof Date) row.push(cell.v.toISOString());
       else row.push(cell.v as string | number);
     }
@@ -52,8 +56,11 @@ export function readCell(parsed: ParsedWorkbook, ref: CellRef): string | number 
 export function readNumber(parsed: ParsedWorkbook, ref: CellRef): number | null {
   const v = readCell(parsed, ref);
   if (v == null) return null;
-  if (typeof v === "number") return v;
-  const n = parseFloat(String(v).replace(",", "."));
+  if (typeof v === "number") return isFinite(v) ? v : null;
+  const s = String(v).trim();
+  if (!s) return null;
+  if (/^#(DIV\/0!|REF!|N\/A|NAME\?|VALUE!|NULL!|NUM!|GETTING_DATA)$/i.test(s)) return null;
+  const n = parseFloat(s.replace(",", "."));
   return isFinite(n) ? n : null;
 }
 
