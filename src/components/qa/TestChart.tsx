@@ -116,11 +116,24 @@ export function TestChart({
     );
   }
 
-  const allValues = data.flatMap((r) =>
-    series.map((s) => (typeof r[s.key] === "number" ? (r[s.key] as number) : null)).filter((v): v is number => v != null),
-  );
-  let yMin = allValues.length ? Math.min(...allValues) : 0;
-  let yMax = allValues.length ? Math.max(...allValues) : 1;
+  const allValues = data
+    .flatMap((r) => series.map((s) => (typeof r[s.key] === "number" ? (r[s.key] as number) : null)))
+    .filter((v): v is number => v != null && Number.isFinite(v));
+
+  // Use a robust percentile range so a single bad import (e.g. a stray 3.3e9
+  // value) does not blow out the Y axis. Falls back to min/max with few points.
+  const sorted = [...allValues].sort((a, b) => a - b);
+  const pct = (p: number) => {
+    if (sorted.length === 0) return 0;
+    const idx = Math.min(sorted.length - 1, Math.max(0, Math.round((p / 100) * (sorted.length - 1))));
+    return sorted[idx];
+  };
+  let yMin = sorted.length <= 4 ? (sorted[0] ?? 0) : pct(5);
+  let yMax = sorted.length <= 4 ? (sorted[sorted.length - 1] ?? 1) : pct(95);
+  if (yMin === yMax && sorted.length > 0) {
+    yMin = sorted[0];
+    yMax = sorted[sorted.length - 1];
+  }
   if (band) {
     const valSpan = Math.max(yMax - yMin, Math.abs(yMax) * 0.01, 1e-9);
     const bandSpan = band.max - band.min;
