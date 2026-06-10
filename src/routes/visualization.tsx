@@ -257,7 +257,7 @@ function VisualizationPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Rango de fechas</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label className="text-[10px] uppercase text-muted-foreground">Desde</Label>
@@ -266,6 +266,16 @@ function VisualizationPage() {
               <div className="space-y-1">
                 <Label className="text-[10px] uppercase text-muted-foreground">Hasta</Label>
                 <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 text-xs" />
+              </div>
+            </div>
+            <div className="space-y-2 border-t pt-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="tog-tol" className="text-xs">Mostrar tolerancias</Label>
+                <Switch id="tog-tol" checked={showTolerance} onCheckedChange={setShowTolerance} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="tog-ref" className="text-xs">Mostrar referencias</Label>
+                <Switch id="tog-ref" checked={showReference} onCheckedChange={setShowReference} />
               </div>
             </div>
           </CardContent>
