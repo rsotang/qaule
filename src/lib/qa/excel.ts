@@ -56,8 +56,11 @@ export function readCell(parsed: ParsedWorkbook, ref: CellRef): string | number 
 export function readNumber(parsed: ParsedWorkbook, ref: CellRef): number | null {
   const v = readCell(parsed, ref);
   if (v == null) return null;
-  if (typeof v === "number") return v;
-  const n = parseFloat(String(v).replace(",", "."));
+  if (typeof v === "number") return isFinite(v) ? v : null;
+  const s = String(v).trim();
+  if (!s) return null;
+  if (/^#(DIV\/0!|REF!|N\/A|NAME\?|VALUE!|NULL!|NUM!|GETTING_DATA)$/i.test(s)) return null;
+  const n = parseFloat(s.replace(",", "."));
   return isFinite(n) ? n : null;
 }
 
