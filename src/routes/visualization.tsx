@@ -93,6 +93,8 @@ function VisualizationPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [series, setSeries] = useState<SeriesSel[]>([newSeries()]);
+  const [showTolerance, setShowTolerance] = useState(true);
+  const [showReference, setShowReference] = useState(true);
 
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
   const allTemplates = useQuery({ queryKey: ["templates-all"], queryFn: () => listTemplates() });
