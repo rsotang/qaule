@@ -33,7 +33,11 @@ function parseSheet(name: string, ws: XLSX.WorkSheet): ParsedSheet {
     for (let c = 0; c < cols; c++) {
       const addr = XLSX.utils.encode_cell({ r, c });
       const cell = ws[addr];
-      if (!cell || cell.v == null) row.push(null);
+      if (!cell) row.push(null);
+      else if (cell.t === "e") row.push(null); // Excel error (#DIV/0!, #REF!, #N/A, etc.)
+      else if (cell.v == null) row.push(null);
+      else if (typeof cell.v === "string" && cell.v.trim() === "") row.push(null);
+      else if (typeof cell.v === "string" && /^#(DIV\/0!|REF!|N\/A|NAME\?|VALUE!|NULL!|NUM!|GETTING_DATA)$/i.test(cell.v.trim())) row.push(null);
       else if (cell.v instanceof Date) row.push(cell.v.toISOString());
       else row.push(cell.v as string | number);
     }
