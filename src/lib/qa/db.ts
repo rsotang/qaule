@@ -266,3 +266,16 @@ export async function importAll(data: Awaited<ReturnType<typeof exportAll>>) {
   for (const m of data.measurements) await tx.objectStore("measurements").put(m);
   await tx.done;
 }
+
+export async function getCalendar(): Promise<CalendarRecord | undefined> {
+  const db = await getDB();
+  return db.get("calendar", "default");
+}
+export async function saveCalendar(rec: CalendarRecord) {
+  const db = await getDB();
+  await db.put("calendar", rec);
+}
+export async function deleteCalendar() {
+  const db = await getDB();
+  await db.delete("calendar", "default");
+}
