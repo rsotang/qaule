@@ -150,6 +150,39 @@ function ImportsPage() {
     }
   }
 
+  async function handleCalendarFile(file: File) {
+    try {
+      const result = await parseCalendarFile(file, { defaultYear: calYear });
+      setCalPreview(result);
+      setCalFileName(file.name);
+      toast.success(`${result.entries.length} tests detectados`);
+    } catch (e) {
+      toast.error(`Error: ${(e as Error).message}`);
+    }
+  }
+
+  async function commitCalendar() {
+    if (!calPreview) return;
+    await saveCalendar({
+      id: "default",
+      updatedAt: new Date().toISOString(),
+      fileName: calFileName,
+      entries: calPreview.entries,
+    });
+    toast.success("Calendario guardado");
+    setCalPreview(null);
+    setCalFileName("");
+    if (calFileRef.current) calFileRef.current.value = "";
+    qc.invalidateQueries({ queryKey: ["calendar"] });
+  }
+
+  async function handleDeleteCalendar() {
+    await deleteCalendar();
+    toast.success("Calendario eliminado");
+    qc.invalidateQueries({ queryKey: ["calendar"] });
+  }
+
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
