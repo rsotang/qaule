@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Trash2, Upload, Download } from "lucide-react";
+import { Trash2, Upload, Download, CalendarDays } from "lucide-react";
 import { toast } from "sonner";
 import {
   deleteImport,
@@ -29,9 +29,13 @@ import {
   listMachines,
   listTemplates,
   saveImport,
+  getCalendar,
+  saveCalendar,
+  deleteCalendar,
 } from "@/lib/qa/db";
 import { extractFromTemplate, readFile, resolveImportDate } from "@/lib/qa/excel";
-import type { MachineId, Measurement } from "@/lib/qa/types";
+import { parseCalendarFile, type ParseCalendarResult } from "@/lib/qa/calendar-excel";
+import type { MachineId, Measurement, CalendarEntry } from "@/lib/qa/types";
 import { MACHINES, evaluateTolerance } from "@/lib/qa/types";
 
 export const Route = createFileRoute("/imports")({ component: ImportsPage });
