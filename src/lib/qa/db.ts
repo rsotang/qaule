@@ -97,7 +97,7 @@ export function getDB() {
     throw new Error("IndexedDB unavailable (SSR)");
   }
   if (!dbPromise) {
-    dbPromise = openDB<QASchema>("qa-dashboard", 3, {
+    dbPromise = openDB<QASchema>("qa-dashboard", 4, {
       upgrade(db, oldVersion, _newVersion, tx) {
         if (oldVersion < 1) {
           db.createObjectStore("machines", { keyPath: "id" });
@@ -124,6 +124,9 @@ export function getDB() {
               cursor = await cursor.continue();
             }
           });
+        }
+        if (oldVersion < 4) {
+          db.createObjectStore("calendar", { keyPath: "id" });
         }
       },
     }).then(async (db) => {
