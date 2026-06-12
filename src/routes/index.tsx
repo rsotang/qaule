@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   listImports,
   listMachines,
   listMeasurements,
   listTemplates,
   updateMachineState,
+  getCalendar,
 } from "@/lib/qa/db";
 import {
   MACHINES,
@@ -19,9 +20,13 @@ import {
   type Template,
   type ImportRecord,
   type Measurement,
+  type CalendarRecord,
 } from "@/lib/qa/types";
+import { entryIsInMonth, entryDatesInMonth } from "@/lib/qa/calendar-excel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -29,7 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertTriangle, CheckCircle2, ShieldAlert } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ShieldAlert, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 
 export const Route = createFileRoute("/")({ component: Dashboard });
 
@@ -45,6 +50,7 @@ function Dashboard() {
   const templates = useQuery({ queryKey: ["templates-all"], queryFn: () => listTemplates() });
   const imports = useQuery({ queryKey: ["imports-all"], queryFn: () => listImports() });
   const measurements = useQuery({ queryKey: ["measurements-all"], queryFn: () => listMeasurements() });
+  const calendar = useQuery({ queryKey: ["calendar"], queryFn: getCalendar });
 
   async function setState(id: MachineId, state: MachineState) {
     await updateMachineState(id, state);
@@ -74,6 +80,12 @@ function Dashboard() {
           />
         ))}
       </div>
+
+      <MonthlySummary
+        calendar={calendar.data}
+        templates={templates.data ?? []}
+        measurements={measurements.data ?? []}
+      />
 
       <OOTPanel
         templates={templates.data ?? []}
@@ -278,3 +290,194 @@ function OOTPanel({
     </Card>
   );
 }
+
+const MONTH_NAMES_ES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
+function MonthlySummary({
+  calendar,
+  templates,
+  measurements,
+}: {
+  calendar?: CalendarRecord;
+  templates: Template[];
+  measurements: Measurement[];
+}) {
+  const today = new Date();
+  const [ym, setYm] = useState<string>(
+    `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`,
+  );
+
+  function shiftMonth(delta: number) {
+    const [y, m] = ym.split("-").map((n) => parseInt(n, 10));
+    const d = new Date(y, m - 1 + delta, 1);
+    setYm(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+
+  const rows = useMemo(() => {
+    if (!calendar) return [];
+    const scheduled = calendar.entries.filter((e) => entryIsInMonth(e, ym));
+    // Build a name -> {test, template} index across all templates
+    const testIndex = new Map<string, { test: Template["tests"][number]; template: Template }>();
+    for (const tpl of templates) {
+      for (const test of tpl.tests) {
+        const key = test.name.trim().toLowerCase();
+        if (!testIndex.has(key)) testIndex.set(key, { test, template: tpl });
+      }
+    }
+
+    return scheduled.map((entry) => {
+      const match = testIndex.get(entry.testName.trim().toLowerCase());
+      const monthStart = `${ym}-01`;
+      const [y, m] = ym.split("-").map((n) => parseInt(n, 10));
+      const monthEnd = new Date(y, m, 0).toISOString().slice(0, 10);
+
+      let status: "done" | "pending" = "pending";
+      let inTolerance: boolean | null = null;
+      let doneDate: string | undefined;
+
+      if (match) {
+        const ms = measurements
+          .filter(
+            (mm) =>
+              mm.testId === match.test.id &&
+              mm.date >= monthStart &&
+              mm.date <= monthEnd,
+          )
+          .sort((a, b) => b.date.localeCompare(a.date));
+        if (ms.length > 0) {
+          status = "done";
+          doneDate = ms[0].date;
+          // Evaluate tolerance for all in-month measurements of that test
+          let anyOut = false;
+          let anyEvaluated = false;
+          for (const meas of ms) {
+            const walked = walkDataPoints(match.test).find(
+              (w) => dpSeriesLabel(w) === meas.cellLabel,
+            );
+            if (!walked?.dp.parsedTolerance || walked.dp.parsedTolerance.type === "none") continue;
+            anyEvaluated = true;
+            if (!evaluateTolerance(walked.dp.parsedTolerance, meas.value).inTolerance) {
+              anyOut = true;
+              break;
+            }
+          }
+          inTolerance = anyEvaluated ? !anyOut : null;
+        }
+      }
+
+      return {
+        entry,
+        scheduleLabel: entryDatesInMonth(entry, ym),
+        status,
+        inTolerance,
+        doneDate,
+        matched: !!match,
+      };
+    });
+  }, [calendar, templates, measurements, ym]);
+
+  const [yStr, mStr] = ym.split("-");
+  const headerLabel = `${MONTH_NAMES_ES[parseInt(mStr, 10) - 1]} ${yStr}`;
+  const doneCount = rows.filter((r) => r.status === "done").length;
+  const oot = rows.filter((r) => r.inTolerance === false).length;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CalendarDays className="size-4" /> Resumen mensual — {headerLabel}
+            </CardTitle>
+            {calendar ? (
+              <p className="text-xs text-muted-foreground">
+                {rows.length} tests programados · {doneCount} realizados · {oot} fuera de tolerancia
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Sin calendario.{" "}
+                <Link to="/imports" className="text-primary underline">
+                  Importar calendario
+                </Link>
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" onClick={() => shiftMonth(-1)}>
+              <ChevronLeft className="size-4" />
+            </Button>
+            <Input
+              type="month"
+              value={ym}
+              onChange={(e) => e.target.value && setYm(e.target.value)}
+              className="w-[160px]"
+            />
+            <Button variant="outline" size="icon" onClick={() => shiftMonth(1)}>
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {!calendar ? null : rows.length === 0 ? (
+          <p className="py-4 text-center text-sm text-muted-foreground">
+            Sin tests programados para {headerLabel}.
+          </p>
+        ) : (
+          <ul className="divide-y">
+            {rows.map((r, i) => (
+              <li key={i} className="flex items-center justify-between gap-3 py-2 text-sm">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">
+                    {r.entry.testName}
+                    {!r.matched && (
+                      <span className="ml-2 text-[10px] text-muted-foreground">
+                        (no asociado a plantilla)
+                      </span>
+                    )}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {r.scheduleLabel}
+                    {r.entry.performer ? ` · ${r.entry.performer}` : ""}
+                    {r.doneDate ? ` · realizado ${r.doneDate}` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {r.status === "done" ? (
+                    <Badge
+                      variant="outline"
+                      className="gap-1 border-emerald-500/30 bg-emerald-500/15 text-emerald-700"
+                    >
+                      <CheckCircle2 className="size-3" /> Realizado
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="gap-1 border-amber-500/30 bg-amber-500/15 text-amber-700">
+                      Pendiente
+                    </Badge>
+                  )}
+                  {r.inTolerance === true && (
+                    <Badge
+                      variant="outline"
+                      className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
+                    >
+                      En tolerancia
+                    </Badge>
+                  )}
+                  {r.inTolerance === false && (
+                    <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive">
+                      Fuera
+                    </Badge>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+

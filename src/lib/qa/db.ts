@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import type { ImportRecord, MachineRecord, Measurement, Template, TestDef, Nest, TreeNode, TextOrRef } from "./types";
+import type { ImportRecord, MachineRecord, Measurement, Template, TestDef, Nest, TreeNode, TextOrRef, CalendarRecord } from "./types";
 import { MACHINES, emptyNest, textValue } from "./types";
 
 interface QASchema extends DBSchema {
@@ -11,7 +11,9 @@ interface QASchema extends DBSchema {
     value: Measurement;
     indexes: { byMachine: string; byImport: string; byTest: string };
   };
+  calendar: { key: string; value: CalendarRecord };
 }
+
 
 let dbPromise: Promise<IDBPDatabase<QASchema>> | null = null;
 
@@ -95,7 +97,7 @@ export function getDB() {
     throw new Error("IndexedDB unavailable (SSR)");
   }
   if (!dbPromise) {
-    dbPromise = openDB<QASchema>("qa-dashboard", 3, {
+    dbPromise = openDB<QASchema>("qa-dashboard", 4, {
       upgrade(db, oldVersion, _newVersion, tx) {
         if (oldVersion < 1) {
           db.createObjectStore("machines", { keyPath: "id" });
@@ -122,6 +124,9 @@ export function getDB() {
               cursor = await cursor.continue();
             }
           });
+        }
+        if (oldVersion < 4) {
+          db.createObjectStore("calendar", { keyPath: "id" });
         }
       },
     }).then(async (db) => {
@@ -260,4 +265,17 @@ export async function importAll(data: Awaited<ReturnType<typeof exportAll>>) {
   for (const i of data.imports) await tx.objectStore("imports").put(i);
   for (const m of data.measurements) await tx.objectStore("measurements").put(m);
   await tx.done;
+}
+
+export async function getCalendar(): Promise<CalendarRecord | undefined> {
+  const db = await getDB();
+  return db.get("calendar", "default");
+}
+export async function saveCalendar(rec: CalendarRecord) {
+  const db = await getDB();
+  await db.put("calendar", rec);
+}
+export async function deleteCalendar() {
+  const db = await getDB();
+  await db.delete("calendar", "default");
 }

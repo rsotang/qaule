@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Trash2, Upload, Download } from "lucide-react";
+import { Trash2, Upload, Download, CalendarDays } from "lucide-react";
 import { toast } from "sonner";
 import {
   deleteImport,
@@ -29,9 +29,13 @@ import {
   listMachines,
   listTemplates,
   saveImport,
+  getCalendar,
+  saveCalendar,
+  deleteCalendar,
 } from "@/lib/qa/db";
 import { extractFromTemplate, readFile, resolveImportDate } from "@/lib/qa/excel";
-import type { MachineId, Measurement } from "@/lib/qa/types";
+import { parseCalendarFile, type ParseCalendarResult } from "@/lib/qa/calendar-excel";
+import type { MachineId, Measurement, CalendarEntry } from "@/lib/qa/types";
 import { MACHINES, evaluateTolerance } from "@/lib/qa/types";
 
 export const Route = createFileRoute("/imports")({ component: ImportsPage });
@@ -49,9 +53,14 @@ function ImportsPage() {
   const [machineId, setMachineId] = useState<MachineId>("TB1");
   const [preview, setPreview] = useState<Preview | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const calFileRef = useRef<HTMLInputElement>(null);
+  const [calYear, setCalYear] = useState<number>(new Date().getFullYear());
+  const [calPreview, setCalPreview] = useState<ParseCalendarResult | null>(null);
+  const [calFileName, setCalFileName] = useState<string>("");
 
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
   const imports = useQuery({ queryKey: ["imports-all"], queryFn: () => listImports() });
+  const calendar = useQuery({ queryKey: ["calendar"], queryFn: getCalendar });
 
   async function handleFile(file: File) {
     try {
@@ -140,6 +149,39 @@ function ImportsPage() {
       toast.error(`Error: ${(e as Error).message}`);
     }
   }
+
+  async function handleCalendarFile(file: File) {
+    try {
+      const result = await parseCalendarFile(file, { defaultYear: calYear });
+      setCalPreview(result);
+      setCalFileName(file.name);
+      toast.success(`${result.entries.length} tests detectados`);
+    } catch (e) {
+      toast.error(`Error: ${(e as Error).message}`);
+    }
+  }
+
+  async function commitCalendar() {
+    if (!calPreview) return;
+    await saveCalendar({
+      id: "default",
+      updatedAt: new Date().toISOString(),
+      fileName: calFileName,
+      entries: calPreview.entries,
+    });
+    toast.success("Calendario guardado");
+    setCalPreview(null);
+    setCalFileName("");
+    if (calFileRef.current) calFileRef.current.value = "";
+    qc.invalidateQueries({ queryKey: ["calendar"] });
+  }
+
+  async function handleDeleteCalendar() {
+    await deleteCalendar();
+    toast.success("Calendario eliminado");
+    qc.invalidateQueries({ queryKey: ["calendar"] });
+  }
+
 
   return (
     <div className="space-y-6">
@@ -258,6 +300,104 @@ function ImportsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <CalendarDays className="size-4" /> Calendario de QA
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Sube una hoja con los tests programados (filas = test, columnas = meses o fechas).
+            Calendario compartido por todas las máquinas.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {calendar.data && !calPreview && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 p-3">
+              <div className="text-xs">
+                <p className="font-medium">{calendar.data.fileName ?? "Calendario actual"}</p>
+                <p className="text-muted-foreground">
+                  {calendar.data.entries.length} tests · actualizado{" "}
+                  {new Date(calendar.data.updatedAt).toLocaleString()}
+                </p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={handleDeleteCalendar}>
+                <Trash2 className="size-4 text-destructive" /> Eliminar
+              </Button>
+            </div>
+          )}
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Año por defecto</label>
+              <Input
+                type="number"
+                value={calYear}
+                onChange={(e) => setCalYear(parseInt(e.target.value || "0", 10) || new Date().getFullYear())}
+                className="w-[120px]"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Archivo .xlsx</label>
+              <Input
+                ref={calFileRef}
+                type="file"
+                accept=".xlsx,.xls,.xlsm"
+                onChange={(e) => e.target.files?.[0] && handleCalendarFile(e.target.files[0])}
+                className="w-[320px]"
+              />
+            </div>
+          </div>
+
+          {calPreview && (
+            <div className="space-y-3 rounded-md border bg-muted/30 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium">{calFileName}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Hoja: {calPreview.sheetName} · {calPreview.detectedColumns.length} columnas detectadas ·{" "}
+                    {calPreview.entries.length} tests
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setCalPreview(null)}>
+                    Cancelar
+                  </Button>
+                  <Button size="sm" onClick={commitCalendar}>
+                    Guardar calendario
+                  </Button>
+                </div>
+              </div>
+              <div className="max-h-[320px] overflow-auto rounded border bg-background">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Test</TableHead>
+                      <TableHead>Programación</TableHead>
+                      <TableHead>Responsable</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {calPreview.entries.map((e: CalendarEntry, i: number) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-xs">{e.testName}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {[
+                            ...e.months.map((m) => `mes ${m}`),
+                            ...e.dates,
+                          ].join(" · ") || "—"}
+                        </TableCell>
+                        <TableCell className="text-xs">{e.performer ?? "—"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+
 
       <Card>
         <CardHeader>
