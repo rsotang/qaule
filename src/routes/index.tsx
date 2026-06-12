@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   listImports,
   listMachines,
   listMeasurements,
   listTemplates,
   updateMachineState,
+  getCalendar,
 } from "@/lib/qa/db";
 import {
   MACHINES,
@@ -19,9 +20,13 @@ import {
   type Template,
   type ImportRecord,
   type Measurement,
+  type CalendarRecord,
 } from "@/lib/qa/types";
+import { entryIsInMonth, entryDatesInMonth } from "@/lib/qa/calendar-excel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -29,7 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertTriangle, CheckCircle2, ShieldAlert } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ShieldAlert, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 
 export const Route = createFileRoute("/")({ component: Dashboard });
 
