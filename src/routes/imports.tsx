@@ -303,6 +303,104 @@ function ImportsPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <CalendarDays className="size-4" /> Calendario de QA
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Sube una hoja con los tests programados (filas = test, columnas = meses o fechas).
+            Calendario compartido por todas las máquinas.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {calendar.data && !calPreview && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 p-3">
+              <div className="text-xs">
+                <p className="font-medium">{calendar.data.fileName ?? "Calendario actual"}</p>
+                <p className="text-muted-foreground">
+                  {calendar.data.entries.length} tests · actualizado{" "}
+                  {new Date(calendar.data.updatedAt).toLocaleString()}
+                </p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={handleDeleteCalendar}>
+                <Trash2 className="size-4 text-destructive" /> Eliminar
+              </Button>
+            </div>
+          )}
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Año por defecto</label>
+              <Input
+                type="number"
+                value={calYear}
+                onChange={(e) => setCalYear(parseInt(e.target.value || "0", 10) || new Date().getFullYear())}
+                className="w-[120px]"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Archivo .xlsx</label>
+              <Input
+                ref={calFileRef}
+                type="file"
+                accept=".xlsx,.xls,.xlsm"
+                onChange={(e) => e.target.files?.[0] && handleCalendarFile(e.target.files[0])}
+                className="w-[320px]"
+              />
+            </div>
+          </div>
+
+          {calPreview && (
+            <div className="space-y-3 rounded-md border bg-muted/30 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium">{calFileName}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Hoja: {calPreview.sheetName} · {calPreview.detectedColumns.length} columnas detectadas ·{" "}
+                    {calPreview.entries.length} tests
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setCalPreview(null)}>
+                    Cancelar
+                  </Button>
+                  <Button size="sm" onClick={commitCalendar}>
+                    Guardar calendario
+                  </Button>
+                </div>
+              </div>
+              <div className="max-h-[320px] overflow-auto rounded border bg-background">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Test</TableHead>
+                      <TableHead>Programación</TableHead>
+                      <TableHead>Responsable</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {calPreview.entries.map((e: CalendarEntry, i: number) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-xs">{e.testName}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {[
+                            ...e.months.map((m) => `mes ${m}`),
+                            ...e.dates,
+                          ].join(" · ") || "—"}
+                        </TableCell>
+                        <TableCell className="text-xs">{e.performer ?? "—"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+
+
+      <Card>
+        <CardHeader>
           <CardTitle className="text-base">Historial de importaciones</CardTitle>
         </CardHeader>
         <CardContent>
