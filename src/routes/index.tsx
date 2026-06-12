@@ -50,6 +50,7 @@ function Dashboard() {
   const templates = useQuery({ queryKey: ["templates-all"], queryFn: () => listTemplates() });
   const imports = useQuery({ queryKey: ["imports-all"], queryFn: () => listImports() });
   const measurements = useQuery({ queryKey: ["measurements-all"], queryFn: () => listMeasurements() });
+  const calendar = useQuery({ queryKey: ["calendar"], queryFn: getCalendar });
 
   async function setState(id: MachineId, state: MachineState) {
     await updateMachineState(id, state);
@@ -79,6 +80,12 @@ function Dashboard() {
           />
         ))}
       </div>
+
+      <MonthlySummary
+        calendar={calendar.data}
+        templates={templates.data ?? []}
+        measurements={measurements.data ?? []}
+      />
 
       <OOTPanel
         templates={templates.data ?? []}
