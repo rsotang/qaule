@@ -53,9 +53,14 @@ function ImportsPage() {
   const [machineId, setMachineId] = useState<MachineId>("TB1");
   const [preview, setPreview] = useState<Preview | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const calFileRef = useRef<HTMLInputElement>(null);
+  const [calYear, setCalYear] = useState<number>(new Date().getFullYear());
+  const [calPreview, setCalPreview] = useState<ParseCalendarResult | null>(null);
+  const [calFileName, setCalFileName] = useState<string>("");
 
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
   const imports = useQuery({ queryKey: ["imports-all"], queryFn: () => listImports() });
+  const calendar = useQuery({ queryKey: ["calendar"], queryFn: getCalendar });
 
   async function handleFile(file: File) {
     try {
