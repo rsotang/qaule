@@ -128,6 +128,22 @@ export interface ImportRecord {
   fileHash: string;
 }
 
+export interface CalendarEntry {
+  testName: string;
+  /** Specific scheduled dates (YYYY-MM-DD) */
+  dates: string[];
+  /** Months scheduled with no specific day (YYYY-MM) */
+  months: string[];
+  performer?: string;
+}
+
+export interface CalendarRecord {
+  id: "default";
+  updatedAt: string;
+  fileName?: string;
+  entries: CalendarEntry[];
+}
+
 export interface Measurement {
   id: string;
   importId: string;
