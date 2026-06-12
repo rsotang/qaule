@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import type { ImportRecord, MachineRecord, Measurement, Template, TestDef, Nest, TreeNode, TextOrRef } from "./types";
+import type { ImportRecord, MachineRecord, Measurement, Template, TestDef, Nest, TreeNode, TextOrRef, CalendarRecord } from "./types";
 import { MACHINES, emptyNest, textValue } from "./types";
 
 interface QASchema extends DBSchema {
@@ -11,7 +11,9 @@ interface QASchema extends DBSchema {
     value: Measurement;
     indexes: { byMachine: string; byImport: string; byTest: string };
   };
+  calendar: { key: string; value: CalendarRecord };
 }
+
 
 let dbPromise: Promise<IDBPDatabase<QASchema>> | null = null;
 
