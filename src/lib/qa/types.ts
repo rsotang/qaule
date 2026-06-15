@@ -1,9 +1,13 @@
-export type MachineId = "TB1" | "TB2" | "TB3";
+export type MachineId = "TB1" | "TB2" | "TB3" | "IMG1" | "IMG2" | "IMG3" | "CTSIM";
 
 export const MACHINES: { id: MachineId; name: string }[] = [
   { id: "TB1", name: "TrueBeam 1" },
   { id: "TB2", name: "TrueBeam 2" },
   { id: "TB3", name: "TrueBeam 3" },
+  { id: "IMG1", name: "Sistema de Imagen TB1" },
+  { id: "IMG2", name: "Sistema de Imagen TB2" },
+  { id: "IMG3", name: "Sistema de Imagen TB3" },
+  { id: "CTSIM", name: "CT Simulador" },
 ];
 
 export type Frequency = "monthly" | "quarterly" | "semiannual" | "annual";

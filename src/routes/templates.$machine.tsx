@@ -137,7 +137,7 @@ function TemplateEditor() {
     }
     await saveTemplate(template);
     await setActiveTemplate(machineId, template.id);
-    toast.success(`Aplicada a TB1/TB2/TB3`);
+    toast.success(`Aplicada a todas las máquinas`);
     qc.invalidateQueries();
   }
 
@@ -247,7 +247,7 @@ function TemplateEditor() {
             <Wand2 className="size-4" /> Auto-detectar
           </Button>
           <Button variant="outline" onClick={handleApplyToAll}>
-            <Copy className="size-4" /> Aplicar a TB1/TB2/TB3
+            <Copy className="size-4" /> Aplicar a todas
           </Button>
           <Button onClick={handleSave}>
             <Save className="size-4" /> Guardar y activar
