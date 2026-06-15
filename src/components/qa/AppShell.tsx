@@ -7,9 +7,12 @@ export function AppShell() {
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b bg-card">
         <div className="flex w-full items-center gap-6 px-4 py-3 sm:px-6 lg:px-8">
-          <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight">
-            <Activity className="size-5 text-primary" />
-            <span>QA Linac</span>
+          <Link to="/" className="flex items-center gap-1.5 font-semibold tracking-tight">
+            <Activity className="size-6 text-primary" />
+            <span className="leading-none">
+              <span className="text-2xl font-bold tracking-tight text-primary">QA</span>
+              <span className="text-base font-semibold tracking-wide text-foreground/80">ULE</span>
+            </span>
           </Link>
           <nav className="flex items-center gap-1 text-sm">
             <NavLink to="/" icon={<Activity className="size-4" />} label="Dashboard" />
