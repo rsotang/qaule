@@ -74,8 +74,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "QA Linac — Control de calidad" },
-      { name: "description", content: "Panel de control de calidad para aceleradores lineales" },
+      { title: "QAULE — Control de calidad" },
+      { name: "description", content: "QAULE: panel de control de calidad para aceleradores lineales y sistemas de imagen" },
     ],
     links: [{ rel: "stylesheet", href: appCss }],
   }),
