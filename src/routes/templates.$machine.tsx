@@ -137,7 +137,7 @@ function TemplateEditor() {
     }
     await saveTemplate(template);
     await setActiveTemplate(machineId, template.id);
-    toast.success(`Aplicada a TB1/TB2/TB3`);
+    toast.success(`Aplicada a todas las máquinas`);
     qc.invalidateQueries();
   }
 
