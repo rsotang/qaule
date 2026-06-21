@@ -36,8 +36,8 @@ type TemplateRow = {
   name: string;
   version: number;
   created_at: string;
-  default_date_cell: Template["defaultDateCell"] | null;
-  tests: Template["tests"];
+  default_date_cell: unknown;
+  tests: unknown;
 };
 function templateFromRow(r: TemplateRow): Template {
   return {
@@ -46,8 +46,8 @@ function templateFromRow(r: TemplateRow): Template {
     name: r.name,
     version: r.version,
     createdAt: r.created_at,
-    defaultDateCell: r.default_date_cell ?? undefined,
-    tests: r.tests ?? [],
+    defaultDateCell: (r.default_date_cell as Template["defaultDateCell"]) ?? undefined,
+    tests: (r.tests as Template["tests"]) ?? [],
   };
 }
 function templateToRow(t: Template) {
@@ -57,8 +57,10 @@ function templateToRow(t: Template) {
     name: t.name,
     version: t.version,
     created_at: t.createdAt,
-    default_date_cell: t.defaultDateCell ?? null,
-    tests: t.tests,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    default_date_cell: (t.defaultDateCell ?? null) as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tests: t.tests as any,
     updated_at: new Date().toISOString(),
   };
 }
