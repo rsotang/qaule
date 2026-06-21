@@ -304,7 +304,7 @@ export async function getCalendar(): Promise<CalendarRecord | undefined> {
     id: "default",
     updatedAt: data.updated_at,
     fileName: data.file_name ?? undefined,
-    entries: data.entries ?? [],
+    entries: (data.entries as CalendarRecord["entries"]) ?? [],
   };
 }
 export async function saveCalendar(rec: CalendarRecord) {
@@ -312,7 +312,8 @@ export async function saveCalendar(rec: CalendarRecord) {
     id: "default",
     updated_at: rec.updatedAt,
     file_name: rec.fileName ?? null,
-    entries: rec.entries,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    entries: rec.entries as any,
   });
   if (error) throw new Error(error.message);
 }
