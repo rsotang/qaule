@@ -304,7 +304,7 @@ export async function getCalendar(): Promise<CalendarRecord | undefined> {
     id: "default",
     updatedAt: data.updated_at,
     fileName: data.file_name ?? undefined,
-    entries: (data.entries as CalendarRecord["entries"]) ?? [],
+    entries: (data.entries as unknown as CalendarRecord["entries"]) ?? [],
   };
 }
 export async function saveCalendar(rec: CalendarRecord) {
