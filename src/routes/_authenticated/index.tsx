@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/select";
 import { AlertTriangle, CheckCircle2, ShieldAlert, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 
-export const Route = createFileRoute("/")({ component: Dashboard });
+export const Route = createFileRoute("/_authenticated/")({ component: Dashboard });
 
 const STATE_META: Record<MachineState, { label: string; cls: string; Icon: typeof CheckCircle2 }> = {
   ok: { label: "OK", cls: "bg-emerald-500/15 text-emerald-700 border-emerald-500/30", Icon: CheckCircle2 },

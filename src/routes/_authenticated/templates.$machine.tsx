@@ -50,7 +50,7 @@ import {
   type TreeNode,
 } from "@/lib/qa/types";
 
-export const Route = createFileRoute("/templates/$machine")({ component: TemplateEditor });
+export const Route = createFileRoute("/_authenticated/templates/$machine")({ component: TemplateEditor });
 
 /** A field on a tree node that accepts TextOrRef. */
 type NodeField = "name" | "unit" | "tolerance" | "reference";

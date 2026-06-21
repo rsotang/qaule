@@ -1,59 +1,44 @@
-# Dashboard refactor + new Visualization tab
 
-## 1. Navigation
-- Update `src/components/qa/AppShell.tsx` to add a new nav link **Visualización** between Dashboard and Importaciones, using a `LineChart` icon.
+# Multi-user QAULE on Lovable Cloud
 
-## 2. Data model (small additions)
-- Extend `MachineRecord` in `src/lib/qa/types.ts` with an optional `state: "ok" | "warning" | "critical"` and `stateNote?: string`.
-- Add `updateMachineState(id, state, note)` to `src/lib/qa/db.ts` (writes the existing `machines` store, bumping cache version is not needed).
+Today every browser keeps its own copy of the data in IndexedDB (`src/lib/qa/db.ts`), so two computers can never see each other's measurements, templates, or calendar. We'll move all persistence to Lovable Cloud (managed Postgres + auth) and add login. The local IndexedDB code path will be removed; everyone starts fresh and re-imports from Excel into the cloud.
 
-## 3. Dashboard (`src/routes/index.tsx`) — simplified summary only
-Replace the current per-test chart grid with a high-level overview:
+## What changes for the user
 
-- **Per-machine cards** (one card per machine in `MACHINES`):
-  - Machine name + manual **state badge** (OK / Warning / Critical) with an inline `Select` so the user can change it; persists via `updateMachineState`.
-  - Counts of tests in the active template, broken down by frequency (M / T / A) and totals.
-  - Last import: date + file name (or "Sin importaciones").
-  - "Última importación: OK / N puntos fuera de tolerancia" derived from the most recent import's measurements via `evaluateTolerance`.
-- **Global OOT alerts panel** below the cards: list of `{machine, test, dataPoint, date, value}` for any out-of-tolerance measurement in the latest import per machine, with a link to open it in the new Visualization tab pre-filtered.
+- A login screen appears before the app. No public signup — an **admin creates accounts** for staff from inside the app.
+- The first user to register becomes the admin automatically (bootstrap). After that, only admins can add new users.
+- Once logged in, everyone sees the **same shared data**: machines, templates, measurements, and the QA calendar. Edits made on one computer appear on others (refresh-based; no live websocket sync in v1).
+- An "Admin" page lists users, lets the admin invite a new one (email + temporary password) or remove one.
+- Existing local data is **not migrated** — re-import Excel files into the cloud.
 
-Remove all `TestChart` rendering, category/frequency filters, and the machine `Tabs` switcher from this page — they move to the Visualization tab.
+## What changes under the hood (technical section)
 
-## 4. New Visualization tab
-Add route `src/routes/visualization.tsx` (file becomes `/visualization`).
+1. **Enable Lovable Cloud** (Supabase-backed). Adds auth + Postgres.
+2. **Schema** (one shared dataset, no per-user scoping):
+   - `machines` (id text PK, name, kind) — seeded with the 7 current machines (TB1/2/3, IMG1/2/3, CTSIM).
+   - `templates` (id uuid, machine_id, name, payload jsonb, updated_at, updated_by).
+   - `measurements` (id uuid, machine_id, test_name, value numeric, unit, tolerance jsonb, reference numeric, performed_at, performer, created_by, created_at).
+   - `calendar_entries` (id uuid, year int, test_name, performer, scheduled_dates jsonb, scheduled_months jsonb).
+   - `profiles` (id uuid → auth.users, display_name, created_at).
+   - `user_roles` (user_id, role enum `admin|user`) + `has_role()` security-definer function — per project rules, never store roles on profiles.
+   - RLS: all four data tables → `SELECT/INSERT/UPDATE/DELETE` to any `authenticated` user (fully shared). `user_roles` writes restricted to admins via `has_role`. Standard `GRANT`s on every public table.
+   - Trigger: on first `auth.users` insert, if `user_roles` is empty → grant `admin`; else grant `user`. Always create a `profiles` row.
+3. **Auth UI**:
+   - `/auth` route: email + password sign-in only (no public signup form). Uses `supabase.auth.signInWithPassword`.
+   - `_authenticated` layout already managed by the integration — move every existing route (`/`, `/imports`, `/visualization`, `/templates/*`) under it.
+   - Sign-out button in `AppShell`.
+4. **Admin page** `/admin` (gated by `has_role(admin)`):
+   - List users (from `profiles` + role).
+   - "Add user" form → server function using `supabaseAdmin.auth.admin.createUser({ email, password, email_confirm: true })`, then assigns `user` role. Caller authorization checked with `requireSupabaseAuth` + `has_role` (per project rules).
+   - "Remove user" → admin server function deletes auth user.
+5. **Data layer rewrite**: replace `src/lib/qa/db.ts` (IndexedDB) with `src/lib/qa/cloud.ts` exposing the same function names (`getTemplates`, `saveTemplate`, `getMeasurements`, `saveMeasurements`, `getCalendar`, `saveCalendar`, etc.) but backed by the browser Supabase client. Call sites in `routes/index.tsx`, `routes/imports.tsx`, `routes/visualization.tsx`, `routes/templates.*.tsx` keep working with minimal changes (async stays async). Delete IndexedDB code and the version-bump logic.
+6. **Seed**: a migration inserts the 7 machines so they exist for everyone without any client-side seeding.
+7. **Bootstrap admin**: since signup is disabled in the UI, we keep `supabase.auth.signUp` available **only on first run** — the auth page detects "no users yet" (via a public RPC `public_has_any_user()` returning bool) and shows a one-time "Create first admin" form; otherwise shows login only.
 
-Layout: two-column on `lg`, stacked on smaller screens, full viewport width via existing `AppShell`.
+## Out of scope for this round
+- Real-time sync (Supabase Realtime) — refresh to see others' changes.
+- Per-user data isolation, per-machine permissions, audit log UI.
+- Migrating existing IndexedDB content into the cloud.
+- Password reset flow (admin can re-create or update password from `/admin`).
 
-### Left column — Selection panel
-1. **Machines**: multi-select (checkbox list of `MACHINES`).
-2. **Tests**: multi-select. Source = union of tests across the selected machines' active templates, grouped by machine. Search box on top.
-3. **Series tree**: for each selected test, render the nest tree (`walkDataPoints`) with checkboxes per data point and per nest (toggling a nest toggles its descendants). Default = all on.
-4. **Filters**:
-   - Date range (from / to) — uses `<input type="date">`.
-   - "Solo fuera de tolerancia" toggle.
-   - "Agrupar por nest" toggle — when on, sums/averages siblings under each nest into a single series (default = off, show individual points).
-
-All selection state is mirrored in URL search params via `validateSearch` + `zodValidator` so views are shareable. Keys: `machines[]`, `tests[]`, `points[]`, `from`, `to`, `ootOnly`, `groupByNest`.
-
-### Right column — Charts
-- One chart card per selected test (reusing logic from `TestChart` but extended to accept an explicit series filter and date filter).
-- Refactor `TestChart` minimally: add optional props `seriesFilter?: string[]`, `dateFrom?`, `dateTo?`, `ootOnly?`, `groupByNest?`. Existing Dashboard usage is removed, so no compatibility shim needed.
-- When `groupByNest` is on, series key becomes the nest path (one less segment); values are averaged per date.
-- Tooltip + legend always on in this view; chart height larger (`h-[320px]`).
-- Empty state when no machines/tests selected: friendly hint card.
-
-## 5. Cross-linking
-- OOT alerts on the Dashboard link to `/visualization?machines=...&tests=...&ootOnly=true`.
-
-## 6. Files touched
-- `src/components/qa/AppShell.tsx` — add nav link.
-- `src/lib/qa/types.ts` — add `state` to `MachineRecord`.
-- `src/lib/qa/db.ts` — `updateMachineState` helper.
-- `src/routes/index.tsx` — rewrite as summary dashboard.
-- `src/routes/visualization.tsx` — new file (selection + charts).
-- `src/components/qa/TestChart.tsx` — add filter props (series / date / OOT / groupByNest).
-- `src/components/qa/VisualizationPanel.tsx` (new) — selection sidebar UI to keep the route file lean.
-
-## Out of scope
-- No changes to template editor, importer, or measurement schema.
-- No backend; everything stays in IndexedDB as today.
+Approve and I'll implement.

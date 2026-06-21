@@ -1,281 +1,323 @@
-import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import type { ImportRecord, MachineRecord, Measurement, Template, TestDef, Nest, TreeNode, TextOrRef, CalendarRecord } from "./types";
-import { MACHINES, emptyNest, textValue } from "./types";
+// Cloud-backed data layer (Supabase). Keeps the legacy function names that
+// the rest of the app already imports, so route components don't need to
+// change. All data is shared across authenticated users.
 
-interface QASchema extends DBSchema {
-  machines: { key: string; value: MachineRecord };
-  templates: { key: string; value: Template; indexes: { byMachine: string } };
-  imports: { key: string; value: ImportRecord; indexes: { byMachine: string } };
-  measurements: {
-    key: string;
-    value: Measurement;
-    indexes: { byMachine: string; byImport: string; byTest: string };
-  };
-  calendar: { key: string; value: CalendarRecord };
+import { supabase } from "@/integrations/supabase/client";
+import type {
+  ImportRecord,
+  MachineRecord,
+  Measurement,
+  Template,
+  CalendarRecord,
+  MachineId,
+  MachineState,
+} from "./types";
+
+// ---------- mapping helpers ----------
+
+type MachineRow = {
+  id: string;
+  name: string;
+  active_template_id: string | null;
+  state: string | null;
+  state_note: string | null;
+};
+function machineFromRow(r: MachineRow): MachineRecord {
+  const rec: MachineRecord = { id: r.id as MachineId, name: r.name };
+  if (r.active_template_id) rec.activeTemplateId = r.active_template_id;
+  if (r.state) rec.state = r.state as MachineState;
+  if (r.state_note) rec.stateNote = r.state_note;
+  return rec;
 }
 
-
-let dbPromise: Promise<IDBPDatabase<QASchema>> | null = null;
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function toTextOrRef(v: any): TextOrRef | undefined {
-  if (v == null) return undefined;
-  if (typeof v === "string") return textValue(v);
-  if (typeof v === "object") {
-    if (v.kind === "text" || v.kind === "literal") return { kind: "text", text: v.text ?? "" };
-    if (v.kind === "cellRef") return { kind: "cellRef", sheet: v.sheet ?? "", address: v.address ?? "" };
-  }
-  return undefined;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function migrateNode(n: any): TreeNode {
-  if (n && n.kind === "nest") {
-    return {
-      id: n.id,
-      kind: "nest",
-      name: toTextOrRef(n.name) ?? textValue(""),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      children: (n.children ?? []).map((c: any) => migrateNode(c)),
-    } as Nest;
-  }
+type TemplateRow = {
+  id: string;
+  machine_id: string;
+  name: string;
+  version: number;
+  created_at: string;
+  default_date_cell: unknown;
+  tests: unknown;
+};
+function templateFromRow(r: TemplateRow): Template {
   return {
-    id: n.id,
-    kind: "data",
-    name: toTextOrRef(n.name) ?? textValue(""),
-    cell: n.cell,
-    unit: toTextOrRef(n.unit),
-    tolerance: toTextOrRef(n.tolerance),
-    reference: toTextOrRef(n.reference),
-    parsedTolerance: n.parsedTolerance,
+    id: r.id,
+    machineId: r.machine_id as MachineId,
+    name: r.name,
+    version: r.version,
+    createdAt: r.created_at,
+    defaultDateCell: (r.default_date_cell as Template["defaultDateCell"]) ?? undefined,
+    tests: (r.tests as Template["tests"]) ?? [],
   };
 }
-
-/** Convert any legacy test into the current shape. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function migrateLegacyTest(t: any): TestDef {
-  if (t && t.root) {
-    const root: Nest = {
-      id: t.root.id,
-      kind: "nest",
-      name: toTextOrRef(t.root.name) ?? textValue("raíz"),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      children: (t.root.children ?? []).map((c: any) => migrateNode(c)),
-    };
-    return {
-      id: t.id,
-      name: t.name,
-      category: t.category,
-      frequency: t.frequency,
-      admin: t.admin ?? {},
-      root,
-    };
-  }
-  // v1 flat -> current
-  const root = emptyNest("raíz");
-  const cells: { sheet: string; address: string; label?: string }[] = t.cells ?? [];
-  root.children = cells.map((c, i) => ({
-    id: `dp-mig-${i}-${Math.random().toString(36).slice(2, 6)}`,
-    kind: "data" as const,
-    name: textValue(c.label || `dato ${i + 1}`),
-    cell: { sheet: c.sheet, address: c.address },
-    unit: t.unit ? textValue(t.unit) : undefined,
-    parsedTolerance: t.tolerance,
-  }));
+function templateToRow(t: Template) {
   return {
     id: t.id,
+    machine_id: t.machineId,
     name: t.name,
-    category: t.category,
-    frequency: t.frequency,
-    admin: { date: t.dateCell ?? undefined },
-    root,
+    version: t.version,
+    created_at: t.createdAt,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    default_date_cell: (t.defaultDateCell ?? null) as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tests: t.tests as any,
+    updated_at: new Date().toISOString(),
   };
 }
 
-export function getDB() {
-  if (typeof indexedDB === "undefined") {
-    throw new Error("IndexedDB unavailable (SSR)");
-  }
-  if (!dbPromise) {
-    dbPromise = openDB<QASchema>("qa-dashboard", 4, {
-      upgrade(db, oldVersion, _newVersion, tx) {
-        if (oldVersion < 1) {
-          db.createObjectStore("machines", { keyPath: "id" });
-          const t = db.createObjectStore("templates", { keyPath: "id" });
-          t.createIndex("byMachine", "machineId");
-          const i = db.createObjectStore("imports", { keyPath: "id" });
-          i.createIndex("byMachine", "machineId");
-          const m = db.createObjectStore("measurements", { keyPath: "id" });
-          m.createIndex("byMachine", "machineId");
-          m.createIndex("byImport", "importId");
-          m.createIndex("byTest", "testId");
-        }
-        if (oldVersion < 3) {
-          const store = tx.objectStore("templates");
-          void store.openCursor().then(async function next(cursor) {
-            while (cursor) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const tpl: any = cursor.value;
-              const migrated: Template = {
-                ...tpl,
-                tests: (tpl.tests ?? []).map(migrateLegacyTest),
-              };
-              await cursor.update(migrated);
-              cursor = await cursor.continue();
-            }
-          });
-        }
-        if (oldVersion < 4) {
-          db.createObjectStore("calendar", { keyPath: "id" });
-        }
-      },
-    }).then(async (db) => {
-      const tx = db.transaction("machines", "readwrite");
-      for (const m of MACHINES) {
-        const existing = await tx.store.get(m.id);
-        if (!existing) await tx.store.put({ id: m.id, name: m.name });
-      }
-      await tx.done;
-      return db;
-    });
-  }
-  return dbPromise;
+type ImportRow = {
+  id: string;
+  machine_id: string;
+  file_name: string;
+  imported_at: string;
+  source_date: string;
+  file_hash: string;
+};
+function importFromRow(r: ImportRow): ImportRecord {
+  return {
+    id: r.id,
+    machineId: r.machine_id as MachineId,
+    fileName: r.file_name,
+    importedAt: r.imported_at,
+    sourceDate: r.source_date,
+    fileHash: r.file_hash,
+  };
 }
 
-export async function listMachines(): Promise<MachineRecord[]> {
-  const db = await getDB();
-  return db.getAll("machines");
+type MeasurementRow = {
+  id: string;
+  import_id: string;
+  machine_id: string;
+  test_id: string;
+  cell_label: string;
+  date: string;
+  value: number;
+};
+function measurementFromRow(r: MeasurementRow): Measurement {
+  return {
+    id: r.id,
+    importId: r.import_id,
+    machineId: r.machine_id as MachineId,
+    testId: r.test_id,
+    cellLabel: r.cell_label,
+    date: r.date,
+    value: Number(r.value),
+  };
 }
-export async function getMachine(id: string) {
-  const db = await getDB();
-  return db.get("machines", id);
+function measurementToRow(m: Measurement) {
+  return {
+    id: m.id,
+    import_id: m.importId,
+    machine_id: m.machineId,
+    test_id: m.testId,
+    cell_label: m.cellLabel,
+    date: m.date,
+    value: m.value,
+  };
+}
+
+function must<T>(data: T | null, error: { message: string } | null): T {
+  if (error) throw new Error(error.message);
+  return data as T;
+}
+
+// ---------- machines ----------
+
+export async function listMachines(): Promise<MachineRecord[]> {
+  const { data, error } = await supabase.from("machines").select("*").order("id");
+  return must(data, error).map(machineFromRow);
+}
+export async function getMachine(id: string): Promise<MachineRecord | undefined> {
+  const { data, error } = await supabase.from("machines").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? machineFromRow(data) : undefined;
 }
 export async function setActiveTemplate(machineId: string, templateId: string) {
-  const db = await getDB();
-  const m = await db.get("machines", machineId);
-  if (m) await db.put("machines", { ...m, activeTemplateId: templateId });
+  const { error } = await supabase
+    .from("machines")
+    .update({ active_template_id: templateId })
+    .eq("id", machineId);
+  if (error) throw new Error(error.message);
+}
+export async function clearActiveTemplate(machineId: string) {
+  const { error } = await supabase
+    .from("machines")
+    .update({ active_template_id: null })
+    .eq("id", machineId);
+  if (error) throw new Error(error.message);
 }
 export async function updateMachineState(
   machineId: string,
-  state: import("./types").MachineState | undefined,
+  state: MachineState | undefined,
   note?: string,
 ) {
-  const db = await getDB();
-  const m = await db.get("machines", machineId);
-  if (m) await db.put("machines", { ...m, state, stateNote: note });
+  const { error } = await supabase
+    .from("machines")
+    .update({ state: state ?? null, state_note: note ?? null })
+    .eq("id", machineId);
+  if (error) throw new Error(error.message);
 }
-export async function clearActiveTemplate(machineId: string) {
-  const db = await getDB();
-  const m = await db.get("machines", machineId);
-  if (m) {
-    const { activeTemplateId: _, ...rest } = m;
-    await db.put("machines", rest);
+
+// ---------- templates ----------
+
+export async function listTemplates(machineId?: string): Promise<Template[]> {
+  let q = supabase.from("templates").select("*");
+  if (machineId) q = q.eq("machine_id", machineId);
+  const { data, error } = await q;
+  return must(data, error).map(templateFromRow);
+}
+export async function getTemplate(id: string): Promise<Template | undefined> {
+  const { data, error } = await supabase.from("templates").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? templateFromRow(data) : undefined;
+}
+export async function saveTemplate(t: Template) {
+  const { error } = await supabase.from("templates").upsert(templateToRow(t));
+  if (error) throw new Error(error.message);
+}
+export async function deleteTemplate(id: string) {
+  // clear it from any machine that points to it
+  await supabase.from("machines").update({ active_template_id: null }).eq("active_template_id", id);
+  const { error } = await supabase.from("templates").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// ---------- imports + measurements ----------
+
+export async function listImports(machineId?: string): Promise<ImportRecord[]> {
+  let q = supabase.from("imports").select("*").order("source_date", { ascending: true });
+  if (machineId) q = q.eq("machine_id", machineId);
+  const { data, error } = await q;
+  return must(data, error).map(importFromRow);
+}
+
+export async function saveImport(rec: ImportRecord, measurements: Measurement[]) {
+  // upsert import row (cascade-deletes existing measurements via FK on delete; but
+  // we want to replace, so explicitly clear old measurements for this import).
+  const { error: delErr } = await supabase.from("measurements").delete().eq("import_id", rec.id);
+  if (delErr) throw new Error(delErr.message);
+  const { error: impErr } = await supabase.from("imports").upsert({
+    id: rec.id,
+    machine_id: rec.machineId,
+    file_name: rec.fileName,
+    imported_at: rec.importedAt,
+    source_date: rec.sourceDate,
+    file_hash: rec.fileHash,
+  });
+  if (impErr) throw new Error(impErr.message);
+  if (measurements.length > 0) {
+    // chunk to keep payload small
+    const rows = measurements.map(measurementToRow);
+    const chunkSize = 500;
+    for (let i = 0; i < rows.length; i += chunkSize) {
+      const { error } = await supabase.from("measurements").insert(rows.slice(i, i + chunkSize));
+      if (error) throw new Error(error.message);
+    }
   }
 }
 
-export async function listTemplates(machineId?: string): Promise<Template[]> {
-  const db = await getDB();
-  if (machineId) return db.getAllFromIndex("templates", "byMachine", machineId);
-  return db.getAll("templates");
-}
-export async function getTemplate(id: string) {
-  const db = await getDB();
-  return db.get("templates", id);
-}
-export async function saveTemplate(t: Template) {
-  const db = await getDB();
-  await db.put("templates", t);
-}
-export async function deleteTemplate(id: string) {
-  const db = await getDB();
-  await db.delete("templates", id);
-}
-
-export async function listImports(machineId?: string): Promise<ImportRecord[]> {
-  const db = await getDB();
-  const all = machineId
-    ? await db.getAllFromIndex("imports", "byMachine", machineId)
-    : await db.getAll("imports");
-  return all.sort((a, b) => a.sourceDate.localeCompare(b.sourceDate));
-}
-export async function saveImport(rec: ImportRecord, measurements: Measurement[]) {
-  const db = await getDB();
-  const tx = db.transaction(["imports", "measurements"], "readwrite");
-  const prev = await tx.objectStore("measurements").index("byImport").getAllKeys(rec.id);
-  for (const k of prev) await tx.objectStore("measurements").delete(k);
-  await tx.objectStore("imports").put(rec);
-  for (const m of measurements) await tx.objectStore("measurements").put(m);
-  await tx.done;
-}
 export async function deleteImport(id: string) {
-  const db = await getDB();
-  const tx = db.transaction(["imports", "measurements"], "readwrite");
-  await tx.objectStore("imports").delete(id);
-  const ks = await tx.objectStore("measurements").index("byImport").getAllKeys(id);
-  for (const k of ks) await tx.objectStore("measurements").delete(k);
-  await tx.done;
+  // measurements have ON DELETE CASCADE
+  const { error } = await supabase.from("imports").delete().eq("id", id);
+  if (error) throw new Error(error.message);
 }
 
 export async function listMeasurements(machineId?: string): Promise<Measurement[]> {
-  const db = await getDB();
-  if (machineId) return db.getAllFromIndex("measurements", "byMachine", machineId);
-  return db.getAll("measurements");
+  // Supabase caps a single response at 1000 rows; paginate.
+  const all: Measurement[] = [];
+  const pageSize = 1000;
+  let from = 0;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    let q = supabase.from("measurements").select("*").range(from, from + pageSize - 1);
+    if (machineId) q = q.eq("machine_id", machineId);
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as MeasurementRow[];
+    all.push(...rows.map(measurementFromRow));
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
 }
 
 export async function updateMeasurement(m: Measurement) {
-  const db = await getDB();
-  await db.put("measurements", m);
+  const { error } = await supabase.from("measurements").update(measurementToRow(m)).eq("id", m.id);
+  if (error) throw new Error(error.message);
 }
 
 export async function deleteMeasurement(id: string) {
-  const db = await getDB();
-  await db.delete("measurements", id);
+  const { error } = await supabase.from("measurements").delete().eq("id", id);
+  if (error) throw new Error(error.message);
 }
 
 export async function clearAllData() {
-  const db = await getDB();
-  const tx = db.transaction(["machines", "templates", "imports", "measurements"], "readwrite");
-  for (const s of ["templates", "imports", "measurements"] as const) {
-    await tx.objectStore(s).clear();
-  }
-  const machines = await tx.objectStore("machines").getAll();
-  for (const m of machines) {
-    await tx.objectStore("machines").put({ id: m.id, name: m.name });
-  }
-  await tx.done;
+  // Keep machines (seeded), drop user data.
+  await supabase.from("measurements").delete().neq("id", "");
+  await supabase.from("imports").delete().neq("id", "");
+  await supabase.from("templates").delete().neq("id", "");
+  await supabase
+    .from("machines")
+    .update({ active_template_id: null, state: null, state_note: null })
+    .neq("id", "");
 }
 
+// ---------- backup ----------
+
 export async function exportAll() {
-  const db = await getDB();
   return {
-    machines: await db.getAll("machines"),
-    templates: await db.getAll("templates"),
-    imports: await db.getAll("imports"),
-    measurements: await db.getAll("measurements"),
+    machines: await listMachines(),
+    templates: await listTemplates(),
+    imports: await listImports(),
+    measurements: await listMeasurements(),
   };
 }
 export async function importAll(data: Awaited<ReturnType<typeof exportAll>>) {
-  const db = await getDB();
-  const tx = db.transaction(["machines", "templates", "imports", "measurements"], "readwrite");
-  for (const s of ["machines", "templates", "imports", "measurements"] as const) {
-    await tx.objectStore(s).clear();
+  await clearAllData();
+  for (const m of data.machines) {
+    await supabase.from("machines").upsert({
+      id: m.id,
+      name: m.name,
+      active_template_id: m.activeTemplateId ?? null,
+      state: m.state ?? null,
+      state_note: m.stateNote ?? null,
+    });
   }
-  for (const m of data.machines) await tx.objectStore("machines").put(m);
-  for (const t of data.templates) await tx.objectStore("templates").put(t);
-  for (const i of data.imports) await tx.objectStore("imports").put(i);
-  for (const m of data.measurements) await tx.objectStore("measurements").put(m);
-  await tx.done;
+  for (const t of data.templates) await saveTemplate(t);
+  for (const i of data.imports) {
+    const ms = data.measurements.filter((m) => m.importId === i.id);
+    await saveImport(i, ms);
+  }
 }
 
+// ---------- calendar ----------
+
 export async function getCalendar(): Promise<CalendarRecord | undefined> {
-  const db = await getDB();
-  return db.get("calendar", "default");
+  const { data, error } = await supabase
+    .from("calendar")
+    .select("*")
+    .eq("id", "default")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return undefined;
+  return {
+    id: "default",
+    updatedAt: data.updated_at,
+    fileName: data.file_name ?? undefined,
+    entries: (data.entries as unknown as CalendarRecord["entries"]) ?? [],
+  };
 }
 export async function saveCalendar(rec: CalendarRecord) {
-  const db = await getDB();
-  await db.put("calendar", rec);
+  const { error } = await supabase.from("calendar").upsert({
+    id: "default",
+    updated_at: rec.updatedAt,
+    file_name: rec.fileName ?? null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    entries: rec.entries as any,
+  });
+  if (error) throw new Error(error.message);
 }
 export async function deleteCalendar() {
-  const db = await getDB();
-  await db.delete("calendar", "default");
+  const { error } = await supabase.from("calendar").delete().eq("id", "default");
+  if (error) throw new Error(error.message);
 }
