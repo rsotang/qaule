@@ -9,7 +9,7 @@ import { buildSeedTemplate } from "@/lib/qa/seed";
 import { toast } from "sonner";
 import { Plus, Pencil, CheckCircle2, Trash2, Download, Upload } from "lucide-react";
 
-export const Route = createFileRoute("/templates/")({ component: TemplatesIndex });
+export const Route = createFileRoute("/_authenticated/templates/")({ component: TemplatesIndex });
 
 function TemplatesIndex() {
   const qc = useQueryClient();

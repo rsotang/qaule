@@ -39,7 +39,7 @@ import {
 import { Plus, Trash2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
-export const Route = createFileRoute("/visualization")({ component: VisualizationPage });
+export const Route = createFileRoute("/_authenticated/visualization")({ component: VisualizationPage });
 
 interface SeriesSel {
   id: string;

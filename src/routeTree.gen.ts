@@ -9,162 +9,167 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as VisualizationRouteImport } from './routes/visualization'
-import { Route as TemplatesRouteImport } from './routes/templates'
-import { Route as ImportsRouteImport } from './routes/imports'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as TemplatesIndexRouteImport } from './routes/templates.index'
-import { Route as TemplatesMachineRouteImport } from './routes/templates.$machine'
+import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedVisualizationRouteImport } from './routes/_authenticated/visualization'
+import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authenticated/templates'
+import { Route as AuthenticatedImportsRouteImport } from './routes/_authenticated/imports'
+import { Route as AuthenticatedTemplatesIndexRouteImport } from './routes/_authenticated/templates.index'
+import { Route as AuthenticatedTemplatesMachineRouteImport } from './routes/_authenticated/templates.$machine'
 
-const VisualizationRoute = VisualizationRouteImport.update({
-  id: '/visualization',
-  path: '/visualization',
+const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
+  id: '/_authenticated/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TemplatesRoute = TemplatesRouteImport.update({
-  id: '/templates',
+const AuthenticatedVisualizationRoute =
+  AuthenticatedVisualizationRouteImport.update({
+    id: '/_authenticated/visualization',
+    path: '/visualization',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const AuthenticatedTemplatesRoute = AuthenticatedTemplatesRouteImport.update({
+  id: '/_authenticated/templates',
   path: '/templates',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ImportsRoute = ImportsRouteImport.update({
-  id: '/imports',
+const AuthenticatedImportsRoute = AuthenticatedImportsRouteImport.update({
+  id: '/_authenticated/imports',
   path: '/imports',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TemplatesIndexRoute = TemplatesIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => TemplatesRoute,
-} as any)
-const TemplatesMachineRoute = TemplatesMachineRouteImport.update({
-  id: '/$machine',
-  path: '/$machine',
-  getParentRoute: () => TemplatesRoute,
-} as any)
+const AuthenticatedTemplatesIndexRoute =
+  AuthenticatedTemplatesIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedTemplatesRoute,
+  } as any)
+const AuthenticatedTemplatesMachineRoute =
+  AuthenticatedTemplatesMachineRouteImport.update({
+    id: '/$machine',
+    path: '/$machine',
+    getParentRoute: () => AuthenticatedTemplatesRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/imports': typeof ImportsRoute
-  '/templates': typeof TemplatesRouteWithChildren
-  '/visualization': typeof VisualizationRoute
-  '/templates/$machine': typeof TemplatesMachineRoute
-  '/templates/': typeof TemplatesIndexRoute
+  '/imports': typeof AuthenticatedImportsRoute
+  '/templates': typeof AuthenticatedTemplatesRouteWithChildren
+  '/visualization': typeof AuthenticatedVisualizationRoute
+  '/': typeof AuthenticatedIndexRoute
+  '/templates/$machine': typeof AuthenticatedTemplatesMachineRoute
+  '/templates/': typeof AuthenticatedTemplatesIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/imports': typeof ImportsRoute
-  '/visualization': typeof VisualizationRoute
-  '/templates/$machine': typeof TemplatesMachineRoute
-  '/templates': typeof TemplatesIndexRoute
+  '/imports': typeof AuthenticatedImportsRoute
+  '/visualization': typeof AuthenticatedVisualizationRoute
+  '/': typeof AuthenticatedIndexRoute
+  '/templates/$machine': typeof AuthenticatedTemplatesMachineRoute
+  '/templates': typeof AuthenticatedTemplatesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/imports': typeof ImportsRoute
-  '/templates': typeof TemplatesRouteWithChildren
-  '/visualization': typeof VisualizationRoute
-  '/templates/$machine': typeof TemplatesMachineRoute
-  '/templates/': typeof TemplatesIndexRoute
+  '/_authenticated/imports': typeof AuthenticatedImportsRoute
+  '/_authenticated/templates': typeof AuthenticatedTemplatesRouteWithChildren
+  '/_authenticated/visualization': typeof AuthenticatedVisualizationRoute
+  '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/templates/$machine': typeof AuthenticatedTemplatesMachineRoute
+  '/_authenticated/templates/': typeof AuthenticatedTemplatesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/'
     | '/imports'
     | '/templates'
     | '/visualization'
+    | '/'
     | '/templates/$machine'
     | '/templates/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/imports' | '/visualization' | '/templates/$machine' | '/templates'
+  to: '/imports' | '/visualization' | '/' | '/templates/$machine' | '/templates'
   id:
     | '__root__'
-    | '/'
-    | '/imports'
-    | '/templates'
-    | '/visualization'
-    | '/templates/$machine'
-    | '/templates/'
+    | '/_authenticated/imports'
+    | '/_authenticated/templates'
+    | '/_authenticated/visualization'
+    | '/_authenticated/'
+    | '/_authenticated/templates/$machine'
+    | '/_authenticated/templates/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  ImportsRoute: typeof ImportsRoute
-  TemplatesRoute: typeof TemplatesRouteWithChildren
-  VisualizationRoute: typeof VisualizationRoute
+  AuthenticatedImportsRoute: typeof AuthenticatedImportsRoute
+  AuthenticatedTemplatesRoute: typeof AuthenticatedTemplatesRouteWithChildren
+  AuthenticatedVisualizationRoute: typeof AuthenticatedVisualizationRoute
+  AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/visualization': {
-      id: '/visualization'
-      path: '/visualization'
-      fullPath: '/visualization'
-      preLoaderRoute: typeof VisualizationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/templates': {
-      id: '/templates'
-      path: '/templates'
-      fullPath: '/templates'
-      preLoaderRoute: typeof TemplatesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/imports': {
-      id: '/imports'
-      path: '/imports'
-      fullPath: '/imports'
-      preLoaderRoute: typeof ImportsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/': {
-      id: '/'
+    '/_authenticated/': {
+      id: '/_authenticated/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/templates/': {
-      id: '/templates/'
+    '/_authenticated/visualization': {
+      id: '/_authenticated/visualization'
+      path: '/visualization'
+      fullPath: '/visualization'
+      preLoaderRoute: typeof AuthenticatedVisualizationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/templates': {
+      id: '/_authenticated/templates'
+      path: '/templates'
+      fullPath: '/templates'
+      preLoaderRoute: typeof AuthenticatedTemplatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/imports': {
+      id: '/_authenticated/imports'
+      path: '/imports'
+      fullPath: '/imports'
+      preLoaderRoute: typeof AuthenticatedImportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/templates/': {
+      id: '/_authenticated/templates/'
       path: '/'
       fullPath: '/templates/'
-      preLoaderRoute: typeof TemplatesIndexRouteImport
-      parentRoute: typeof TemplatesRoute
+      preLoaderRoute: typeof AuthenticatedTemplatesIndexRouteImport
+      parentRoute: typeof AuthenticatedTemplatesRoute
     }
-    '/templates/$machine': {
-      id: '/templates/$machine'
+    '/_authenticated/templates/$machine': {
+      id: '/_authenticated/templates/$machine'
       path: '/$machine'
       fullPath: '/templates/$machine'
-      preLoaderRoute: typeof TemplatesMachineRouteImport
-      parentRoute: typeof TemplatesRoute
+      preLoaderRoute: typeof AuthenticatedTemplatesMachineRouteImport
+      parentRoute: typeof AuthenticatedTemplatesRoute
     }
   }
 }
 
-interface TemplatesRouteChildren {
-  TemplatesMachineRoute: typeof TemplatesMachineRoute
-  TemplatesIndexRoute: typeof TemplatesIndexRoute
+interface AuthenticatedTemplatesRouteChildren {
+  AuthenticatedTemplatesMachineRoute: typeof AuthenticatedTemplatesMachineRoute
+  AuthenticatedTemplatesIndexRoute: typeof AuthenticatedTemplatesIndexRoute
 }
 
-const TemplatesRouteChildren: TemplatesRouteChildren = {
-  TemplatesMachineRoute: TemplatesMachineRoute,
-  TemplatesIndexRoute: TemplatesIndexRoute,
-}
+const AuthenticatedTemplatesRouteChildren: AuthenticatedTemplatesRouteChildren =
+  {
+    AuthenticatedTemplatesMachineRoute: AuthenticatedTemplatesMachineRoute,
+    AuthenticatedTemplatesIndexRoute: AuthenticatedTemplatesIndexRoute,
+  }
 
-const TemplatesRouteWithChildren = TemplatesRoute._addFileChildren(
-  TemplatesRouteChildren,
-)
+const AuthenticatedTemplatesRouteWithChildren =
+  AuthenticatedTemplatesRoute._addFileChildren(
+    AuthenticatedTemplatesRouteChildren,
+  )
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  ImportsRoute: ImportsRoute,
-  TemplatesRoute: TemplatesRouteWithChildren,
-  VisualizationRoute: VisualizationRoute,
+  AuthenticatedImportsRoute: AuthenticatedImportsRoute,
+  AuthenticatedTemplatesRoute: AuthenticatedTemplatesRouteWithChildren,
+  AuthenticatedVisualizationRoute: AuthenticatedVisualizationRoute,
+  AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

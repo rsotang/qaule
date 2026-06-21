@@ -38,7 +38,7 @@ import { parseCalendarFile, type ParseCalendarResult } from "@/lib/qa/calendar-e
 import type { MachineId, Measurement, CalendarEntry } from "@/lib/qa/types";
 import { MACHINES, evaluateTolerance } from "@/lib/qa/types";
 
-export const Route = createFileRoute("/imports")({ component: ImportsPage });
+export const Route = createFileRoute("/_authenticated/imports")({ component: ImportsPage });
 
 interface Preview {
   machineId: MachineId;
