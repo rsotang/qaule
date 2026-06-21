@@ -14,16 +14,213 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      calendar: {
+        Row: {
+          entries: Json
+          file_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          entries?: Json
+          file_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          entries?: Json
+          file_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      imports: {
+        Row: {
+          created_by: string | null
+          file_hash: string
+          file_name: string
+          id: string
+          imported_at: string
+          machine_id: string
+          source_date: string
+        }
+        Insert: {
+          created_by?: string | null
+          file_hash: string
+          file_name: string
+          id: string
+          imported_at?: string
+          machine_id: string
+          source_date: string
+        }
+        Update: {
+          created_by?: string | null
+          file_hash?: string
+          file_name?: string
+          id?: string
+          imported_at?: string
+          machine_id?: string
+          source_date?: string
+        }
+        Relationships: []
+      }
+      machines: {
+        Row: {
+          active_template_id: string | null
+          id: string
+          name: string
+          state: string | null
+          state_note: string | null
+        }
+        Insert: {
+          active_template_id?: string | null
+          id: string
+          name: string
+          state?: string | null
+          state_note?: string | null
+        }
+        Update: {
+          active_template_id?: string | null
+          id?: string
+          name?: string
+          state?: string | null
+          state_note?: string | null
+        }
+        Relationships: []
+      }
+      measurements: {
+        Row: {
+          cell_label: string
+          date: string
+          id: string
+          import_id: string
+          machine_id: string
+          test_id: string
+          value: number
+        }
+        Insert: {
+          cell_label: string
+          date: string
+          id: string
+          import_id: string
+          machine_id: string
+          test_id: string
+          value: number
+        }
+        Update: {
+          cell_label?: string
+          date?: string
+          id?: string
+          import_id?: string
+          machine_id?: string
+          test_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "measurements_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "imports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      templates: {
+        Row: {
+          created_at: string
+          default_date_cell: Json | null
+          id: string
+          machine_id: string
+          name: string
+          tests: Json
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          default_date_cell?: Json | null
+          id: string
+          machine_id: string
+          name: string
+          tests?: Json
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          default_date_cell?: Json | null
+          id?: string
+          machine_id?: string
+          name?: string
+          tests?: Json
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      public_has_any_user: { Args: never; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +347,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
