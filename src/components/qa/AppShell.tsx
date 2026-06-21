@@ -1,8 +1,32 @@
-import { Link, Outlet } from "@tanstack/react-router";
-import { Activity, Upload, Settings2, LineChart } from "lucide-react";
+import { Link, Outlet, useNavigate } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { Activity, Upload, Settings2, LineChart, LogOut, Users } from "lucide-react";
 import { SettingsMenu } from "./SettingsMenu";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { meIsAdmin } from "@/lib/admin.functions";
+import { toast } from "sonner";
 
 export function AppShell() {
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const meFn = useServerFn(meIsAdmin);
+  const me = useQuery({ queryKey: ["me-admin"], queryFn: () => meFn() });
+
+  const user = useQuery({
+    queryKey: ["me-user"],
+    queryFn: async () => (await supabase.auth.getUser()).data.user,
+  });
+
+  async function signOut() {
+    await qc.cancelQueries();
+    qc.clear();
+    await supabase.auth.signOut();
+    toast.success("Sesión cerrada");
+    navigate({ to: "/auth", replace: true });
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b bg-card">
@@ -19,9 +43,20 @@ export function AppShell() {
             <NavLink to="/visualization" icon={<LineChart className="size-4" />} label="Visualización" />
             <NavLink to="/imports" icon={<Upload className="size-4" />} label="Importaciones" />
             <NavLink to="/templates" icon={<Settings2 className="size-4" />} label="Plantillas" />
+            {me.data?.isAdmin && (
+              <NavLink to="/admin" icon={<Users className="size-4" />} label="Usuarios" />
+            )}
           </nav>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            {user.data?.email && (
+              <span className="hidden text-xs text-muted-foreground sm:inline">
+                {user.data.email}
+              </span>
+            )}
             <SettingsMenu />
+            <Button variant="ghost" size="icon" onClick={signOut} aria-label="Cerrar sesión">
+              <LogOut className="size-5" />
+            </Button>
           </div>
         </div>
       </header>
