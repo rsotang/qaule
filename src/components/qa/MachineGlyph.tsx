@@ -1,26 +1,33 @@
 import type { MachineId } from "@/lib/qa/types";
 
-/** Simple line drawing of a C-arm LINAC: stand, rotating C-arm and treatment head. */
+/** Clinac-inspired line drawing: wide pedestal, rounded gantry housing, C-arm and treatment head. */
 function LinacDrawing({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 48 40" fill="none" className={className} aria-hidden="true">
-      {/* stand / base */}
-      <path d="M4 34h40" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <rect x="6" y="8" width="7" height="26" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      {/* floor / base */}
+      <path d="M2 36h44" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      {/* pedestal */}
+      <rect x="8" y="24" width="10" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M8 29h10" stroke="currentColor" strokeWidth="1.2" opacity=".5" />
+      {/* main gantry housing */}
+      <rect x="18" y="8" width="16" height="18" rx="4" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="26" cy="17" r="3.5" stroke="currentColor" strokeWidth="1.2" />
       {/* C-arm arc */}
       <path
-        d="M14 27a14 14 0 1 1 24 0"
+        d="M14 30a14 14 0 0 1 24 0"
         stroke="currentColor"
         strokeWidth="1.5"
         strokeLinecap="round"
         fill="none"
       />
-      {/* isocenter marker */}
-      <circle cx="26" cy="17" r="2" stroke="currentColor" strokeWidth="1.2" />
-      {/* treatment head on the upper arm */}
-      <rect x="22" y="2" width="8" height="5" rx="1" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M26 7v4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-      <path d="M24 11l-2 6M28 11l2 6" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" opacity=".6" />
+      {/* treatment head extending downward */}
+      <rect x="22" y="2" width="8" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M23 8l-2.5 6h9l-2.5-6" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+      {/* beam cone */}
+      <path d="M26 14v7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity=".7" />
+      <path d="M24 21l-2 6M28 21l2 6" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" opacity=".5" />
+      {/* collimator / detail lines */}
+      <path d="M24.5 4h3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity=".6" />
     </svg>
   );
 }
