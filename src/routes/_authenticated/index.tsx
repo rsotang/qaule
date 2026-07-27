@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AlertTriangle, CheckCircle2, ShieldAlert, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import { MachineGlyph } from "@/components/qa/MachineGlyph";
 
 export const Route = createFileRoute("/_authenticated/")({ component: Dashboard });
 
