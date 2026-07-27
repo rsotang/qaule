@@ -150,9 +150,15 @@ function MachineCard({
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
-          <div>
-            <CardTitle className="text-sm">{machineId}</CardTitle>
-            <p className="text-xs text-muted-foreground">{machineName}</p>
+          <div className="flex items-center gap-2.5">
+            <MachineGlyph
+              machineId={machineId}
+              className="h-9 w-11 shrink-0 rounded-md bg-primary/10 p-1 text-primary"
+            />
+            <div>
+              <CardTitle className="text-sm">{machineId}</CardTitle>
+              <p className="text-xs text-muted-foreground">{machineName}</p>
+            </div>
           </div>
           <Badge variant="outline" className={`gap-1 ${meta.cls}`}>
             <meta.Icon className="size-3" /> {meta.label}
