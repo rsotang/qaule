@@ -1,33 +1,42 @@
 import type { MachineId } from "@/lib/qa/types";
 
-/** Clinac-inspired line drawing: wide pedestal, rounded gantry housing, C-arm and treatment head. */
+/** Medical linear accelerator icon inspired by clean vector medical device sets. */
 function LinacDrawing({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 48 40" fill="none" className={className} aria-hidden="true">
-      {/* floor / base */}
-      <path d="M2 36h44" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      {/* pedestal */}
-      <rect x="8" y="24" width="10" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M8 29h10" stroke="currentColor" strokeWidth="1.2" opacity=".5" />
-      {/* main gantry housing */}
-      <rect x="18" y="8" width="16" height="18" rx="4" stroke="currentColor" strokeWidth="1.5" />
-      <circle cx="26" cy="17" r="3.5" stroke="currentColor" strokeWidth="1.2" />
-      {/* C-arm arc */}
-      <path
-        d="M14 30a14 14 0 0 1 24 0"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        fill="none"
-      />
-      {/* treatment head extending downward */}
-      <rect x="22" y="2" width="8" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M23 8l-2.5 6h9l-2.5-6" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-      {/* beam cone */}
-      <path d="M26 14v7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity=".7" />
-      <path d="M24 21l-2 6M28 21l2 6" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" opacity=".5" />
-      {/* collimator / detail lines */}
-      <path d="M24.5 4h3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity=".6" />
+      {/* floor / base line */}
+      <path d="M3 37h42" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity=".5" />
+
+      {/* wide pedestal base */}
+      <rect x="9" y="30" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M9 33h10" stroke="currentColor" strokeWidth="1.2" opacity=".4" />
+
+      {/* vertical support column */}
+      <rect x="13" y="22" width="2" height="8" stroke="currentColor" strokeWidth="1.5" />
+
+      {/* main gantry ring */}
+      <circle cx="26" cy="17" r="12" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="26" cy="17" r="8" stroke="currentColor" strokeWidth="1.5" opacity=".85" />
+
+      {/* isocenter / beam target point */}
+      <circle cx="26" cy="17" r="1.5" fill="currentColor" opacity=".6" />
+
+      {/* treatment head mounted on top of the ring */}
+      <rect x="22" y="1" width="8" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="24" y="3" width="4" height="2" rx="0.5" stroke="currentColor" strokeWidth="1.2" opacity=".7" />
+      <path d="M26 7v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+
+      {/* beam lines radiating from head toward isocenter */}
+      <path d="M23.5 7l-2.5 6" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" opacity=".5" />
+      <path d="M28.5 7l2.5 6" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" opacity=".5" />
+
+      {/* gantry housing / mechanical detail */}
+      <path d="M19 12h14" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity=".4" />
+      <path d="M19 22h14" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity=".4" />
+
+      {/* small accent bolts on the ring */}
+      <circle cx="18" cy="17" r="0.8" fill="currentColor" opacity=".5" />
+      <circle cx="34" cy="17" r="0.8" fill="currentColor" opacity=".5" />
     </svg>
   );
 }
