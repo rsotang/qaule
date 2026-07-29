@@ -12,17 +12,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -54,6 +44,9 @@ import { MACHINES } from "@/lib/qa/types";
 export function SettingsMenu() {
   const [open, setOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [wipeOpen, setWipeOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const [wiping, setWiping] = useState(false);
   const qc = useQueryClient();
 
   async function handleBackup() {
@@ -81,9 +74,27 @@ export function SettingsMenu() {
   }
 
   async function handleClear() {
-    await clearAllData();
-    toast.success("Todos los datos borrados");
-    qc.invalidateQueries();
+    if (!password) {
+      toast.error("Introduce tu contraseña");
+      return;
+    }
+    setWiping(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const email = userData.user?.email;
+      if (!email) throw new Error("Sesión no válida");
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw new Error("Contraseña incorrecta");
+      await clearAllData();
+      toast.success("Todos los datos borrados");
+      setPassword("");
+      setWipeOpen(false);
+      qc.invalidateQueries();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setWiping(false);
+    }
   }
 
   return (
@@ -135,30 +146,55 @@ export function SettingsMenu() {
 
             <section className="space-y-2">
               <h3 className="text-xs font-semibold uppercase text-muted-foreground">Zona peligrosa</h3>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" className="w-full justify-start">
-                    <Trash2 className="size-4" /> Borrar todos los datos
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>¿Borrar todos los datos?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Se eliminarán plantillas, importaciones y medidas. Las máquinas se mantienen
-                      pero se reinicia su estado. Esta acción no se puede deshacer.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleClear}>Borrar todo</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <Button
+                variant="destructive"
+                className="w-full justify-start"
+                onClick={() => {
+                  setPassword("");
+                  setWipeOpen(true);
+                }}
+              >
+                <Trash2 className="size-4" /> Borrar todos los datos
+              </Button>
             </section>
           </div>
         </SheetContent>
       </Sheet>
+
+      <Dialog open={wipeOpen} onOpenChange={(v) => { setWipeOpen(v); if (!v) setPassword(""); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>¿Borrar todos los datos?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Se eliminarán plantillas, importaciones y medidas. Esta acción no se puede deshacer.
+            Confirma con tu contraseña para continuar.
+          </p>
+          <form
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleClear();
+            }}
+          >
+            <Input
+              type="password"
+              autoComplete="current-password"
+              placeholder="Tu contraseña"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setWipeOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" variant="destructive" disabled={wiping || !password}>
+                {wiping ? "Borrando…" : "Borrar todo"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <DatabaseEditor open={editorOpen} onOpenChange={setEditorOpen} />
     </>
