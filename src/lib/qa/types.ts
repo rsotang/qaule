@@ -349,6 +349,8 @@ export interface CalendarTask {
   note?: string;
 }
 
-export function calendarTaskId(ym: string, testName: string): string {
-  return `${ym}::${testName.trim().toLowerCase()}`;
+export function calendarTaskId(ym: string, testName: string, machineId?: string): string {
+  const base = `${ym}::${testName.trim().toLowerCase()}`;
+  return machineId ? `${base}::${machineId.toLowerCase()}` : base;
+
 }
