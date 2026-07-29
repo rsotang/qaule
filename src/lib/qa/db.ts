@@ -9,9 +9,12 @@ import type {
   Measurement,
   Template,
   CalendarRecord,
+  CalendarTask,
   MachineId,
   MachineState,
 } from "./types";
+import { calendarTaskId } from "./types";
+
 
 // ---------- mapping helpers ----------
 
