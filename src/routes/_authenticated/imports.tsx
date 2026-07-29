@@ -295,9 +295,9 @@ function ImportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Importaciones</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">Importaciones</h1>
           <p className="text-sm text-muted-foreground">
             Sube un archivo .xlsm mensual por máquina
           </p>
@@ -327,11 +327,11 @@ function ImportsPage() {
           <CardTitle className="text-base">Nueva importación</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="w-full space-y-1 sm:w-auto">
               <label className="text-xs text-muted-foreground">Máquina</label>
               <Select value={machineId} onValueChange={(v) => setMachineId(v as MachineId)}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -343,14 +343,14 @@ function ImportsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
+            <div className="w-full space-y-1 sm:w-auto">
               <label className="text-xs text-muted-foreground">Archivo .xlsm / .xlsx</label>
               <Input
                 ref={fileRef}
                 type="file"
                 accept=".xlsm,.xlsx,.xls"
                 onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-                className="w-[320px]"
+                className="w-full sm:w-[320px]"
               />
             </div>
           </div>
@@ -504,8 +504,8 @@ function ImportsPage() {
             )}
           </div>
 
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="w-full space-y-1 sm:w-auto">
               <label className="text-xs text-muted-foreground">Año por defecto</label>
               <Input
                 type="number"
@@ -514,24 +514,24 @@ function ImportsPage() {
                 className="w-[120px]"
               />
             </div>
-            <div className="space-y-1">
+            <div className="w-full space-y-1 sm:w-auto">
               <label className="text-xs text-muted-foreground">Archivo .xlsx</label>
               <Input
                 ref={calFileRef}
                 type="file"
                 accept=".xlsx,.xls,.xlsm"
                 onChange={(e) => e.target.files?.[0] && handleCalendarFile(e.target.files[0])}
-                className="w-[320px]"
+                className="w-full sm:w-[320px]"
               />
             </div>
-            <div className="space-y-1">
+            <div className="w-full space-y-1 sm:w-auto">
               <label className="text-xs text-muted-foreground">o archivo .json</label>
               <Input
                 ref={calJsonRef}
                 type="file"
                 accept=".json"
                 onChange={(e) => e.target.files?.[0] && handleCalendarJson(e.target.files[0])}
-                className="w-[260px]"
+                className="w-full sm:w-[260px]"
               />
             </div>
           </div>

@@ -245,7 +245,7 @@ function VisualizationPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Visualización</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl tracking-tight">Visualización</h1>
         <p className="text-sm text-muted-foreground">
           Selecciona parámetros para graficarlos en función del tiempo
         </p>
@@ -253,7 +253,7 @@ function VisualizationPage() {
 
       <div className="flex flex-wrap items-start gap-4">
         {/* Date range */}
-        <Card className="w-[260px] shrink-0">
+        <Card className="w-full shrink-0 lg:w-[260px]">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Rango de fechas</CardTitle>
           </CardHeader>
@@ -316,7 +316,7 @@ function VisualizationPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap items-end gap-2">
-                    <div className="w-[180px] space-y-1">
+                    <div className="w-full space-y-1 sm:w-[180px]">
                       <Label className="text-[10px] uppercase text-muted-foreground">Máquina</Label>
                       <Select
                         value={s.machineId || undefined}
@@ -334,7 +334,7 @@ function VisualizationPage() {
                     </div>
 
                     {tpl && (
-                      <div className="w-[200px] space-y-1">
+                      <div className="w-full space-y-1 sm:w-[200px]">
                         <Label className="text-[10px] uppercase text-muted-foreground">Test</Label>
                         <Select
                           value={s.testId || undefined}
@@ -353,7 +353,7 @@ function VisualizationPage() {
                     {levels.map(({ current, selectedId, depth }) => {
                       if (current.children.length === 0) return null;
                       return (
-                        <div key={depth} className="w-[180px] space-y-1">
+                        <div key={depth} className="w-full space-y-1 sm:w-[180px]">
                           <Label className="text-[10px] uppercase text-muted-foreground">
                             Nivel {depth + 1}
                           </Label>
