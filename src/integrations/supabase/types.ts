@@ -35,6 +35,45 @@ export type Database = {
         }
         Relationships: []
       }
+      calendar_tasks: {
+        Row: {
+          completed_at: string | null
+          completed_by: string | null
+          completed_by_name: string | null
+          created_at: string
+          done: boolean
+          id: string
+          note: string | null
+          test_name: string
+          updated_at: string
+          ym: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_by?: string | null
+          completed_by_name?: string | null
+          created_at?: string
+          done?: boolean
+          id: string
+          note?: string | null
+          test_name: string
+          updated_at?: string
+          ym: string
+        }
+        Update: {
+          completed_at?: string | null
+          completed_by?: string | null
+          completed_by_name?: string | null
+          created_at?: string
+          done?: boolean
+          id?: string
+          note?: string | null
+          test_name?: string
+          updated_at?: string
+          ym?: string
+        }
+        Relationships: []
+      }
       imports: {
         Row: {
           created_by: string | null
