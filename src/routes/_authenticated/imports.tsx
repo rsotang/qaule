@@ -34,9 +34,30 @@ import {
   deleteCalendar,
 } from "@/lib/qa/db";
 import { extractFromTemplate, readFile, resolveImportDate } from "@/lib/qa/excel";
-import { parseCalendarFile, type ParseCalendarResult } from "@/lib/qa/calendar-excel";
+import {
+  parseCalendarFile,
+  parseCalendarJson,
+  calendarToJson,
+  readCalendarWorkbook,
+  type ParseCalendarResult,
+  type CalendarMapping,
+  type Grid,
+} from "@/lib/qa/calendar-excel";
+import { CalendarMapper } from "@/components/qa/CalendarMapper";
 import type { MachineId, Measurement, CalendarEntry } from "@/lib/qa/types";
 import { MACHINES, evaluateTolerance } from "@/lib/qa/types";
+
+const MAPPING_KEY = "qaule.calendarMapping";
+
+function downloadText(text: string, filename: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 
 export const Route = createFileRoute("/_authenticated/imports")({ component: ImportsPage });
 
