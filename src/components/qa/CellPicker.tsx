@@ -36,7 +36,7 @@ export function CellPicker({ parsed, initialSheet, selected = [], onPick, maxRow
       <div className="flex items-center gap-2">
         <span className="text-xs text-muted-foreground">Hoja:</span>
         <Select value={active} onValueChange={setActive}>
-          <SelectTrigger className="h-8 w-[280px] text-xs">
+          <SelectTrigger className="h-8 w-full text-xs sm:w-[280px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

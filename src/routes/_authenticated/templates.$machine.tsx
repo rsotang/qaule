@@ -222,7 +222,7 @@ function TemplateEditor() {
         <div className="flex flex-wrap gap-2">
           {templates.data && templates.data.length > 0 && (
             <Select value={template.id} onValueChange={loadTemplate}>
-              <SelectTrigger className="w-[220px]">
+              <SelectTrigger className="w-full sm:w-[220px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

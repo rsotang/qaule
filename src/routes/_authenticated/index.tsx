@@ -471,7 +471,7 @@ function MonthlySummary({
               type="month"
               value={ym}
               onChange={(e) => e.target.value && setYm(e.target.value)}
-              className="w-[160px]"
+              className="w-[130px] sm:w-[160px]"
             />
             <Button variant="outline" size="icon" onClick={() => shiftMonth(1)}>
               <ChevronRight className="size-4" />
