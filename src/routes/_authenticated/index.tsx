@@ -466,7 +466,7 @@ function MonthlySummary({
                   <Checkbox
                     className="mt-0.5"
                     checked={checked}
-                    onCheckedChange={(v) => toggleTask(r.entry.testName, v === true)}
+                    onCheckedChange={(v: boolean | "indeterminate") => toggleTask(r.entry.testName, v === true)}
                     aria-label={`Marcar ${r.entry.testName} como completado`}
                   />
                   <div className="min-w-0">
