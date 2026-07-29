@@ -321,3 +321,59 @@ export async function deleteCalendar() {
   const { error } = await supabase.from("calendar").delete().eq("id", "default");
   if (error) throw new Error(error.message);
 }
+
+// ---------- calendar tasks ----------
+
+type CalendarTaskRow = {
+  id: string;
+  ym: string;
+  test_name: string;
+  done: boolean;
+  completed_by: string | null;
+  completed_by_name: string | null;
+  completed_at: string | null;
+  note: string | null;
+};
+function taskFromRow(r: CalendarTaskRow): CalendarTask {
+  return {
+    id: r.id,
+    ym: r.ym,
+    testName: r.test_name,
+    done: r.done,
+    completedBy: r.completed_by ?? undefined,
+    completedByName: r.completed_by_name ?? undefined,
+    completedAt: r.completed_at ?? undefined,
+    note: r.note ?? undefined,
+  };
+}
+
+export async function listCalendarTasks(ym?: string): Promise<CalendarTask[]> {
+  let q = supabase.from("calendar_tasks").select("*");
+  if (ym) q = q.eq("ym", ym);
+  const { data, error } = await q;
+  return must(data, error).map(taskFromRow);
+}
+
+export async function setCalendarTask(
+  ym: string,
+  testName: string,
+  done: boolean,
+  note?: string,
+): Promise<void> {
+  const { data: auth } = await supabase.auth.getUser();
+  const user = auth.user;
+  const { error } = await supabase.from("calendar_tasks").upsert({
+    id: calendarTaskId(ym, testName),
+    ym,
+    test_name: testName,
+    done,
+    completed_by: done ? (user?.id ?? null) : null,
+    completed_by_name: done
+      ? ((user?.user_metadata?.display_name as string | undefined) ?? user?.email ?? null)
+      : null,
+    completed_at: done ? new Date().toISOString() : null,
+    note: note ?? null,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throw new Error(error.message);
+}

@@ -323,3 +323,21 @@ export function toleranceBand(tol: Tolerance | undefined): { min: number; max: n
       return null;
   }
 }
+
+// ---------- calendar tasks (traceability) ----------
+
+export interface CalendarTask {
+  /** `${ym}::${testName}` */
+  id: string;
+  ym: string;
+  testName: string;
+  done: boolean;
+  completedBy?: string;
+  completedByName?: string;
+  completedAt?: string;
+  note?: string;
+}
+
+export function calendarTaskId(ym: string, testName: string): string {
+  return `${ym}::${testName.trim().toLowerCase()}`;
+}
