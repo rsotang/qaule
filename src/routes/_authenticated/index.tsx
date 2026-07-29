@@ -375,6 +375,7 @@ function MonthlySummary({
           .filter(
             (mm) =>
               mm.testId === match.test.id &&
+              (!entry.machineId || mm.machineId === entry.machineId) &&
               mm.date >= monthStart &&
               mm.date <= monthEnd,
           )
