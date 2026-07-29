@@ -159,8 +159,9 @@ function MachineCard({
           <div className="flex items-center gap-2.5">
             <MachineGlyph
               machineId={machineId}
-              className="h-9 w-11 shrink-0 rounded-md bg-primary/10 p-1 text-primary"
+              className="h-20 w-24 shrink-0 rounded-md bg-primary/10 object-contain p-1.5"
             />
+
             <div>
               <CardTitle className="text-sm">{machineId}</CardTitle>
               <p className="text-xs text-muted-foreground">{machineName}</p>
