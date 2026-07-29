@@ -362,11 +362,12 @@ export async function setCalendarTask(
   testName: string,
   done: boolean,
   note?: string,
+  machineId?: string,
 ): Promise<void> {
   const { data: auth } = await supabase.auth.getUser();
   const user = auth.user;
   const { error } = await supabase.from("calendar_tasks").upsert({
-    id: calendarTaskId(ym, testName),
+    id: calendarTaskId(ym, testName, machineId),
     ym,
     test_name: testName,
     done,

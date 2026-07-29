@@ -139,7 +139,18 @@ export interface CalendarEntry {
   /** Months scheduled with no specific day (YYYY-MM) */
   months: string[];
   performer?: string;
+  /** Machine the entry belongs to (undefined = applies to all machines) */
+  machineId?: MachineId;
+  /** Test group, e.g. "QC IGRT", "C. Mecánico Unidad(m)" */
+  category?: string;
+  detail?: string;
+  patientId?: string;
+  course?: string;
+  plan?: string;
+  /** Estimated duration, e.g. "10'" */
+  time?: string;
 }
+
 
 export interface CalendarRecord {
   id: "default";
@@ -338,6 +349,8 @@ export interface CalendarTask {
   note?: string;
 }
 
-export function calendarTaskId(ym: string, testName: string): string {
-  return `${ym}::${testName.trim().toLowerCase()}`;
+export function calendarTaskId(ym: string, testName: string, machineId?: string): string {
+  const base = `${ym}::${testName.trim().toLowerCase()}`;
+  return machineId ? `${base}::${machineId.toLowerCase()}` : base;
+
 }

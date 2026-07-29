@@ -236,13 +236,126 @@ export function calendarToJson(rec: {
   );
 }
 
-/** Parse a calendar JSON file (exported by this app or hand-written). */
+// ----- Anual per-machine schedule format (calendario_qc_YYYY.json) -----
+
+interface AnualPrueba {
+  tipo_prueba?: string | null;
+  nombre_prueba?: string | null;
+  detalle?: string | null;
+  paciente_id?: string | null;
+  curso?: string | null;
+  plan?: string | null;
+  tiempo?: string | null;
+  responsable?: string | null;
+}
+interface AnualMes {
+  numero?: number;
+  nombre?: string;
+  fecha_qc?: string | null;
+  radiofisico?: string | null;
+  pruebas?: AnualPrueba[];
+}
+interface AnualDoc {
+  ["año"]?: number;
+  ano?: number;
+  year?: number;
+  fuente?: string;
+  linacs?: Record<string, { nombre_completo?: string; meses?: AnualMes[] }>;
+  maquinas?: Record<string, { nombre_completo?: string; meses?: AnualMes[] }>;
+}
+
+const KNOWN_MACHINES = new Set(["TB1", "TB2", "TB3", "IMG1", "IMG2", "IMG3", "CTSIM"]);
+
+function isAnualDoc(raw: unknown): raw is AnualDoc {
+  const o = raw as AnualDoc | null;
+  return !!o && typeof o === "object" && (!!o.linacs || !!o.maquinas);
+}
+
+/** Flatten the nested yearly per-machine calendar into CalendarEntry rows. */
+export function parseAnualCalendar(doc: AnualDoc): { fileName?: string; entries: CalendarEntry[] } {
+  const year = doc["año"] ?? doc.ano ?? doc.year ?? new Date().getFullYear();
+  const machines = { ...(doc.linacs ?? {}), ...(doc.maquinas ?? {}) };
+  const byKey = new Map<string, CalendarEntry>();
+
+  for (const [rawId, machine] of Object.entries(machines)) {
+    const id = rawId.trim().toUpperCase().replace(/\s+/g, "");
+    const machineId = KNOWN_MACHINES.has(id) ? (id as NonNullable<CalendarEntry["machineId"]>) : undefined;
+    for (const mes of machine?.meses ?? []) {
+      const num = typeof mes.numero === "number" ? mes.numero : null;
+      if (!num || num < 1 || num > 12) continue;
+      const ym = `${year}-${String(num).padStart(2, "0")}`;
+      const date =
+        typeof mes.fecha_qc === "string" && /^\d{4}-\d{2}-\d{2}$/.test(mes.fecha_qc)
+          ? // ignore dates that fall outside the month they are listed under
+            mes.fecha_qc.startsWith(ym)
+            ? mes.fecha_qc
+            : null
+          : null;
+      for (const p of mes.pruebas ?? []) {
+        const category = (p.tipo_prueba ?? "").trim();
+        const name = (p.nombre_prueba ?? "").trim();
+        const testName = name && name.toLowerCase() !== "todas"
+          ? name
+          : category
+            ? `${category}${name ? ` — ${name}` : ""}`
+            : name;
+        if (!testName) continue;
+        const key = `${machineId ?? rawId}|${category}|${testName.toLowerCase()}`;
+        let entry = byKey.get(key);
+        if (!entry) {
+          entry = {
+            testName,
+            dates: [],
+            months: [],
+            machineId,
+            category: category || undefined,
+            detail: p.detalle ?? undefined,
+            patientId: p.paciente_id ?? undefined,
+            course: p.curso ?? undefined,
+            plan: p.plan ?? undefined,
+            time: p.tiempo ?? undefined,
+          };
+          byKey.set(key, entry);
+        }
+        const performer = (p.responsable ?? mes.radiofisico ?? "").trim();
+        if (performer) {
+          const set = new Set((entry.performer ?? "").split(", ").filter(Boolean));
+          set.add(performer);
+          entry.performer = [...set].join(", ");
+        }
+        if (date) {
+          if (!entry.dates.includes(date)) entry.dates.push(date);
+        } else if (!entry.months.includes(ym)) entry.months.push(ym);
+      }
+    }
+  }
+
+  const entries = [...byKey.values()].map((e) => ({
+    ...e,
+    dates: e.dates.sort(),
+    months: e.months.sort(),
+  }));
+  entries.sort(
+    (a, b) =>
+      (a.machineId ?? "").localeCompare(b.machineId ?? "") ||
+      (a.category ?? "").localeCompare(b.category ?? "") ||
+      a.testName.localeCompare(b.testName),
+  );
+  return { fileName: doc.fuente, entries };
+}
+
+/** Parse a calendar JSON file (exported by this app, the yearly schedule, or hand-written). */
 export function parseCalendarJson(text: string): { fileName?: string; entries: CalendarEntry[] } {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
   } catch {
     throw new Error("El archivo no es JSON válido");
+  }
+  if (isAnualDoc(raw)) {
+    const res = parseAnualCalendar(raw);
+    if (res.entries.length === 0) throw new Error("El calendario anual no contiene pruebas");
+    return res;
   }
   const obj = (Array.isArray(raw) ? { entries: raw } : raw) as {
     fileName?: string;
@@ -262,10 +375,18 @@ export function parseCalendarJson(text: string): { fileName?: string; entries: C
       dates: [...dates].sort(),
       months: [...months].sort(),
       performer: typeof o.performer === "string" ? o.performer : undefined,
+      machineId: o.machineId,
+      category: typeof o.category === "string" ? o.category : undefined,
+      detail: typeof o.detail === "string" ? o.detail : undefined,
+      patientId: typeof o.patientId === "string" ? o.patientId : undefined,
+      course: typeof o.course === "string" ? o.course : undefined,
+      plan: typeof o.plan === "string" ? o.plan : undefined,
+      time: typeof o.time === "string" ? o.time : undefined,
     };
   });
   return { fileName: typeof obj.fileName === "string" ? obj.fileName : undefined, entries };
 }
+
 
 
 /** True if the entry is scheduled within the given month (YYYY-MM). */
