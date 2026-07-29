@@ -78,6 +78,24 @@ function ImportsPage() {
   const [calYear, setCalYear] = useState<number>(new Date().getFullYear());
   const [calPreview, setCalPreview] = useState<ParseCalendarResult | null>(null);
   const [calFileName, setCalFileName] = useState<string>("");
+  const calJsonRef = useRef<HTMLInputElement>(null);
+  const mapSrcRef = useRef<HTMLInputElement>(null);
+  const mapJsonRef = useRef<HTMLInputElement>(null);
+  const [mapping, setMapping] = useState<CalendarMapping | null>(() => {
+    if (typeof window === "undefined") return null;
+    const raw = localStorage.getItem(MAPPING_KEY);
+    try {
+      return raw ? (JSON.parse(raw) as CalendarMapping) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [mapperSource, setMapperSource] = useState<{
+    sheetNames: string[];
+    sheets: Record<string, Grid>;
+  } | null>(null);
+
+
 
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
   const imports = useQuery({ queryKey: ["imports-all"], queryFn: () => listImports() });
