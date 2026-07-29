@@ -8,7 +8,10 @@ import {
   listTemplates,
   updateMachineState,
   getCalendar,
+  listCalendarTasks,
+  setCalendarTask,
 } from "@/lib/qa/db";
+
 import {
   MACHINES,
   walkDataPoints,
@@ -27,6 +30,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+
 import {
   Select,
   SelectContent,
@@ -317,6 +322,23 @@ function MonthlySummary({
     `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`,
   );
 
+  const qc = useQueryClient();
+  const tasks = useQuery({
+    queryKey: ["calendar-tasks", ym],
+    queryFn: () => listCalendarTasks(ym),
+  });
+  const taskByName = useMemo(() => {
+    const m = new Map<string, (typeof tasks.data extends (infer T)[] | undefined ? T : never)>();
+    for (const t of tasks.data ?? []) m.set(t.testName.trim().toLowerCase(), t);
+    return m;
+  }, [tasks.data]);
+
+  async function toggleTask(testName: string, done: boolean) {
+    await setCalendarTask(ym, testName, done);
+    qc.invalidateQueries({ queryKey: ["calendar-tasks", ym] });
+  }
+
+
   function shiftMonth(delta: number) {
     const [y, m] = ym.split("-").map((n) => parseInt(n, 10));
     const d = new Date(y, m - 1 + delta, 1);
@@ -435,30 +457,54 @@ function MonthlySummary({
           </p>
         ) : (
           <ul className="divide-y">
-            {rows.map((r, i) => (
+            {rows.map((r, i) => {
+              const task = taskByName.get(r.entry.testName.trim().toLowerCase());
+              const checked = task?.done ?? false;
+              return (
               <li key={i} className="flex items-center justify-between gap-3 py-2 text-sm">
-                <div className="min-w-0">
-                  <p className="truncate font-medium">
-                    {r.entry.testName}
-                    {!r.matched && (
-                      <span className="ml-2 text-[10px] text-muted-foreground">
-                        (no asociado a plantilla)
-                      </span>
+                <div className="flex min-w-0 items-start gap-2">
+                  <Checkbox
+                    className="mt-0.5"
+                    checked={checked}
+                    onCheckedChange={(v: boolean | "indeterminate") => toggleTask(r.entry.testName, v === true)}
+                    aria-label={`Marcar ${r.entry.testName} como completado`}
+                  />
+                  <div className="min-w-0">
+                    <p className={`truncate font-medium ${checked ? "line-through opacity-70" : ""}`}>
+                      {r.entry.testName}
+                      {!r.matched && (
+                        <span className="ml-2 text-[10px] text-muted-foreground">
+                          (no asociado a plantilla)
+                        </span>
+                      )}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {r.scheduleLabel}
+                      {r.entry.performer ? ` · ${r.entry.performer}` : ""}
+                      {r.doneDate ? ` · datos ${r.doneDate}` : ""}
+                    </p>
+                    {task?.done && task.completedAt && (
+                      <p className="truncate text-xs text-emerald-700">
+                        Completado por {task.completedByName ?? "usuario"} el{" "}
+                        {new Date(task.completedAt).toLocaleString()}
+                      </p>
                     )}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {r.scheduleLabel}
-                    {r.entry.performer ? ` · ${r.entry.performer}` : ""}
-                    {r.doneDate ? ` · realizado ${r.doneDate}` : ""}
-                  </p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {r.status === "done" ? (
+                  {checked ? (
                     <Badge
                       variant="outline"
                       className="gap-1 border-emerald-500/30 bg-emerald-500/15 text-emerald-700"
                     >
-                      <CheckCircle2 className="size-3" /> Realizado
+                      <CheckCircle2 className="size-3" /> Completado
+                    </Badge>
+                  ) : r.status === "done" ? (
+                    <Badge
+                      variant="outline"
+                      className="gap-1 border-sky-500/30 bg-sky-500/15 text-sky-700"
+                    >
+                      Con datos
                     </Badge>
                   ) : (
                     <Badge variant="outline" className="gap-1 border-amber-500/30 bg-amber-500/15 text-amber-700">
@@ -480,8 +526,10 @@ function MonthlySummary({
                   )}
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
+
         )}
       </CardContent>
     </Card>

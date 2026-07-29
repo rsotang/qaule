@@ -34,9 +34,30 @@ import {
   deleteCalendar,
 } from "@/lib/qa/db";
 import { extractFromTemplate, readFile, resolveImportDate } from "@/lib/qa/excel";
-import { parseCalendarFile, type ParseCalendarResult } from "@/lib/qa/calendar-excel";
+import {
+  parseCalendarFile,
+  parseCalendarJson,
+  calendarToJson,
+  readCalendarWorkbook,
+  type ParseCalendarResult,
+  type CalendarMapping,
+  type Grid,
+} from "@/lib/qa/calendar-excel";
+import { CalendarMapper } from "@/components/qa/CalendarMapper";
 import type { MachineId, Measurement, CalendarEntry } from "@/lib/qa/types";
 import { MACHINES, evaluateTolerance } from "@/lib/qa/types";
+
+const MAPPING_KEY = "qaule.calendarMapping";
+
+function downloadText(text: string, filename: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 
 export const Route = createFileRoute("/_authenticated/imports")({ component: ImportsPage });
 
@@ -57,6 +78,24 @@ function ImportsPage() {
   const [calYear, setCalYear] = useState<number>(new Date().getFullYear());
   const [calPreview, setCalPreview] = useState<ParseCalendarResult | null>(null);
   const [calFileName, setCalFileName] = useState<string>("");
+  const calJsonRef = useRef<HTMLInputElement>(null);
+  const mapSrcRef = useRef<HTMLInputElement>(null);
+  const mapJsonRef = useRef<HTMLInputElement>(null);
+  const [mapping, setMapping] = useState<CalendarMapping | null>(() => {
+    if (typeof window === "undefined") return null;
+    const raw = localStorage.getItem(MAPPING_KEY);
+    try {
+      return raw ? (JSON.parse(raw) as CalendarMapping) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [mapperSource, setMapperSource] = useState<{
+    sheetNames: string[];
+    sheets: Record<string, Grid>;
+  } | null>(null);
+
+
 
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
   const imports = useQuery({ queryKey: ["imports-all"], queryFn: () => listImports() });
@@ -152,13 +191,82 @@ function ImportsPage() {
 
   async function handleCalendarFile(file: File) {
     try {
-      const result = await parseCalendarFile(file, { defaultYear: calYear });
+      const result = await parseCalendarFile(file, {
+        defaultYear: calYear,
+        mapping: mapping ?? undefined,
+      });
       setCalPreview(result);
       setCalFileName(file.name);
       toast.success(`${result.entries.length} tests detectados`);
     } catch (e) {
       toast.error(`Error: ${(e as Error).message}`);
     }
+  }
+
+  async function handleCalendarJson(file: File) {
+    try {
+      const { entries } = parseCalendarJson(await file.text());
+      await saveCalendar({
+        id: "default",
+        updatedAt: new Date().toISOString(),
+        fileName: file.name,
+        entries,
+      });
+      toast.success(`Calendario importado (${entries.length} tests)`);
+      qc.invalidateQueries({ queryKey: ["calendar"] });
+    } catch (e) {
+      toast.error(`Error: ${(e as Error).message}`);
+    } finally {
+      if (calJsonRef.current) calJsonRef.current.value = "";
+    }
+  }
+
+  function exportCalendarJson() {
+    const cal = calendar.data;
+    if (!cal) return;
+    downloadText(
+      calendarToJson({ fileName: cal.fileName, updatedAt: cal.updatedAt, entries: cal.entries }),
+      "calendario-qaule.json",
+    );
+  }
+
+  async function handleMapperSource(file: File) {
+    try {
+      const wb = await readCalendarWorkbook(file);
+      setMapperSource(wb);
+    } catch (e) {
+      toast.error(`Error: ${(e as Error).message}`);
+    } finally {
+      if (mapSrcRef.current) mapSrcRef.current.value = "";
+    }
+  }
+
+  function saveMapping(m: CalendarMapping) {
+    setMapping(m);
+    localStorage.setItem(MAPPING_KEY, JSON.stringify(m));
+    setMapperSource(null);
+    setCalYear(m.defaultYear ?? calYear);
+    toast.success("Plantilla de calendario guardada");
+  }
+
+  async function handleMappingJson(file: File) {
+    try {
+      const m = JSON.parse(await file.text()) as CalendarMapping;
+      if (!m || typeof m.sheetName !== "string" || typeof m.headerRow !== "number")
+        throw new Error("Plantilla no válida");
+      setMapping(m);
+      localStorage.setItem(MAPPING_KEY, JSON.stringify(m));
+      toast.success("Plantilla de calendario cargada");
+    } catch (e) {
+      toast.error(`Error: ${(e as Error).message}`);
+    } finally {
+      if (mapJsonRef.current) mapJsonRef.current.value = "";
+    }
+  }
+
+  function clearMapping() {
+    setMapping(null);
+    localStorage.removeItem(MAPPING_KEY);
   }
 
   async function commitCalendar() {
@@ -181,6 +289,8 @@ function ImportsPage() {
     toast.success("Calendario eliminado");
     qc.invalidateQueries({ queryKey: ["calendar"] });
   }
+
+
 
 
   return (
@@ -321,11 +431,78 @@ function ImportsPage() {
                   {new Date(calendar.data.updatedAt).toLocaleString()}
                 </p>
               </div>
-              <Button variant="ghost" size="sm" onClick={handleDeleteCalendar}>
-                <Trash2 className="size-4 text-destructive" /> Eliminar
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="sm" onClick={exportCalendarJson}>
+                  <Download className="size-4" /> Exportar JSON
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleDeleteCalendar}>
+                  <Trash2 className="size-4 text-destructive" /> Eliminar
+                </Button>
+              </div>
             </div>
           )}
+
+          {/* Plantilla de importación del calendario */}
+          <div className="space-y-2 rounded-md border p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs">
+                <p className="font-medium">Plantilla de importación</p>
+                <p className="text-muted-foreground">
+                  {mapping
+                    ? `${mapping.name ?? "Plantilla"} · hoja "${mapping.sheetName}" · cabecera fila ${mapping.headerRow + 1}`
+                    : "Sin plantilla: se detectan cabeceras automáticamente."}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-1">
+                <Button variant="outline" size="sm" onClick={() => mapSrcRef.current?.click()}>
+                  <Upload className="size-4" /> {mapping ? "Reconfigurar" : "Crear con Excel"}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => mapJsonRef.current?.click()}>
+                  Cargar JSON
+                </Button>
+                {mapping && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        downloadText(JSON.stringify(mapping, null, 2), "plantilla-calendario.json")
+                      }
+                    >
+                      <Download className="size-4" /> Exportar
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={clearMapping}>
+                      <Trash2 className="size-4 text-destructive" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+            <input
+              ref={mapSrcRef}
+              type="file"
+              accept=".xlsx,.xls,.xlsm"
+              className="hidden"
+              onChange={(e) => e.target.files?.[0] && handleMapperSource(e.target.files[0])}
+            />
+            <input
+              ref={mapJsonRef}
+              type="file"
+              accept=".json"
+              className="hidden"
+              onChange={(e) => e.target.files?.[0] && handleMappingJson(e.target.files[0])}
+            />
+            {mapperSource && (
+              <CalendarMapper
+                sheetNames={mapperSource.sheetNames}
+                sheets={mapperSource.sheets}
+                initial={mapping}
+                onSave={saveMapping}
+                onCancel={() => setMapperSource(null)}
+              />
+            )}
+          </div>
+
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Año por defecto</label>
@@ -346,7 +523,18 @@ function ImportsPage() {
                 className="w-[320px]"
               />
             </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">o archivo .json</label>
+              <Input
+                ref={calJsonRef}
+                type="file"
+                accept=".json"
+                onChange={(e) => e.target.files?.[0] && handleCalendarJson(e.target.files[0])}
+                className="w-[260px]"
+              />
+            </div>
           </div>
+
 
           {calPreview && (
             <div className="space-y-3 rounded-md border bg-muted/30 p-4">

@@ -65,6 +65,22 @@ export interface ParseCalendarOptions {
   defaultYear: number;
   /** Sheet name, defaults to first sheet */
   sheetName?: string;
+  /** Optional explicit mapping (from the calendar template tool) */
+  mapping?: CalendarMapping;
+}
+
+/** Reusable mapping describing where the calendar lives inside a workbook. */
+export interface CalendarMapping {
+  version: 1;
+  name?: string;
+  sheetName: string;
+  /** 0-based index of the row that contains the month/date headers */
+  headerRow: number;
+  /** 0-based index of the column that contains the test names */
+  nameCol: number;
+  /** 0-based indexes of the columns to read (empty = auto-detect) */
+  valueCols?: number[];
+  defaultYear?: number;
 }
 
 export interface ParseCalendarResult {
@@ -74,36 +90,60 @@ export interface ParseCalendarResult {
   sheetName: string;
 }
 
-export async function parseCalendarFile(
-  file: File,
-  opts: ParseCalendarOptions,
-): Promise<ParseCalendarResult> {
-  const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array", cellDates: false });
-  const sheetName = opts.sheetName ?? wb.SheetNames[0];
-  const ws = wb.Sheets[sheetName];
-  if (!ws) throw new Error(`Hoja "${sheetName}" no encontrada`);
-  const aoa = XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, {
+export type Grid = (string | number | null)[][];
+
+function sheetToAoa(ws: XLSX.WorkSheet): Grid {
+  return XLSX.utils.sheet_to_json<Grid[number]>(ws, {
     header: 1,
     blankrows: false,
     defval: null,
   });
+}
 
-  // Find the header row: the row with the most parseable columns.
-  let headerRow = 0;
+/** Read every sheet of a workbook as a raw grid — used by the mapping tool. */
+export async function readCalendarWorkbook(
+  file: File,
+): Promise<{ sheetNames: string[]; sheets: Record<string, Grid> }> {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array", cellDates: false });
+  const sheets: Record<string, Grid> = {};
+  for (const name of wb.SheetNames) sheets[name] = sheetToAoa(wb.Sheets[name]);
+  return { sheetNames: wb.SheetNames, sheets };
+}
+
+export function parseCalendarGrid(
+  aoa: Grid,
+  sheetName: string,
+  opts: { defaultYear: number; headerRow?: number; nameCol?: number; valueCols?: number[] },
+): ParseCalendarResult {
+  const nameCol = opts.nameCol ?? 0;
+  let headerRow = opts.headerRow ?? 0;
   let detected: { idx: number; col: Col }[] = [];
-  for (let r = 0; r < Math.min(aoa.length, 15); r++) {
+
+  const scanRow = (r: number) => {
     const row = aoa[r] ?? [];
     const cols: { idx: number; col: Col }[] = [];
-    for (let c = 1; c < row.length; c++) {
+    for (let c = 0; c < row.length; c++) {
+      if (c === nameCol) continue;
+      if (opts.valueCols?.length && !opts.valueCols.includes(c)) continue;
       const parsed = parseHeader(row[c] as string | number | null, opts.defaultYear);
       if (parsed) cols.push({ idx: c, col: parsed });
     }
-    if (cols.length > detected.length) {
-      detected = cols;
-      headerRow = r;
+    return cols;
+  };
+
+  if (opts.headerRow == null) {
+    for (let r = 0; r < Math.min(aoa.length, 15); r++) {
+      const cols = scanRow(r);
+      if (cols.length > detected.length) {
+        detected = cols;
+        headerRow = r;
+      }
     }
+  } else {
+    detected = scanRow(headerRow);
   }
+
   if (detected.length === 0) {
     throw new Error(
       "No se han detectado columnas de mes/fecha. Las cabeceras deben ser nombres de mes (Enero, Febrero…), 'YYYY-MM' o fechas.",
@@ -113,7 +153,7 @@ export async function parseCalendarFile(
   const entries: CalendarEntry[] = [];
   for (let r = headerRow + 1; r < aoa.length; r++) {
     const row = aoa[r] ?? [];
-    const testName = row[0] == null ? "" : String(row[0]).trim();
+    const testName = row[nameCol] == null ? "" : String(row[nameCol]).trim();
     if (!testName) continue;
     const dates = new Set<string>();
     const months = new Set<string>();
@@ -164,6 +204,69 @@ export async function parseCalendarFile(
 
   return { entries, detectedColumns: detected, headerRow, sheetName };
 }
+
+export async function parseCalendarFile(
+  file: File,
+  opts: ParseCalendarOptions,
+): Promise<ParseCalendarResult> {
+  const { sheetNames, sheets } = await readCalendarWorkbook(file);
+  const mapping = opts.mapping;
+  const sheetName = mapping?.sheetName ?? opts.sheetName ?? sheetNames[0];
+  const aoa = sheets[sheetName];
+  if (!aoa) throw new Error(`Hoja "${sheetName}" no encontrada`);
+  return parseCalendarGrid(aoa, sheetName, {
+    defaultYear: mapping?.defaultYear ?? opts.defaultYear,
+    headerRow: mapping?.headerRow,
+    nameCol: mapping?.nameCol,
+    valueCols: mapping?.valueCols,
+  });
+}
+
+// ---------- JSON import / export ----------
+
+export function calendarToJson(rec: {
+  fileName?: string;
+  updatedAt: string;
+  entries: CalendarEntry[];
+}): string {
+  return JSON.stringify(
+    { kind: "qaule-calendar", version: 1, ...rec },
+    null,
+    2,
+  );
+}
+
+/** Parse a calendar JSON file (exported by this app or hand-written). */
+export function parseCalendarJson(text: string): { fileName?: string; entries: CalendarEntry[] } {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    throw new Error("El archivo no es JSON válido");
+  }
+  const obj = (Array.isArray(raw) ? { entries: raw } : raw) as {
+    fileName?: string;
+    entries?: unknown;
+  };
+  if (!Array.isArray(obj.entries)) throw new Error("Falta la lista 'entries' en el JSON");
+  const entries: CalendarEntry[] = obj.entries.map((e, i) => {
+    const o = e as Partial<CalendarEntry>;
+    const testName = typeof o.testName === "string" ? o.testName.trim() : "";
+    if (!testName) throw new Error(`Entrada ${i + 1}: falta 'testName'`);
+    const dates = Array.isArray(o.dates) ? o.dates.filter((d) => typeof d === "string") : [];
+    const months = Array.isArray(o.months) ? o.months.filter((m) => typeof m === "string") : [];
+    if (dates.length === 0 && months.length === 0)
+      throw new Error(`Entrada "${testName}": necesita 'dates' o 'months'`);
+    return {
+      testName,
+      dates: [...dates].sort(),
+      months: [...months].sort(),
+      performer: typeof o.performer === "string" ? o.performer : undefined,
+    };
+  });
+  return { fileName: typeof obj.fileName === "string" ? obj.fileName : undefined, entries };
+}
+
 
 /** True if the entry is scheduled within the given month (YYYY-MM). */
 export function entryIsInMonth(entry: CalendarEntry, ym: string): boolean {
