@@ -85,7 +85,7 @@ export function AppShell() {
                 {user.data.email}
               </span>
             )}
-            <SettingsMenu />
+            {me.data?.isAdmin && <SettingsMenu />}
             <Button variant="ghost" size="icon" onClick={signOut} aria-label="Cerrar sesión">
               <LogOut className="size-5" />
             </Button>
