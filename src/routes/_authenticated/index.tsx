@@ -320,6 +320,23 @@ function MonthlySummary({
     `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`,
   );
 
+  const qc = useQueryClient();
+  const tasks = useQuery({
+    queryKey: ["calendar-tasks", ym],
+    queryFn: () => listCalendarTasks(ym),
+  });
+  const taskByName = useMemo(() => {
+    const m = new Map<string, (typeof tasks.data extends (infer T)[] | undefined ? T : never)>();
+    for (const t of tasks.data ?? []) m.set(t.testName.trim().toLowerCase(), t);
+    return m;
+  }, [tasks.data]);
+
+  async function toggleTask(testName: string, done: boolean) {
+    await setCalendarTask(ym, testName, done);
+    qc.invalidateQueries({ queryKey: ["calendar-tasks", ym] });
+  }
+
+
   function shiftMonth(delta: number) {
     const [y, m] = ym.split("-").map((n) => parseInt(n, 10));
     const d = new Date(y, m - 1 + delta, 1);
