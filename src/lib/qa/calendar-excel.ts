@@ -65,6 +65,22 @@ export interface ParseCalendarOptions {
   defaultYear: number;
   /** Sheet name, defaults to first sheet */
   sheetName?: string;
+  /** Optional explicit mapping (from the calendar template tool) */
+  mapping?: CalendarMapping;
+}
+
+/** Reusable mapping describing where the calendar lives inside a workbook. */
+export interface CalendarMapping {
+  version: 1;
+  name?: string;
+  sheetName: string;
+  /** 0-based index of the row that contains the month/date headers */
+  headerRow: number;
+  /** 0-based index of the column that contains the test names */
+  nameCol: number;
+  /** 0-based indexes of the columns to read (empty = auto-detect) */
+  valueCols?: number[];
+  defaultYear?: number;
 }
 
 export interface ParseCalendarResult {
@@ -74,36 +90,60 @@ export interface ParseCalendarResult {
   sheetName: string;
 }
 
-export async function parseCalendarFile(
-  file: File,
-  opts: ParseCalendarOptions,
-): Promise<ParseCalendarResult> {
-  const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array", cellDates: false });
-  const sheetName = opts.sheetName ?? wb.SheetNames[0];
-  const ws = wb.Sheets[sheetName];
-  if (!ws) throw new Error(`Hoja "${sheetName}" no encontrada`);
-  const aoa = XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, {
+export type Grid = (string | number | null)[][];
+
+function sheetToAoa(ws: XLSX.WorkSheet): Grid {
+  return XLSX.utils.sheet_to_json<Grid[number]>(ws, {
     header: 1,
     blankrows: false,
     defval: null,
   });
+}
 
-  // Find the header row: the row with the most parseable columns.
-  let headerRow = 0;
+/** Read every sheet of a workbook as a raw grid — used by the mapping tool. */
+export async function readCalendarWorkbook(
+  file: File,
+): Promise<{ sheetNames: string[]; sheets: Record<string, Grid> }> {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array", cellDates: false });
+  const sheets: Record<string, Grid> = {};
+  for (const name of wb.SheetNames) sheets[name] = sheetToAoa(wb.Sheets[name]);
+  return { sheetNames: wb.SheetNames, sheets };
+}
+
+export function parseCalendarGrid(
+  aoa: Grid,
+  sheetName: string,
+  opts: { defaultYear: number; headerRow?: number; nameCol?: number; valueCols?: number[] },
+): ParseCalendarResult {
+  const nameCol = opts.nameCol ?? 0;
+  let headerRow = opts.headerRow ?? 0;
   let detected: { idx: number; col: Col }[] = [];
-  for (let r = 0; r < Math.min(aoa.length, 15); r++) {
+
+  const scanRow = (r: number) => {
     const row = aoa[r] ?? [];
     const cols: { idx: number; col: Col }[] = [];
-    for (let c = 1; c < row.length; c++) {
+    for (let c = 0; c < row.length; c++) {
+      if (c === nameCol) continue;
+      if (opts.valueCols?.length && !opts.valueCols.includes(c)) continue;
       const parsed = parseHeader(row[c] as string | number | null, opts.defaultYear);
       if (parsed) cols.push({ idx: c, col: parsed });
     }
-    if (cols.length > detected.length) {
-      detected = cols;
-      headerRow = r;
+    return cols;
+  };
+
+  if (opts.headerRow == null) {
+    for (let r = 0; r < Math.min(aoa.length, 15); r++) {
+      const cols = scanRow(r);
+      if (cols.length > detected.length) {
+        detected = cols;
+        headerRow = r;
+      }
     }
+  } else {
+    detected = scanRow(headerRow);
   }
+
   if (detected.length === 0) {
     throw new Error(
       "No se han detectado columnas de mes/fecha. Las cabeceras deben ser nombres de mes (Enero, Febrero…), 'YYYY-MM' o fechas.",
@@ -113,7 +153,7 @@ export async function parseCalendarFile(
   const entries: CalendarEntry[] = [];
   for (let r = headerRow + 1; r < aoa.length; r++) {
     const row = aoa[r] ?? [];
-    const testName = row[0] == null ? "" : String(row[0]).trim();
+    const testName = row[nameCol] == null ? "" : String(row[nameCol]).trim();
     if (!testName) continue;
     const dates = new Set<string>();
     const months = new Set<string>();
