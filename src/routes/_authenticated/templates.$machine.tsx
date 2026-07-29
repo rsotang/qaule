@@ -217,7 +217,7 @@ function TemplateEditor() {
           >
             ← Volver a plantillas
           </button>
-          <h1 className="text-2xl font-semibold">Editor — {machineId}</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">Editor — {machineId}</h1>
         </div>
         <div className="flex flex-wrap gap-2">
           {templates.data && templates.data.length > 0 && (

@@ -90,7 +90,7 @@ function AdminPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Usuarios</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl">Usuarios</h1>
         <p className="text-sm text-muted-foreground">
           Crea cuentas para el personal. Todos comparten los mismos datos.
         </p>

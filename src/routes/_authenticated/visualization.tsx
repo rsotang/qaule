@@ -245,7 +245,7 @@ function VisualizationPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Visualización</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl tracking-tight">Visualización</h1>
         <p className="text-sm text-muted-foreground">
           Selecciona parámetros para graficarlos en función del tiempo
         </p>

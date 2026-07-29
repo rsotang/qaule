@@ -76,7 +76,7 @@ function TemplatesIndex() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Plantillas</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl">Plantillas</h1>
         <p className="text-sm text-muted-foreground">
           Define qué tests extraer y en qué celdas se encuentran. Cada máquina tiene su plantilla activa.
         </p>
