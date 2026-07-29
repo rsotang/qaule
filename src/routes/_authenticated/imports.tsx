@@ -431,11 +431,78 @@ function ImportsPage() {
                   {new Date(calendar.data.updatedAt).toLocaleString()}
                 </p>
               </div>
-              <Button variant="ghost" size="sm" onClick={handleDeleteCalendar}>
-                <Trash2 className="size-4 text-destructive" /> Eliminar
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="sm" onClick={exportCalendarJson}>
+                  <Download className="size-4" /> Exportar JSON
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleDeleteCalendar}>
+                  <Trash2 className="size-4 text-destructive" /> Eliminar
+                </Button>
+              </div>
             </div>
           )}
+
+          {/* Plantilla de importación del calendario */}
+          <div className="space-y-2 rounded-md border p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs">
+                <p className="font-medium">Plantilla de importación</p>
+                <p className="text-muted-foreground">
+                  {mapping
+                    ? `${mapping.name ?? "Plantilla"} · hoja "${mapping.sheetName}" · cabecera fila ${mapping.headerRow + 1}`
+                    : "Sin plantilla: se detectan cabeceras automáticamente."}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-1">
+                <Button variant="outline" size="sm" onClick={() => mapSrcRef.current?.click()}>
+                  <Upload className="size-4" /> {mapping ? "Reconfigurar" : "Crear con Excel"}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => mapJsonRef.current?.click()}>
+                  Cargar JSON
+                </Button>
+                {mapping && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        downloadText(JSON.stringify(mapping, null, 2), "plantilla-calendario.json")
+                      }
+                    >
+                      <Download className="size-4" /> Exportar
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={clearMapping}>
+                      <Trash2 className="size-4 text-destructive" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+            <input
+              ref={mapSrcRef}
+              type="file"
+              accept=".xlsx,.xls,.xlsm"
+              className="hidden"
+              onChange={(e) => e.target.files?.[0] && handleMapperSource(e.target.files[0])}
+            />
+            <input
+              ref={mapJsonRef}
+              type="file"
+              accept=".json"
+              className="hidden"
+              onChange={(e) => e.target.files?.[0] && handleMappingJson(e.target.files[0])}
+            />
+            {mapperSource && (
+              <CalendarMapper
+                sheetNames={mapperSource.sheetNames}
+                sheets={mapperSource.sheets}
+                initial={mapping}
+                onSave={saveMapping}
+                onCancel={() => setMapperSource(null)}
+              />
+            )}
+          </div>
+
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Año por defecto</label>
@@ -456,7 +523,18 @@ function ImportsPage() {
                 className="w-[320px]"
               />
             </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">o archivo .json</label>
+              <Input
+                ref={calJsonRef}
+                type="file"
+                accept=".json"
+                onChange={(e) => e.target.files?.[0] && handleCalendarJson(e.target.files[0])}
+                className="w-[260px]"
+              />
+            </div>
           </div>
+
 
           {calPreview && (
             <div className="space-y-3 rounded-md border bg-muted/30 p-4">
