@@ -378,6 +378,7 @@ function ImportsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Máquina</TableHead>
                       <TableHead>Test</TableHead>
                       <TableHead>Serie</TableHead>
                       <TableHead className="text-right">Valor</TableHead>
@@ -559,6 +560,7 @@ function ImportsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Máquina</TableHead>
                       <TableHead>Test</TableHead>
                       <TableHead>Programación</TableHead>
                       <TableHead>Responsable</TableHead>
@@ -567,7 +569,13 @@ function ImportsPage() {
                   <TableBody>
                     {calPreview.entries.map((e: CalendarEntry, i: number) => (
                       <TableRow key={i}>
-                        <TableCell className="text-xs">{e.testName}</TableCell>
+                        <TableCell className="text-xs">{e.machineId ?? "Todas"}</TableCell>
+                        <TableCell className="text-xs">
+                          {e.testName}
+                          {e.category && (
+                            <span className="block text-[10px] text-muted-foreground">{e.category}</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {[
                             ...e.months.map((m) => `mes ${m}`),
