@@ -328,14 +328,14 @@ function MonthlySummary({
     queryKey: ["calendar-tasks", ym],
     queryFn: () => listCalendarTasks(ym),
   });
-  const taskByName = useMemo(() => {
-    const m = new Map<string, (typeof tasks.data extends (infer T)[] | undefined ? T : never)>();
-    for (const t of tasks.data ?? []) m.set(t.testName.trim().toLowerCase(), t);
+  const taskById = useMemo(() => {
+    const m = new Map<string, NonNullable<typeof tasks.data>[number]>();
+    for (const t of tasks.data ?? []) m.set(t.id, t);
     return m;
   }, [tasks.data]);
 
-  async function toggleTask(testName: string, done: boolean) {
-    await setCalendarTask(ym, testName, done);
+  async function toggleTask(testName: string, done: boolean, machineId?: string) {
+    await setCalendarTask(ym, testName, done, undefined, machineId);
     qc.invalidateQueries({ queryKey: ["calendar-tasks", ym] });
   }
 
@@ -400,6 +400,7 @@ function MonthlySummary({
 
       return {
         entry,
+        taskId: calendarTaskId(ym, entry.testName, entry.machineId),
         scheduleLabel: entryDatesInMonth(entry, ym),
         status,
         inTolerance,
@@ -459,7 +460,7 @@ function MonthlySummary({
         ) : (
           <ul className="divide-y">
             {rows.map((r, i) => {
-              const task = taskByName.get(r.entry.testName.trim().toLowerCase());
+              const task = taskById.get(r.taskId);
               const checked = task?.done ?? false;
               return (
               <li key={i} className="flex items-center justify-between gap-3 py-2 text-sm">
@@ -467,11 +468,16 @@ function MonthlySummary({
                   <Checkbox
                     className="mt-0.5"
                     checked={checked}
-                    onCheckedChange={(v: boolean | "indeterminate") => toggleTask(r.entry.testName, v === true)}
+                    onCheckedChange={(v: boolean | "indeterminate") => toggleTask(r.entry.testName, v === true, r.entry.machineId)}
                     aria-label={`Marcar ${r.entry.testName} como completado`}
                   />
                   <div className="min-w-0">
                     <p className={`truncate font-medium ${checked ? "line-through opacity-70" : ""}`}>
+                      {r.entry.machineId && (
+                        <Badge variant="secondary" className="mr-2 align-middle text-[10px]">
+                          {r.entry.machineId}
+                        </Badge>
+                      )}
                       {r.entry.testName}
                       {!r.matched && (
                         <span className="ml-2 text-[10px] text-muted-foreground">
@@ -480,7 +486,9 @@ function MonthlySummary({
                       )}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
+                      {r.entry.category ? `${r.entry.category} · ` : ""}
                       {r.scheduleLabel}
+                      {r.entry.time ? ` · ${r.entry.time}` : ""}
                       {r.entry.performer ? ` · ${r.entry.performer}` : ""}
                       {r.doneDate ? ` · datos ${r.doneDate}` : ""}
                     </p>
