@@ -418,6 +418,30 @@ function MonthlySummary({
   const doneCount = rows.filter((r) => r.status === "done").length;
   const oot = rows.filter((r) => r.inTolerance === false).length;
 
+  const groups = useMemo(() => {
+    const map = new Map<string, typeof rows>();
+    for (const r of rows) {
+      const key = r.entry.machineId ?? "__all__";
+      const arr = map.get(key);
+      if (arr) arr.push(r);
+      else map.set(key, [r]);
+    }
+    const order = [...MACHINES.map((m) => m.id as string), "__all__"];
+    return [...map.entries()]
+      .sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]))
+      .map(([key, items]) => ({
+        key,
+        label:
+          key === "__all__"
+            ? "Todas las máquinas"
+            : (MACHINES.find((m) => m.id === key)?.name ?? key),
+        badge: key === "__all__" ? null : key,
+        items,
+        done: items.filter((r) => r.status === "done" || taskById.get(r.taskId)?.done).length,
+      }));
+  }, [rows, taskById]);
+
+
   return (
     <Card>
       <CardHeader className="pb-2">
