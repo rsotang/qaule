@@ -152,13 +152,82 @@ function ImportsPage() {
 
   async function handleCalendarFile(file: File) {
     try {
-      const result = await parseCalendarFile(file, { defaultYear: calYear });
+      const result = await parseCalendarFile(file, {
+        defaultYear: calYear,
+        mapping: mapping ?? undefined,
+      });
       setCalPreview(result);
       setCalFileName(file.name);
       toast.success(`${result.entries.length} tests detectados`);
     } catch (e) {
       toast.error(`Error: ${(e as Error).message}`);
     }
+  }
+
+  async function handleCalendarJson(file: File) {
+    try {
+      const { entries } = parseCalendarJson(await file.text());
+      await saveCalendar({
+        id: "default",
+        updatedAt: new Date().toISOString(),
+        fileName: file.name,
+        entries,
+      });
+      toast.success(`Calendario importado (${entries.length} tests)`);
+      qc.invalidateQueries({ queryKey: ["calendar"] });
+    } catch (e) {
+      toast.error(`Error: ${(e as Error).message}`);
+    } finally {
+      if (calJsonRef.current) calJsonRef.current.value = "";
+    }
+  }
+
+  function exportCalendarJson() {
+    const cal = calendar.data;
+    if (!cal) return;
+    downloadText(
+      calendarToJson({ fileName: cal.fileName, updatedAt: cal.updatedAt, entries: cal.entries }),
+      "calendario-qaule.json",
+    );
+  }
+
+  async function handleMapperSource(file: File) {
+    try {
+      const wb = await readCalendarWorkbook(file);
+      setMapperSource(wb);
+    } catch (e) {
+      toast.error(`Error: ${(e as Error).message}`);
+    } finally {
+      if (mapSrcRef.current) mapSrcRef.current.value = "";
+    }
+  }
+
+  function saveMapping(m: CalendarMapping) {
+    setMapping(m);
+    localStorage.setItem(MAPPING_KEY, JSON.stringify(m));
+    setMapperSource(null);
+    setCalYear(m.defaultYear ?? calYear);
+    toast.success("Plantilla de calendario guardada");
+  }
+
+  async function handleMappingJson(file: File) {
+    try {
+      const m = JSON.parse(await file.text()) as CalendarMapping;
+      if (!m || typeof m.sheetName !== "string" || typeof m.headerRow !== "number")
+        throw new Error("Plantilla no válida");
+      setMapping(m);
+      localStorage.setItem(MAPPING_KEY, JSON.stringify(m));
+      toast.success("Plantilla de calendario cargada");
+    } catch (e) {
+      toast.error(`Error: ${(e as Error).message}`);
+    } finally {
+      if (mapJsonRef.current) mapJsonRef.current.value = "";
+    }
+  }
+
+  function clearMapping() {
+    setMapping(null);
+    localStorage.removeItem(MAPPING_KEY);
   }
 
   async function commitCalendar() {
@@ -181,6 +250,8 @@ function ImportsPage() {
     toast.success("Calendario eliminado");
     qc.invalidateQueries({ queryKey: ["calendar"] });
   }
+
+
 
 
   return (
