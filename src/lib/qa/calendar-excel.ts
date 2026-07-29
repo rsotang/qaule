@@ -205,6 +205,69 @@ export function parseCalendarGrid(
   return { entries, detectedColumns: detected, headerRow, sheetName };
 }
 
+export async function parseCalendarFile(
+  file: File,
+  opts: ParseCalendarOptions,
+): Promise<ParseCalendarResult> {
+  const { sheetNames, sheets } = await readCalendarWorkbook(file);
+  const mapping = opts.mapping;
+  const sheetName = mapping?.sheetName ?? opts.sheetName ?? sheetNames[0];
+  const aoa = sheets[sheetName];
+  if (!aoa) throw new Error(`Hoja "${sheetName}" no encontrada`);
+  return parseCalendarGrid(aoa, sheetName, {
+    defaultYear: mapping?.defaultYear ?? opts.defaultYear,
+    headerRow: mapping?.headerRow,
+    nameCol: mapping?.nameCol,
+    valueCols: mapping?.valueCols,
+  });
+}
+
+// ---------- JSON import / export ----------
+
+export function calendarToJson(rec: {
+  fileName?: string;
+  updatedAt: string;
+  entries: CalendarEntry[];
+}): string {
+  return JSON.stringify(
+    { kind: "qaule-calendar", version: 1, ...rec },
+    null,
+    2,
+  );
+}
+
+/** Parse a calendar JSON file (exported by this app or hand-written). */
+export function parseCalendarJson(text: string): { fileName?: string; entries: CalendarEntry[] } {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    throw new Error("El archivo no es JSON válido");
+  }
+  const obj = (Array.isArray(raw) ? { entries: raw } : raw) as {
+    fileName?: string;
+    entries?: unknown;
+  };
+  if (!Array.isArray(obj.entries)) throw new Error("Falta la lista 'entries' en el JSON");
+  const entries: CalendarEntry[] = obj.entries.map((e, i) => {
+    const o = e as Partial<CalendarEntry>;
+    const testName = typeof o.testName === "string" ? o.testName.trim() : "";
+    if (!testName) throw new Error(`Entrada ${i + 1}: falta 'testName'`);
+    const dates = Array.isArray(o.dates) ? o.dates.filter((d) => typeof d === "string") : [];
+    const months = Array.isArray(o.months) ? o.months.filter((m) => typeof m === "string") : [];
+    if (dates.length === 0 && months.length === 0)
+      throw new Error(`Entrada "${testName}": necesita 'dates' o 'months'`);
+    return {
+      testName,
+      dates: [...dates].sort(),
+      months: [...months].sort(),
+      performer: typeof o.performer === "string" ? o.performer : undefined,
+    };
+  });
+  return { fileName: typeof obj.fileName === "string" ? obj.fileName : undefined, entries };
+}
+
+
 /** True if the entry is scheduled within the given month (YYYY-MM). */
 export function entryIsInMonth(entry: CalendarEntry, ym: string): boolean {
   if (entry.months.includes(ym)) return true;
