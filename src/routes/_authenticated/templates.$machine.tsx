@@ -605,7 +605,22 @@ function TestEditor({
                   if (!original) return;
                   onTreeChange(insertAfter(test.root, id, cloneNodeDeep(original)));
                 }}
+                root={test.root}
+                onMove={(id, action) => {
+                  if (action === "up") onTreeChange(moveNodeVertical(test.root, id, -1));
+                  else if (action === "down") onTreeChange(moveNodeVertical(test.root, id, 1));
+                  else if (action === "in") onTreeChange(indentNode(test.root, id));
+                  else onTreeChange(outdentNode(test.root, id));
+                }}
+                onMoveInto={(id, nestId) =>
+                  onTreeChange(
+                    nestId === "__root__"
+                      ? moveNodeInto(test.root, id, test.root.id)
+                      : moveNodeInto(test.root, id, nestId),
+                  )
+                }
               />
+
             ))}
           </div>
         </div>
