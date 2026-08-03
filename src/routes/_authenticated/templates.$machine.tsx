@@ -631,6 +631,60 @@ function TestEditor({
 
 // ---------------- TreeNodeView ----------------
 
+type MoveAction = "up" | "down" | "in" | "out";
+
+interface MoveProps {
+  root: Nest;
+  onMove: (id: string, action: MoveAction) => void;
+  onMoveInto: (id: string, nestId: string) => void;
+}
+
+/** Small toolbar to reorder / re-parent a node. */
+function MoveControls({ id, root, onMove, onMoveInto }: MoveProps & { id: string }) {
+  const targets = listNestTargets(root, id);
+  return (
+    <div className="flex items-center gap-0.5">
+      <Button size="icon" variant="ghost" className="size-7" title="Subir" onClick={() => onMove(id, "up")}>
+        <ArrowUp className="size-3" />
+      </Button>
+      <Button size="icon" variant="ghost" className="size-7" title="Bajar" onClick={() => onMove(id, "down")}>
+        <ArrowDown className="size-3" />
+      </Button>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-7"
+        title="Meter en el grupo anterior"
+        disabled={!canIndent(root, id)}
+        onClick={() => onMove(id, "in")}
+      >
+        <IndentIncrease className="size-3" />
+      </Button>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-7"
+        title="Sacar del grupo"
+        disabled={!canOutdent(root, id)}
+        onClick={() => onMove(id, "out")}
+      >
+        <IndentDecrease className="size-3" />
+      </Button>
+      <Select value="" onValueChange={(v) => onMoveInto(id, v)}>
+        <SelectTrigger className="h-7 w-[46px] px-1 text-[10px]" title="Mover a un grupo">
+          <MoveRight className="size-3" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__root__" className="text-xs">raíz</SelectItem>
+          {targets.map((t) => (
+            <SelectItem key={t.id} value={t.id} className="text-xs">{t.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 function TreeNodeView({
   node,
   depth,
@@ -641,7 +695,10 @@ function TreeNodeView({
   onAddChild,
   onRemove,
   onDuplicate,
-}: {
+  root,
+  onMove,
+  onMoveInto,
+}: MoveProps & {
   node: TreeNode;
   depth: number;
   test: TestDef;
@@ -654,6 +711,7 @@ function TreeNodeView({
 }) {
   const [open, setOpen] = useState(true);
   const pad = { paddingLeft: `${depth * 16}px` };
+
 
   if (node.kind === "nest") {
     const nameActive =
