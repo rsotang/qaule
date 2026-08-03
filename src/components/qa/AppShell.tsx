@@ -2,7 +2,7 @@ import { Link, Outlet, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { Activity, Upload, Settings2, LineChart, LogOut, Users, Menu } from "lucide-react";
+import { Upload, Settings2, LineChart, LogOut, Users, Menu } from "lucide-react";
 import { SettingsMenu } from "./SettingsMenu";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -32,7 +32,7 @@ export function AppShell() {
 
   const links = (
     <>
-      <NavLink to="/" icon={<Activity className="size-4" />} label="Dashboard" />
+      <NavLink to="/" icon={<RadiationIcon className="size-4" />} label="Dashboard" />
       <NavLink to="/visualization" icon={<LineChart className="size-4" />} label="Visualización" />
       <NavLink to="/imports" icon={<Upload className="size-4" />} label="Importaciones" />
       <NavLink to="/templates" icon={<Settings2 className="size-4" />} label="Plantillas" />
@@ -70,7 +70,7 @@ export function AppShell() {
           </Sheet>
 
           <Link to="/" className="flex min-w-0 items-center gap-1.5 font-semibold tracking-tight">
-            <Activity className="size-6 shrink-0 text-primary" />
+            <RadiationIcon className="size-6 shrink-0 text-primary" />
             <span className="leading-none">
               <span className="text-2xl font-bold tracking-tight text-primary">QA</span>
               <span className="text-base font-semibold tracking-wide text-foreground/80">ULE</span>
@@ -110,6 +110,26 @@ function NavLink({ to, icon, label }: { to: string; icon: React.ReactNode; label
       {icon}
       {label}
     </Link>
+  );
+}
+
+function RadiationIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="2" />
+      <path d="M12 7a8.4 8.4 0 0 1 4.2 1.1l3.4-5.9A13.7 13.7 0 0 0 12 1v6Z" />
+      <path d="M7.8 8.1A8.4 8.4 0 0 1 12 7V1a13.7 13.7 0 0 0-7.6 3.2l3.4 5.9Z" />
+      <path d="M4.4 14a8.4 8.4 0 0 1 0-3.9l-5.9-3.4A13.7 13.7 0 0 0 1 12a13.7 13.7 0 0 0 2.5 5.4l5.9-3.4Z" />
+    </svg>
   );
 }
 
