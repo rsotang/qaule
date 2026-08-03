@@ -32,7 +32,7 @@ export function AppShell() {
 
   const links = (
     <>
-      <NavLink to="/" icon={<Activity className="size-4" />} label="Dashboard" />
+      <NavLink to="/" icon={<RadiationIcon className="size-4" />} label="Dashboard" />
       <NavLink to="/visualization" icon={<LineChart className="size-4" />} label="Visualización" />
       <NavLink to="/imports" icon={<Upload className="size-4" />} label="Importaciones" />
       <NavLink to="/templates" icon={<Settings2 className="size-4" />} label="Plantillas" />
