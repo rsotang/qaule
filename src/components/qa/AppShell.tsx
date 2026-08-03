@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { supabase } from "@/integrations/supabase/client";
 import { meIsAdmin } from "@/lib/admin.functions";
 import { toast } from "sonner";
+import logoAsset from "@/assets/trebol_radiacion.svg.asset.json";
 
 export function AppShell() {
   const navigate = useNavigate();
