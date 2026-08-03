@@ -15,11 +15,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import {
   Trash2, Plus, Save, Upload, Wand2, Copy, FolderPlus, FilePlus,
-  ChevronRight, ChevronDown, X, Target, Type, Hash, CopyPlus,
+  ChevronRight, ChevronDown, X, Target, Type, Hash, CopyPlus, FileJson, Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { CellPicker } from "@/components/qa/CellPicker";
+import { parseTestJson, testToJson, testJsonFileName } from "@/lib/qa/test-json";
 import { listTemplates, saveTemplate, setActiveTemplate } from "@/lib/qa/db";
+
 import { readFile, type ParsedWorkbook } from "@/lib/qa/excel";
 import { autoBuildTemplate, buildSeedTemplate, cloneTemplateForMachine } from "@/lib/qa/seed";
 import {
@@ -400,16 +402,68 @@ function TestEditor({
   target: TargetSlot | null;
   setTarget: (t: TargetSlot | null) => void;
 }) {
+  async function importJson(file: File) {
+    try {
+      const next = parseTestJson(await file.text(), test);
+      onChange({
+        name: next.name,
+        category: next.category,
+        frequency: next.frequency,
+        admin: next.admin,
+        root: next.root,
+      });
+      setTarget(null);
+      toast.success("JSON importado en el test");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }
+
+  function exportJson() {
+    const blob = new Blob([JSON.stringify(testToJson(test), null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = testJsonFileName(test);
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <Card>
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="text-base">Editar test</CardTitle>
-          <Button variant="ghost" size="icon" onClick={onDelete}>
-            <Trash2 className="size-4 text-destructive" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <label className="cursor-pointer">
+              <input
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) importJson(f);
+                  e.target.value = "";
+                }}
+              />
+              <Button size="sm" variant="outline" asChild>
+                <span><FileJson className="size-4" /> Importar JSON</span>
+              </Button>
+            </label>
+            <Button size="sm" variant="outline" onClick={exportJson}>
+              <Download className="size-4" /> Exportar JSON
+            </Button>
+            <Button variant="ghost" size="icon" onClick={onDelete}>
+              <Trash2 className="size-4 text-destructive" />
+            </Button>
+          </div>
         </div>
+        <p className="text-xs text-muted-foreground">
+          El JSON puede ser un test exportado o un objeto anidado con los parámetros; se cargará en el
+          editor para poder ajustarlo y asignar celdas.
+        </p>
       </CardHeader>
+
       <CardContent className="space-y-4">
         {/* Test metadata */}
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
