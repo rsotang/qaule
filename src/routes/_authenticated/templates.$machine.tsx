@@ -854,7 +854,9 @@ function TreeNodeView({
             </SelectContent>
           </Select>
         )}
+        <MoveControls id={dp.id} root={root} onMove={onMove} onMoveInto={onMoveInto} />
         <Button
+
           size="icon"
           variant="ghost"
           className="size-7"
