@@ -16,7 +16,9 @@ import { Badge } from "@/components/ui/badge";
 import {
   Trash2, Plus, Save, Upload, Wand2, Copy, FolderPlus, FilePlus,
   ChevronRight, ChevronDown, X, Target, Type, Hash, CopyPlus, FileJson, Download,
+  ArrowUp, ArrowDown, IndentIncrease, IndentDecrease, MoveRight,
 } from "lucide-react";
+
 import { toast } from "sonner";
 import { CellPicker } from "@/components/qa/CellPicker";
 import { parseTestJson, testToJson, testJsonFileName } from "@/lib/qa/test-json";
