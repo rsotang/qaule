@@ -441,11 +441,9 @@ function MonthlySummary({
       }));
   }, [rows, taskById]);
 
-  // Initialize expanded state once groups are known so all sections start open
+  // Menús colapsados por defecto; el usuario expande los grupos que quiera ver
   useEffect(() => {
-    if (groups.length > 0) {
-      setExpanded(new Set(groups.map((g) => g.key)));
-    }
+    setExpanded(new Set());
   }, [groups.map((g) => g.key).join(",")]);
 
   function toggleGroup(key: string) {
