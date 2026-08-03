@@ -738,6 +738,7 @@ function TreeNodeView({
           <Button size="sm" variant="ghost" className="h-7 px-2 text-[10px]" onClick={() => onAddChild(node.id, "data")}>
             <FilePlus className="size-3" /> dato
           </Button>
+          <MoveControls id={node.id} root={root} onMove={onMove} onMoveInto={onMoveInto} />
           <Button
             size="icon"
             variant="ghost"
@@ -765,8 +766,12 @@ function TreeNodeView({
                 onAddChild={onAddChild}
                 onRemove={onRemove}
                 onDuplicate={onDuplicate}
+                root={root}
+                onMove={onMove}
+                onMoveInto={onMoveInto}
               />
             ))}
+
           </div>
         )}
       </div>
