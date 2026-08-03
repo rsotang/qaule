@@ -2,7 +2,7 @@ import { Link, Outlet, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { Activity, Upload, Settings2, LineChart, LogOut, Users, Menu } from "lucide-react";
+import { Upload, Settings2, LineChart, LogOut, Users, Menu } from "lucide-react";
 import { SettingsMenu } from "./SettingsMenu";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
