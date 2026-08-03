@@ -34,7 +34,7 @@ export function AppShell() {
 
   const links = (
     <>
-      <NavLink to="/" icon={<RadiationIcon className="size-4" />} label="Dashboard" />
+      <NavLink to="/" label="Resumen" />
       <NavLink to="/visualization" icon={<LineChart className="size-4" />} label="Visualización" />
       <NavLink to="/imports" icon={<Upload className="size-4" />} label="Importaciones" />
       <NavLink to="/templates" icon={<Settings2 className="size-4" />} label="Plantillas" />
@@ -102,7 +102,7 @@ export function AppShell() {
   );
 }
 
-function NavLink({ to, icon, label }: { to: string; icon: React.ReactNode; label: string }) {
+function NavLink({ to, icon, label }: { to: string; icon?: React.ReactNode; label: string }) {
   return (
     <Link
       to={to}
