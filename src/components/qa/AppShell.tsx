@@ -72,7 +72,7 @@ export function AppShell() {
           </Sheet>
 
           <Link to="/" className="flex min-w-0 items-center gap-1.5 font-semibold tracking-tight">
-            <RadiationIcon className="size-6 shrink-0 text-primary" />
+            <img src={logoAsset.url} alt="QAULE" className="size-7 shrink-0" />
             <span className="leading-none">
               <span className="text-2xl font-bold tracking-tight text-primary">QA</span>
               <span className="text-base font-semibold tracking-wide text-foreground/80">ULE</span>
