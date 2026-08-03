@@ -15,11 +15,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import {
   Trash2, Plus, Save, Upload, Wand2, Copy, FolderPlus, FilePlus,
-  ChevronRight, ChevronDown, X, Target, Type, Hash, CopyPlus,
+  ChevronRight, ChevronDown, X, Target, Type, Hash, CopyPlus, FileJson, Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { CellPicker } from "@/components/qa/CellPicker";
+import { parseTestJson, testToJson, testJsonFileName } from "@/lib/qa/test-json";
 import { listTemplates, saveTemplate, setActiveTemplate } from "@/lib/qa/db";
+
 import { readFile, type ParsedWorkbook } from "@/lib/qa/excel";
 import { autoBuildTemplate, buildSeedTemplate, cloneTemplateForMachine } from "@/lib/qa/seed";
 import {
