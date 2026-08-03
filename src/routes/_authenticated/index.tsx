@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   listImports,
   listMachines,
@@ -41,7 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertTriangle, CheckCircle2, ShieldAlert, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ShieldAlert, ChevronLeft, ChevronRight, CalendarDays, ChevronDown, ChevronUp } from "lucide-react";
 import { MachineGlyph } from "@/components/qa/MachineGlyph";
 
 export const Route = createFileRoute("/_authenticated/")({ component: Dashboard });
@@ -324,6 +324,7 @@ function MonthlySummary({
   const [ym, setYm] = useState<string>(
     `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`,
   );
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const qc = useQueryClient();
   const tasks = useQuery({
@@ -340,7 +341,6 @@ function MonthlySummary({
     await setCalendarTask(ym, testName, done, undefined, machineId);
     qc.invalidateQueries({ queryKey: ["calendar-tasks", ym] });
   }
-
 
   function shiftMonth(delta: number) {
     const [y, m] = ym.split("-").map((n) => parseInt(n, 10));
@@ -441,6 +441,21 @@ function MonthlySummary({
       }));
   }, [rows, taskById]);
 
+  // Initialize expanded state once groups are known so all sections start open
+  useEffect(() => {
+    if (groups.length > 0) {
+      setExpanded(new Set(groups.map((g) => g.key)));
+    }
+  }, [groups.map((g) => g.key).join(",")]);
+
+  function toggleGroup(key: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   return (
     <Card>
@@ -485,107 +500,126 @@ function MonthlySummary({
             Sin tests programados para {headerLabel}.
           </p>
         ) : (
-          <div className="space-y-5">
-            {groups.map((g) => (
-              <div key={g.key}>
-                <div className="mb-1 flex items-center gap-2 border-b pb-1">
-                  {g.badge && (
-                    <Badge variant="secondary" className="text-[10px]">
-                      {g.badge}
-                    </Badge>
-                  )}
-                  <h4 className="text-sm font-semibold">{g.label}</h4>
-                  <span className="text-xs text-muted-foreground">
-                    {g.done}/{g.items.length} completados
-                  </span>
-                </div>
-                <ul className="divide-y">
-                  {g.items.map((r, i) => {
-                    const task = taskById.get(r.taskId);
-                    const checked = task?.done ?? false;
-                    return (
-                      <li key={i} className="flex items-center justify-between gap-3 py-2 text-sm">
-                        <div className="flex min-w-0 items-start gap-2">
-                          <Checkbox
-                            className="mt-0.5"
-                            checked={checked}
-                            onCheckedChange={(v: boolean | "indeterminate") =>
-                              toggleTask(r.entry.testName, v === true, r.entry.machineId)
-                            }
-                            aria-label={`Marcar ${r.entry.testName} como completado`}
-                          />
-                          <div className="min-w-0">
-                            <p
-                              className={`truncate font-medium ${checked ? "line-through opacity-70" : ""}`}
-                            >
-                              {r.entry.testName}
-                              {!r.matched && (
-                                <span className="ml-2 text-[10px] text-muted-foreground">
-                                  (no asociado a plantilla)
-                                </span>
+          <div className="space-y-3">
+            {groups.map((g) => {
+              const isOpen = expanded.has(g.key);
+              return (
+                <div key={g.key} className="rounded-md border">
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(g.key)}
+                    className="flex w-full items-center justify-between gap-2 px-3 py-2 hover:bg-muted/50"
+                  >
+                    <div className="flex items-center gap-2">
+                      {g.badge && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          {g.badge}
+                        </Badge>
+                      )}
+                      <h4 className="text-sm font-semibold">{g.label}</h4>
+                      <span className="text-xs text-muted-foreground">
+                        {g.done}/{g.items.length} completados
+                      </span>
+                    </div>
+                    {isOpen ? (
+                      <ChevronUp className="size-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="size-4 text-muted-foreground" />
+                    )}
+                  </button>
+                  {isOpen && (
+                    <ul className="divide-y border-t">
+                      {g.items.map((r, i) => {
+                        const task = taskById.get(r.taskId);
+                        const checked = task?.done ?? false;
+                        return (
+                          <li
+                            key={i}
+                            className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+                          >
+                            <div className="flex min-w-0 items-start gap-2">
+                              <Checkbox
+                                className="mt-0.5"
+                                checked={checked}
+                                onCheckedChange={(v: boolean | "indeterminate") =>
+                                  toggleTask(r.entry.testName, v === true, r.entry.machineId)
+                                }
+                                aria-label={`Marcar ${r.entry.testName} como completado`}
+                              />
+                              <div className="min-w-0">
+                                <p
+                                  className={`truncate font-medium ${checked ? "line-through opacity-70" : ""}`}
+                                >
+                                  {r.entry.testName}
+                                  {!r.matched && (
+                                    <span className="ml-2 text-[10px] text-muted-foreground">
+                                      (no asociado a plantilla)
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="truncate text-xs text-muted-foreground">
+                                  {r.entry.category ? `${r.entry.category} · ` : ""}
+                                  {r.scheduleLabel}
+                                  {r.entry.time ? ` · ${r.entry.time}` : ""}
+                                  {r.entry.performer ? ` · ${r.entry.performer}` : ""}
+                                  {r.doneDate ? ` · datos ${r.doneDate}` : ""}
+                                </p>
+                                {task?.done && task.completedAt && (
+                                  <p className="truncate text-xs text-emerald-700">
+                                    Completado por {task.completedByName ?? "usuario"} el{" "}
+                                    {new Date(task.completedAt).toLocaleString()}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {checked ? (
+                                <Badge
+                                  variant="outline"
+                                  className="gap-1 border-emerald-500/30 bg-emerald-500/15 text-emerald-700"
+                                >
+                                  <CheckCircle2 className="size-3" /> Completado
+                                </Badge>
+                              ) : r.status === "done" ? (
+                                <Badge
+                                  variant="outline"
+                                  className="gap-1 border-sky-500/30 bg-sky-500/15 text-sky-700"
+                                >
+                                  Con datos
+                                </Badge>
+                              ) : (
+                                <Badge
+                                  variant="outline"
+                                  className="gap-1 border-amber-500/30 bg-amber-500/15 text-amber-700"
+                                >
+                                  Pendiente
+                                </Badge>
                               )}
-                            </p>
-                            <p className="truncate text-xs text-muted-foreground">
-                              {r.entry.category ? `${r.entry.category} · ` : ""}
-                              {r.scheduleLabel}
-                              {r.entry.time ? ` · ${r.entry.time}` : ""}
-                              {r.entry.performer ? ` · ${r.entry.performer}` : ""}
-                              {r.doneDate ? ` · datos ${r.doneDate}` : ""}
-                            </p>
-                            {task?.done && task.completedAt && (
-                              <p className="truncate text-xs text-emerald-700">
-                                Completado por {task.completedByName ?? "usuario"} el{" "}
-                                {new Date(task.completedAt).toLocaleString()}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {checked ? (
-                            <Badge
-                              variant="outline"
-                              className="gap-1 border-emerald-500/30 bg-emerald-500/15 text-emerald-700"
-                            >
-                              <CheckCircle2 className="size-3" /> Completado
-                            </Badge>
-                          ) : r.status === "done" ? (
-                            <Badge
-                              variant="outline"
-                              className="gap-1 border-sky-500/30 bg-sky-500/15 text-sky-700"
-                            >
-                              Con datos
-                            </Badge>
-                          ) : (
-                            <Badge
-                              variant="outline"
-                              className="gap-1 border-amber-500/30 bg-amber-500/15 text-amber-700"
-                            >
-                              Pendiente
-                            </Badge>
-                          )}
-                          {r.inTolerance === true && (
-                            <Badge
-                              variant="outline"
-                              className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
-                            >
-                              En tolerancia
-                            </Badge>
-                          )}
-                          {r.inTolerance === false && (
-                            <Badge
-                              variant="outline"
-                              className="border-destructive/30 bg-destructive/10 text-destructive"
-                            >
-                              Fuera
-                            </Badge>
-                          )}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
+                              {r.inTolerance === true && (
+                                <Badge
+                                  variant="outline"
+                                  className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
+                                >
+                                  En tolerancia
+                                </Badge>
+                              )}
+                              {r.inTolerance === false && (
+                                <Badge
+                                  variant="outline"
+                                  className="border-destructive/30 bg-destructive/10 text-destructive"
+                                >
+                                  Fuera
+                                </Badge>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
