@@ -286,6 +286,114 @@ export function insertAfter(root: Nest, afterId: string, newNode: TreeNode): Nes
   return visit(root);
 }
 
+// ---------- moving nodes ----------
+
+interface FoundParent {
+  parent: Nest;
+  index: number;
+  node: TreeNode;
+}
+
+function findParent(root: Nest, id: string): FoundParent | null {
+  const visit = (n: Nest): FoundParent | null => {
+    const idx = n.children.findIndex((c) => c.id === id);
+    if (idx !== -1) return { parent: n, index: idx, node: n.children[idx] };
+    for (const c of n.children) {
+      if (c.kind === "nest") {
+        const r = visit(c);
+        if (r) return r;
+      }
+    }
+    return null;
+  };
+  return visit(root);
+}
+
+/** Remove a node from the tree, returning the new root (no id changes). */
+function detach(root: Nest, id: string): Nest {
+  const visit = (n: Nest): Nest => ({
+    ...n,
+    children: n.children.filter((c) => c.id !== id).map((c) => (c.kind === "nest" ? visit(c) : c)),
+  });
+  return visit(root);
+}
+
+/** Move a node up or down among its siblings. */
+export function moveNodeVertical(root: Nest, id: string, dir: -1 | 1): Nest {
+  const found = findParent(root, id);
+  if (!found) return root;
+  const target = found.index + dir;
+  if (target < 0 || target >= found.parent.children.length) return root;
+  const next = [...found.parent.children];
+  const [n] = next.splice(found.index, 1);
+  next.splice(target, 0, n);
+  return updateNode(root, found.parent.id, (p) => ({ ...(p as Nest), children: next })) as Nest;
+}
+
+/** Can the node be moved into the sibling nest directly above it? */
+export function canIndent(root: Nest, id: string): boolean {
+  const found = findParent(root, id);
+  if (!found || found.index === 0) return false;
+  return found.parent.children[found.index - 1].kind === "nest";
+}
+
+/** Move a node inside the previous sibling nest (as its last child). */
+export function indentNode(root: Nest, id: string): Nest {
+  const found = findParent(root, id);
+  if (!found || found.index === 0) return root;
+  const prev = found.parent.children[found.index - 1];
+  if (prev.kind !== "nest") return root;
+  const detached = detach(root, id);
+  return addChild(detached, prev.id, found.node);
+}
+
+/** Can the node be moved out of its parent nest? */
+export function canOutdent(root: Nest, id: string): boolean {
+  const found = findParent(root, id);
+  return !!found && found.parent.id !== root.id;
+}
+
+/** Move a node out of its parent nest, placing it right after the parent. */
+export function outdentNode(root: Nest, id: string): Nest {
+  const found = findParent(root, id);
+  if (!found || found.parent.id === root.id) return root;
+  const detached = detach(root, id);
+  return insertAfter(detached, found.parent.id, found.node);
+}
+
+/** Move a node into a specific nest (as last child). Rejects moving a nest into itself. */
+export function moveNodeInto(root: Nest, id: string, targetNestId: string): Nest {
+  if (id === targetNestId) return root;
+  const found = findParent(root, id);
+  if (!found) return root;
+  if (found.node.kind === "nest") {
+    const containsTarget = (n: TreeNode): boolean =>
+      n.id === targetNestId ||
+      (n.kind === "nest" && n.children.some(containsTarget));
+    if (containsTarget(found.node)) return root;
+  }
+  const detached = detach(root, id);
+  if (targetNestId === root.id) return { ...detached, children: [...detached.children, found.node] };
+  return addChild(detached, targetNestId, found.node);
+}
+
+/** List of nests available as move targets (excluding the node itself and its descendants). */
+export function listNestTargets(root: Nest, excludeId: string): { id: string; label: string }[] {
+  const out: { id: string; label: string }[] = [];
+  const walk = (n: Nest, path: string[]) => {
+    for (const c of n.children) {
+      if (c.kind !== "nest") continue;
+      if (c.id === excludeId) continue;
+      const label = [...path, displayTextOrRef(c.name, "grupo")].join(" / ");
+      out.push({ id: c.id, label });
+      walk(c, [...path, displayTextOrRef(c.name, "grupo")]);
+    }
+  };
+  walk(root, []);
+  return out;
+}
+
+
 // ---------- tolerance helpers ----------
 
 export function parseToleranceText(text: string): Tolerance {

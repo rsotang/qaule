@@ -16,7 +16,9 @@ import { Badge } from "@/components/ui/badge";
 import {
   Trash2, Plus, Save, Upload, Wand2, Copy, FolderPlus, FilePlus,
   ChevronRight, ChevronDown, X, Target, Type, Hash, CopyPlus, FileJson, Download,
+  ArrowUp, ArrowDown, IndentIncrease, IndentDecrease, MoveRight,
 } from "lucide-react";
+
 import { toast } from "sonner";
 import { CellPicker } from "@/components/qa/CellPicker";
 import { parseTestJson, testToJson, testJsonFileName } from "@/lib/qa/test-json";
@@ -35,7 +37,15 @@ import {
   updateNode,
   cloneNodeDeep,
   insertAfter,
+  moveNodeVertical,
+  indentNode,
+  outdentNode,
+  canIndent,
+  canOutdent,
+  moveNodeInto,
+  listNestTargets,
   walkDataPoints,
+
   allBoundCells,
   textValue,
   refValue,
@@ -595,7 +605,22 @@ function TestEditor({
                   if (!original) return;
                   onTreeChange(insertAfter(test.root, id, cloneNodeDeep(original)));
                 }}
+                root={test.root}
+                onMove={(id, action) => {
+                  if (action === "up") onTreeChange(moveNodeVertical(test.root, id, -1));
+                  else if (action === "down") onTreeChange(moveNodeVertical(test.root, id, 1));
+                  else if (action === "in") onTreeChange(indentNode(test.root, id));
+                  else onTreeChange(outdentNode(test.root, id));
+                }}
+                onMoveInto={(id, nestId) =>
+                  onTreeChange(
+                    nestId === "__root__"
+                      ? moveNodeInto(test.root, id, test.root.id)
+                      : moveNodeInto(test.root, id, nestId),
+                  )
+                }
               />
+
             ))}
           </div>
         </div>
@@ -605,6 +630,60 @@ function TestEditor({
 }
 
 // ---------------- TreeNodeView ----------------
+
+type MoveAction = "up" | "down" | "in" | "out";
+
+interface MoveProps {
+  root: Nest;
+  onMove: (id: string, action: MoveAction) => void;
+  onMoveInto: (id: string, nestId: string) => void;
+}
+
+/** Small toolbar to reorder / re-parent a node. */
+function MoveControls({ id, root, onMove, onMoveInto }: MoveProps & { id: string }) {
+  const targets = listNestTargets(root, id);
+  return (
+    <div className="flex items-center gap-0.5">
+      <Button size="icon" variant="ghost" className="size-7" title="Subir" onClick={() => onMove(id, "up")}>
+        <ArrowUp className="size-3" />
+      </Button>
+      <Button size="icon" variant="ghost" className="size-7" title="Bajar" onClick={() => onMove(id, "down")}>
+        <ArrowDown className="size-3" />
+      </Button>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-7"
+        title="Meter en el grupo anterior"
+        disabled={!canIndent(root, id)}
+        onClick={() => onMove(id, "in")}
+      >
+        <IndentIncrease className="size-3" />
+      </Button>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-7"
+        title="Sacar del grupo"
+        disabled={!canOutdent(root, id)}
+        onClick={() => onMove(id, "out")}
+      >
+        <IndentDecrease className="size-3" />
+      </Button>
+      <Select value="" onValueChange={(v) => onMoveInto(id, v)}>
+        <SelectTrigger className="h-7 w-[46px] px-1 text-[10px]" title="Mover a un grupo">
+          <MoveRight className="size-3" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__root__" className="text-xs">raíz</SelectItem>
+          {targets.map((t) => (
+            <SelectItem key={t.id} value={t.id} className="text-xs">{t.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
 
 function TreeNodeView({
   node,
@@ -616,7 +695,10 @@ function TreeNodeView({
   onAddChild,
   onRemove,
   onDuplicate,
-}: {
+  root,
+  onMove,
+  onMoveInto,
+}: MoveProps & {
   node: TreeNode;
   depth: number;
   test: TestDef;
@@ -629,6 +711,7 @@ function TreeNodeView({
 }) {
   const [open, setOpen] = useState(true);
   const pad = { paddingLeft: `${depth * 16}px` };
+
 
   if (node.kind === "nest") {
     const nameActive =
@@ -655,6 +738,7 @@ function TreeNodeView({
           <Button size="sm" variant="ghost" className="h-7 px-2 text-[10px]" onClick={() => onAddChild(node.id, "data")}>
             <FilePlus className="size-3" /> dato
           </Button>
+          <MoveControls id={node.id} root={root} onMove={onMove} onMoveInto={onMoveInto} />
           <Button
             size="icon"
             variant="ghost"
@@ -682,8 +766,12 @@ function TreeNodeView({
                 onAddChild={onAddChild}
                 onRemove={onRemove}
                 onDuplicate={onDuplicate}
+                root={root}
+                onMove={onMove}
+                onMoveInto={onMoveInto}
               />
             ))}
+
           </div>
         )}
       </div>
@@ -766,7 +854,9 @@ function TreeNodeView({
             </SelectContent>
           </Select>
         )}
+        <MoveControls id={dp.id} root={root} onMove={onMove} onMoveInto={onMoveInto} />
         <Button
+
           size="icon"
           variant="ghost"
           className="size-7"
