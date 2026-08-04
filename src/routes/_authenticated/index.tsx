@@ -529,24 +529,42 @@ function MonthlySummary({
                     <ul className="divide-y border-t">
                       {g.items.map((r, i) => {
                         const task = taskById.get(r.taskId);
-                        const checked = task?.done ?? false;
+                        const measured = task?.measured ?? false;
+                        const analyzed = task?.analyzed ?? false;
+                        const done = measured && analyzed;
                         return (
                           <li
                             key={i}
-                            className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+                            className="flex flex-col gap-2 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
                           >
                             <div className="flex min-w-0 items-start gap-2">
-                              <Checkbox
-                                className="mt-0.5"
-                                checked={checked}
-                                onCheckedChange={(v: boolean | "indeterminate") =>
-                                  toggleTask(r.entry.testName, v === true, r.entry.machineId)
-                                }
-                                aria-label={`Marcar ${r.entry.testName} como completado`}
-                              />
+                              <div className="mt-0.5 flex flex-col gap-1">
+                                <div className="flex items-center gap-1.5">
+                                  <Checkbox
+                                    id={`m-${r.taskId}`}
+                                    checked={measured}
+                                    onCheckedChange={(v: boolean | "indeterminate") =>
+                                      setTaskState(r.entry.testName, r.entry.machineId, { measured: v === true })
+                                    }
+                                    aria-label={`Marcar ${r.entry.testName} como medido`}
+                                  />
+                                  <label htmlFor={`m-${r.taskId}`} className="text-xs text-muted-foreground">Medido</label>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <Checkbox
+                                    id={`a-${r.taskId}`}
+                                    checked={analyzed}
+                                    onCheckedChange={(v: boolean | "indeterminate") =>
+                                      setTaskState(r.entry.testName, r.entry.machineId, { analyzed: v === true })
+                                    }
+                                    aria-label={`Marcar ${r.entry.testName} como analizado`}
+                                  />
+                                  <label htmlFor={`a-${r.taskId}`} className="text-xs text-muted-foreground">Analizado</label>
+                                </div>
+                              </div>
                               <div className="min-w-0">
                                 <p
-                                  className={`truncate font-medium ${checked ? "line-through opacity-70" : ""}`}
+                                  className={`truncate font-medium ${done ? "line-through opacity-70" : ""}`}
                                 >
                                   {r.entry.testName}
                                   {!r.matched && (
@@ -562,16 +580,22 @@ function MonthlySummary({
                                   {r.entry.performer ? ` · ${r.entry.performer}` : ""}
                                   {r.doneDate ? ` · datos ${r.doneDate}` : ""}
                                 </p>
-                                {task?.done && task.completedAt && (
+                                {measured && task?.measuredAt && (
                                   <p className="truncate text-xs text-emerald-700">
-                                    Completado por {task.completedByName ?? "usuario"} el{" "}
-                                    {new Date(task.completedAt).toLocaleString()}
+                                    Medido por {task.measuredByName ?? "usuario"} el{" "}
+                                    {new Date(task.measuredAt).toLocaleString()}
+                                  </p>
+                                )}
+                                {analyzed && task?.analyzedAt && (
+                                  <p className="truncate text-xs text-sky-700">
+                                    Analizado por {task.analyzedByName ?? "usuario"} el{" "}
+                                    {new Date(task.analyzedAt).toLocaleString()}
                                   </p>
                                 )}
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              {checked ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                              {done ? (
                                 <Badge
                                   variant="outline"
                                   className="gap-1 border-emerald-500/30 bg-emerald-500/15 text-emerald-700"
