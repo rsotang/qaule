@@ -332,6 +332,14 @@ type CalendarTaskRow = {
   ym: string;
   test_name: string;
   done: boolean;
+  measured: boolean;
+  measured_by: string | null;
+  measured_by_name: string | null;
+  measured_at: string | null;
+  analyzed: boolean;
+  analyzed_by: string | null;
+  analyzed_by_name: string | null;
+  analyzed_at: string | null;
   completed_by: string | null;
   completed_by_name: string | null;
   completed_at: string | null;
@@ -343,6 +351,14 @@ function taskFromRow(r: CalendarTaskRow): CalendarTask {
     ym: r.ym,
     testName: r.test_name,
     done: r.done,
+    measured: r.measured,
+    measuredBy: r.measured_by ?? undefined,
+    measuredByName: r.measured_by_name ?? undefined,
+    measuredAt: r.measured_at ?? undefined,
+    analyzed: r.analyzed,
+    analyzedBy: r.analyzed_by ?? undefined,
+    analyzedByName: r.analyzed_by_name ?? undefined,
+    analyzedAt: r.analyzed_at ?? undefined,
     completedBy: r.completed_by ?? undefined,
     completedByName: r.completed_by_name ?? undefined,
     completedAt: r.completed_at ?? undefined,
@@ -360,23 +376,56 @@ export async function listCalendarTasks(ym?: string): Promise<CalendarTask[]> {
 export async function setCalendarTask(
   ym: string,
   testName: string,
-  done: boolean,
-  note?: string,
+  fields: { measured?: boolean; analyzed?: boolean; note?: string },
   machineId?: string,
 ): Promise<void> {
   const { data: auth } = await supabase.auth.getUser();
   const user = auth.user;
+  const id = calendarTaskId(ym, testName, machineId);
+
+  // Fetch existing row to merge booleans and metadata
+  const { data: existing } = await supabase.from("calendar_tasks").select("*").eq("id", id).maybeSingle();
+  const prev = existing as CalendarTaskRow | null;
+
+  const measured = fields.measured ?? prev?.measured ?? false;
+  const analyzed = fields.analyzed ?? prev?.analyzed ?? false;
+  const done = measured && analyzed;
+
+  const measuredBy = measured ? (user?.id ?? prev?.measured_by ?? null) : null;
+  const measuredByName = measured
+    ? ((user?.user_metadata?.display_name as string | undefined) ?? user?.email ?? prev?.measured_by_name ?? null)
+    : null;
+  const measuredAt = measured ? (prev?.measured_at ?? new Date().toISOString()) : null;
+
+  const analyzedBy = analyzed ? (user?.id ?? prev?.analyzed_by ?? null) : null;
+  const analyzedByName = analyzed
+    ? ((user?.user_metadata?.display_name as string | undefined) ?? user?.email ?? prev?.analyzed_by_name ?? null)
+    : null;
+  const analyzedAt = analyzed ? (prev?.analyzed_at ?? new Date().toISOString()) : null;
+
+  const completedBy = done ? (user?.id ?? prev?.completed_by ?? null) : null;
+  const completedByName = done
+    ? ((user?.user_metadata?.display_name as string | undefined) ?? user?.email ?? prev?.completed_by_name ?? null)
+    : null;
+  const completedAt = done ? (prev?.completed_at ?? new Date().toISOString()) : null;
+
   const { error } = await supabase.from("calendar_tasks").upsert({
-    id: calendarTaskId(ym, testName, machineId),
+    id,
     ym,
     test_name: testName,
     done,
-    completed_by: done ? (user?.id ?? null) : null,
-    completed_by_name: done
-      ? ((user?.user_metadata?.display_name as string | undefined) ?? user?.email ?? null)
-      : null,
-    completed_at: done ? new Date().toISOString() : null,
-    note: note ?? null,
+    measured,
+    measured_by: measuredBy,
+    measured_by_name: measuredByName,
+    measured_at: measuredAt,
+    analyzed,
+    analyzed_by: analyzedBy,
+    analyzed_by_name: analyzedByName,
+    analyzed_at: analyzedAt,
+    completed_by: completedBy,
+    completed_by_name: completedByName,
+    completed_at: completedAt,
+    note: fields.note ?? prev?.note ?? null,
     updated_at: new Date().toISOString(),
   });
   if (error) throw new Error(error.message);
