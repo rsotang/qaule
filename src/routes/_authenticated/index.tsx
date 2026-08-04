@@ -337,8 +337,8 @@ function MonthlySummary({
     return m;
   }, [tasks.data]);
 
-  async function toggleTask(testName: string, done: boolean, machineId?: string) {
-    await setCalendarTask(ym, testName, done, undefined, machineId);
+  async function setTaskState(testName: string, machineId: string | undefined, patch: { measured?: boolean; analyzed?: boolean }) {
+    await setCalendarTask(ym, testName, patch, machineId);
     qc.invalidateQueries({ queryKey: ["calendar-tasks", ym] });
   }
 
