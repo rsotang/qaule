@@ -37,36 +37,60 @@ export type Database = {
       }
       calendar_tasks: {
         Row: {
+          analyzed: boolean
+          analyzed_at: string | null
+          analyzed_by: string | null
+          analyzed_by_name: string | null
           completed_at: string | null
           completed_by: string | null
           completed_by_name: string | null
           created_at: string
           done: boolean
           id: string
+          measured: boolean
+          measured_at: string | null
+          measured_by: string | null
+          measured_by_name: string | null
           note: string | null
           test_name: string
           updated_at: string
           ym: string
         }
         Insert: {
+          analyzed?: boolean
+          analyzed_at?: string | null
+          analyzed_by?: string | null
+          analyzed_by_name?: string | null
           completed_at?: string | null
           completed_by?: string | null
           completed_by_name?: string | null
           created_at?: string
           done?: boolean
           id: string
+          measured?: boolean
+          measured_at?: string | null
+          measured_by?: string | null
+          measured_by_name?: string | null
           note?: string | null
           test_name: string
           updated_at?: string
           ym: string
         }
         Update: {
+          analyzed?: boolean
+          analyzed_at?: string | null
+          analyzed_by?: string | null
+          analyzed_by_name?: string | null
           completed_at?: string | null
           completed_by?: string | null
           completed_by_name?: string | null
           created_at?: string
           done?: boolean
           id?: string
+          measured?: boolean
+          measured_at?: string | null
+          measured_by?: string | null
+          measured_by_name?: string | null
           note?: string | null
           test_name?: string
           updated_at?: string
