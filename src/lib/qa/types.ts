@@ -450,11 +450,26 @@ export interface CalendarTask {
   id: string;
   ym: string;
   testName: string;
+  /** True when the test has been physically measured */
+  measured: boolean;
+  measuredBy?: string;
+  measuredByName?: string;
+  measuredAt?: string;
+  /** True when the test results have been analyzed/reviewed */
+  analyzed: boolean;
+  analyzedBy?: string;
+  analyzedByName?: string;
+  analyzedAt?: string;
+  /** Legacy computed state: both measured and analyzed */
   done: boolean;
   completedBy?: string;
   completedByName?: string;
   completedAt?: string;
   note?: string;
+}
+
+export function calendarTaskDone(task: CalendarTask): boolean {
+  return task.measured && task.analyzed;
 }
 
 export function calendarTaskId(ym: string, testName: string, machineId?: string): string {

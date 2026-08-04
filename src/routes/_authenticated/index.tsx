@@ -337,8 +337,8 @@ function MonthlySummary({
     return m;
   }, [tasks.data]);
 
-  async function toggleTask(testName: string, done: boolean, machineId?: string) {
-    await setCalendarTask(ym, testName, done, undefined, machineId);
+  async function setTaskState(testName: string, machineId: string | undefined, patch: { measured?: boolean; analyzed?: boolean }) {
+    await setCalendarTask(ym, testName, patch, machineId);
     qc.invalidateQueries({ queryKey: ["calendar-tasks", ym] });
   }
 
@@ -415,7 +415,12 @@ function MonthlySummary({
 
   const [yStr, mStr] = ym.split("-");
   const headerLabel = `${MONTH_NAMES_ES[parseInt(mStr, 10) - 1]} ${yStr}`;
-  const doneCount = rows.filter((r) => r.status === "done").length;
+  const measuredCount = rows.filter((r) => taskById.get(r.taskId)?.measured).length;
+  const analyzedCount = rows.filter((r) => taskById.get(r.taskId)?.analyzed).length;
+  const doneCount = rows.filter((r) => {
+    const t = taskById.get(r.taskId);
+    return (t?.measured && t?.analyzed) ?? false;
+  }).length;
   const oot = rows.filter((r) => r.inTolerance === false).length;
 
   const groups = useMemo(() => {
@@ -437,7 +442,12 @@ function MonthlySummary({
             : (MACHINES.find((m) => m.id === key)?.name ?? key),
         badge: key === "__all__" ? null : key,
         items,
-        done: items.filter((r) => r.status === "done" || taskById.get(r.taskId)?.done).length,
+        done: items.filter((r) => {
+          const t = taskById.get(r.taskId);
+          return (t?.measured && t?.analyzed) ?? false;
+        }).length,
+        measured: items.filter((r) => taskById.get(r.taskId)?.measured).length,
+        analyzed: items.filter((r) => taskById.get(r.taskId)?.analyzed).length,
       }));
   }, [rows, taskById]);
 
@@ -465,7 +475,7 @@ function MonthlySummary({
             </CardTitle>
             {calendar ? (
               <p className="text-xs text-muted-foreground">
-                {rows.length} tests programados · {doneCount} realizados · {oot} fuera de tolerancia
+                {rows.length} tests programados · {doneCount} completados ({measuredCount} medidos · {analyzedCount} analizados) · {oot} fuera de tolerancia
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
@@ -516,7 +526,7 @@ function MonthlySummary({
                       )}
                       <h4 className="text-sm font-semibold">{g.label}</h4>
                       <span className="text-xs text-muted-foreground">
-                        {g.done}/{g.items.length} completados
+                        {g.done}/{g.items.length} completados · {g.measured} medidos · {g.analyzed} analizados
                       </span>
                     </div>
                     {isOpen ? (
@@ -529,24 +539,42 @@ function MonthlySummary({
                     <ul className="divide-y border-t">
                       {g.items.map((r, i) => {
                         const task = taskById.get(r.taskId);
-                        const checked = task?.done ?? false;
+                        const measured = task?.measured ?? false;
+                        const analyzed = task?.analyzed ?? false;
+                        const done = measured && analyzed;
                         return (
                           <li
                             key={i}
-                            className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+                            className="flex flex-col gap-2 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
                           >
                             <div className="flex min-w-0 items-start gap-2">
-                              <Checkbox
-                                className="mt-0.5"
-                                checked={checked}
-                                onCheckedChange={(v: boolean | "indeterminate") =>
-                                  toggleTask(r.entry.testName, v === true, r.entry.machineId)
-                                }
-                                aria-label={`Marcar ${r.entry.testName} como completado`}
-                              />
+                              <div className="mt-0.5 flex flex-col gap-1">
+                                <div className="flex items-center gap-1.5">
+                                  <Checkbox
+                                    id={`m-${r.taskId}`}
+                                    checked={measured}
+                                    onCheckedChange={(v: boolean | "indeterminate") =>
+                                      setTaskState(r.entry.testName, r.entry.machineId, { measured: v === true })
+                                    }
+                                    aria-label={`Marcar ${r.entry.testName} como medido`}
+                                  />
+                                  <label htmlFor={`m-${r.taskId}`} className="text-xs text-muted-foreground">Medido</label>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <Checkbox
+                                    id={`a-${r.taskId}`}
+                                    checked={analyzed}
+                                    onCheckedChange={(v: boolean | "indeterminate") =>
+                                      setTaskState(r.entry.testName, r.entry.machineId, { analyzed: v === true })
+                                    }
+                                    aria-label={`Marcar ${r.entry.testName} como analizado`}
+                                  />
+                                  <label htmlFor={`a-${r.taskId}`} className="text-xs text-muted-foreground">Analizado</label>
+                                </div>
+                              </div>
                               <div className="min-w-0">
                                 <p
-                                  className={`truncate font-medium ${checked ? "line-through opacity-70" : ""}`}
+                                  className={`truncate font-medium ${done ? "line-through opacity-70" : ""}`}
                                 >
                                   {r.entry.testName}
                                   {!r.matched && (
@@ -562,16 +590,22 @@ function MonthlySummary({
                                   {r.entry.performer ? ` · ${r.entry.performer}` : ""}
                                   {r.doneDate ? ` · datos ${r.doneDate}` : ""}
                                 </p>
-                                {task?.done && task.completedAt && (
+                                {measured && task?.measuredAt && (
                                   <p className="truncate text-xs text-emerald-700">
-                                    Completado por {task.completedByName ?? "usuario"} el{" "}
-                                    {new Date(task.completedAt).toLocaleString()}
+                                    Medido por {task.measuredByName ?? "usuario"} el{" "}
+                                    {new Date(task.measuredAt).toLocaleString()}
+                                  </p>
+                                )}
+                                {analyzed && task?.analyzedAt && (
+                                  <p className="truncate text-xs text-sky-700">
+                                    Analizado por {task.analyzedByName ?? "usuario"} el{" "}
+                                    {new Date(task.analyzedAt).toLocaleString()}
                                   </p>
                                 )}
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              {checked ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                              {done ? (
                                 <Badge
                                   variant="outline"
                                   className="gap-1 border-emerald-500/30 bg-emerald-500/15 text-emerald-700"
