@@ -526,7 +526,7 @@ function MonthlySummary({
                       )}
                       <h4 className="text-sm font-semibold">{g.label}</h4>
                       <span className="text-xs text-muted-foreground">
-                        {g.done}/{g.items.length} completados
+                        {g.done}/{g.items.length} completados · {g.measured} medidos · {g.analyzed} analizados
                       </span>
                     </div>
                     {isOpen ? (
