@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Activity } from "lucide-react";
+import trebolAsset from "@/assets/trebol_radiacion.svg.asset.json";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
