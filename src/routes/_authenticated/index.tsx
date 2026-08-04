@@ -437,7 +437,12 @@ function MonthlySummary({
             : (MACHINES.find((m) => m.id === key)?.name ?? key),
         badge: key === "__all__" ? null : key,
         items,
-        done: items.filter((r) => r.status === "done" || taskById.get(r.taskId)?.done).length,
+        done: items.filter((r) => {
+          const t = taskById.get(r.taskId);
+          return (t?.measured && t?.analyzed) ?? false;
+        }).length,
+        measured: items.filter((r) => taskById.get(r.taskId)?.measured).length,
+        analyzed: items.filter((r) => taskById.get(r.taskId)?.analyzed).length,
       }));
   }, [rows, taskById]);
 
