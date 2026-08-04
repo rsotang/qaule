@@ -475,7 +475,7 @@ function MonthlySummary({
             </CardTitle>
             {calendar ? (
               <p className="text-xs text-muted-foreground">
-                {rows.length} tests programados · {doneCount} realizados · {oot} fuera de tolerancia
+                {rows.length} tests programados · {doneCount} completados ({measuredCount} medidos · {analyzedCount} analizados) · {oot} fuera de tolerancia
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
