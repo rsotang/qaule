@@ -80,7 +80,7 @@ function AuthPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="space-y-2 text-center">
           <div className="flex items-center justify-center gap-1.5">
-            <Activity className="size-7 text-primary" />
+            <img src={trebolAsset.url} alt="QAULE" className="h-8 w-auto" />
             <span className="leading-none">
               <span className="text-3xl font-bold tracking-tight text-primary">QA</span>
               <span className="text-lg font-semibold tracking-wide text-foreground/80">ULE</span>
