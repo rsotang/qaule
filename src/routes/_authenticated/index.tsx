@@ -415,7 +415,12 @@ function MonthlySummary({
 
   const [yStr, mStr] = ym.split("-");
   const headerLabel = `${MONTH_NAMES_ES[parseInt(mStr, 10) - 1]} ${yStr}`;
-  const doneCount = rows.filter((r) => r.status === "done").length;
+  const measuredCount = rows.filter((r) => taskById.get(r.taskId)?.measured).length;
+  const analyzedCount = rows.filter((r) => taskById.get(r.taskId)?.analyzed).length;
+  const doneCount = rows.filter((r) => {
+    const t = taskById.get(r.taskId);
+    return (t?.measured && t?.analyzed) ?? false;
+  }).length;
   const oot = rows.filter((r) => r.inTolerance === false).length;
 
   const groups = useMemo(() => {
