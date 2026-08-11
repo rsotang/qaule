@@ -16,6 +16,7 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedImportsRouteImport } from './routes/_authenticated/imports'
 import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authenticated/templates'
 import { Route as AuthenticatedVisualizationRouteImport } from './routes/_authenticated/visualization'
+import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as AuthenticatedAdminMachinesRouteImport } from './routes/_authenticated/admin.machines'
 import { Route as AuthenticatedTemplatesIndexRouteImport } from './routes/_authenticated/templates.index'
 import { Route as AuthenticatedTemplatesMachineRouteImport } from './routes/_authenticated/templates.$machine'
@@ -55,6 +56,11 @@ const AuthenticatedVisualizationRoute =
     path: '/visualization',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
 const AuthenticatedAdminMachinesRoute =
   AuthenticatedAdminMachinesRouteImport.update({
     id: '/machines',
@@ -83,16 +89,17 @@ export interface FileRoutesByFullPath {
   '/visualization': typeof AuthenticatedVisualizationRoute
   '/admin/machines': typeof AuthenticatedAdminMachinesRoute
   '/templates/$machine': typeof AuthenticatedTemplatesMachineRoute
+  '/admin/': typeof AuthenticatedAdminIndexRoute
   '/templates/': typeof AuthenticatedTemplatesIndexRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
-  '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/imports': typeof AuthenticatedImportsRoute
   '/visualization': typeof AuthenticatedVisualizationRoute
   '/': typeof AuthenticatedIndexRoute
   '/admin/machines': typeof AuthenticatedAdminMachinesRoute
   '/templates/$machine': typeof AuthenticatedTemplatesMachineRoute
+  '/admin': typeof AuthenticatedAdminIndexRoute
   '/templates': typeof AuthenticatedTemplatesIndexRoute
 }
 export interface FileRoutesById {
@@ -106,6 +113,7 @@ export interface FileRoutesById {
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/admin/machines': typeof AuthenticatedAdminMachinesRoute
   '/_authenticated/templates/$machine': typeof AuthenticatedTemplatesMachineRoute
+  '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/templates/': typeof AuthenticatedTemplatesIndexRoute
 }
 export interface FileRouteTypes {
@@ -119,16 +127,17 @@ export interface FileRouteTypes {
     | '/visualization'
     | '/admin/machines'
     | '/templates/$machine'
+    | '/admin/'
     | '/templates/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
-    | '/admin'
     | '/imports'
     | '/visualization'
     | '/'
     | '/admin/machines'
     | '/templates/$machine'
+    | '/admin'
     | '/templates'
   id:
     | '__root__'
@@ -141,6 +150,7 @@ export interface FileRouteTypes {
     | '/_authenticated/'
     | '/_authenticated/admin/machines'
     | '/_authenticated/templates/$machine'
+    | '/_authenticated/admin/'
     | '/_authenticated/templates/'
   fileRoutesById: FileRoutesById
 }
@@ -200,6 +210,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVisualizationRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/': {
+      id: '/_authenticated/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/machines': {
       id: '/_authenticated/admin/machines'
       path: '/machines'
@@ -226,10 +243,12 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminMachinesRoute: typeof AuthenticatedAdminMachinesRoute
+  AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminMachinesRoute: AuthenticatedAdminMachinesRoute,
+  AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
 }
 
 const AuthenticatedAdminRouteWithChildren =
