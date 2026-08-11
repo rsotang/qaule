@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
-import type { CellRef, Template, ToleranceValue, Tolerance } from "./types";
-import { walkDataPoints, dpSeriesLabel, parseToleranceText } from "./types";
+import type { CellRef, Template, ToleranceValue, Tolerance, TextOrRef, WalkedDataPoint } from "./types";
+import { walkDataPoints, dpSeriesLabel, parseToleranceText, displayTextOrRef } from "./types";
 
 export interface ParsedWorkbook {
   sheets: ParsedSheet[];
