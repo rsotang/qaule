@@ -284,18 +284,23 @@ function TemplateEditor() {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Tests ({template.tests.length})</CardTitle>
-              <Button size="sm" variant="outline" onClick={addTest}>
-                <Plus className="size-4" /> Añadir
-              </Button>
+              {isAdmin && (
+                <Button size="sm" variant="outline" onClick={addTest}>
+                  <Plus className="size-4" /> Añadir
+                </Button>
+              )}
             </div>
             <div className="space-y-1 pt-2">
               <Label className="text-xs">Nombre plantilla</Label>
               <Input
                 value={template.name}
+                readOnly={!isAdmin}
+                disabled={!isAdmin}
                 onChange={(e) => setTemplate({ ...template, name: e.target.value })}
                 className="h-8 text-sm"
               />
             </div>
+
           </CardHeader>
           <CardContent className="space-y-2">
             {template.tests.map((t) => {
