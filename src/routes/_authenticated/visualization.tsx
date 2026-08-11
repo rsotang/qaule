@@ -18,6 +18,9 @@ import {
   MACHINES,
   displayTextOrRef,
   toleranceBand,
+  evaluateTolerance,
+  walkDataPoints,
+  dpSeriesLabel,
   type MachineId,
   type Template,
   type Nest,
@@ -25,6 +28,8 @@ import {
   type DataPoint,
   type TextOrRef,
   type Measurement,
+  type TestDef,
+  type Tolerance,
 } from "@/lib/qa/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -640,13 +645,43 @@ interface SnapNode {
   children: Map<string, SnapNode>;
   value?: number;
   date?: string;
+  /** Template metadata for the leaf data point, if found. */
+  meta?: {
+    unit?: string;
+    tolerance?: string;
+    reference?: string;
+    inTolerance?: boolean;
+  };
 }
 
-function buildSnapTree(rows: Measurement[]): SnapNode {
+type MetaEntry = {
+  unit?: string;
+  tolerance?: string;
+  reference?: string;
+  parsedTolerance?: Tolerance;
+};
+
+function buildMetaMap(test: TestDef | undefined): Map<string, MetaEntry> {
+  const map = new Map<string, MetaEntry>();
+  if (!test) return map;
+  for (const w of walkDataPoints(test)) {
+    const label = dpSeriesLabel(w);
+    map.set(label, {
+      unit: displayTextOrRef(w.dp.unit, "").trim() || undefined,
+      tolerance: displayTextOrRef(w.dp.tolerance, "").trim() || undefined,
+      reference: displayTextOrRef(w.dp.reference, "").trim() || undefined,
+      parsedTolerance: w.dp.parsedTolerance,
+    });
+  }
+  return map;
+}
+
+function buildSnapTree(rows: Measurement[], metaMap: Map<string, MetaEntry>): SnapNode {
   const root: SnapNode = { name: "", children: new Map() };
   for (const m of rows) {
     const segs = m.cellLabel.split(" / ").map((s) => s.trim()).filter(Boolean);
     let cur = root;
+    const meta = metaMap.get(m.cellLabel);
     segs.forEach((seg, i) => {
       let next = cur.children.get(seg);
       if (!next) {
@@ -656,6 +691,15 @@ function buildSnapTree(rows: Measurement[]): SnapNode {
       if (i === segs.length - 1) {
         next.value = m.value;
         next.date = m.date;
+        if (meta) {
+          const ok = meta.parsedTolerance ? evaluateTolerance(meta.parsedTolerance, m.value).inTolerance : true;
+          next.meta = {
+            unit: meta.unit,
+            tolerance: meta.tolerance,
+            reference: meta.reference,
+            inTolerance: ok,
+          };
+        }
       }
       cur = next;
     });
@@ -674,10 +718,21 @@ function SnapBranch({ node, depth }: { node: SnapNode; depth: number }) {
     <ul className={depth === 0 ? "space-y-0.5" : "space-y-0.5 border-l pl-3"}>
       {[...node.children.values()].map((c) => (
         <li key={c.name}>
-          <div className="flex items-baseline justify-between gap-3 py-0.5">
-            <span className={c.children.size === 0 ? "text-xs" : "text-xs font-medium"}>{c.name}</span>
-            {c.value != null && (
-              <span className="font-mono text-xs tabular-nums text-primary">{fmtVal(c.value)}</span>
+          <div className="flex flex-col gap-0.5 py-0.5">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className={c.children.size === 0 ? "text-xs" : "text-xs font-medium"}>{c.name}</span>
+              {c.value != null && (
+                <span className={`font-mono text-xs tabular-nums ${c.meta && !c.meta.inTolerance ? "text-destructive" : "text-primary"}`}>
+                  {fmtVal(c.value)}
+                  {c.meta?.unit ? ` ${c.meta.unit}` : ""}
+                </span>
+              )}
+            </div>
+            {c.meta && (c.meta.tolerance || c.meta.reference) && (
+              <div className="flex flex-wrap gap-x-2 text-[10px] text-muted-foreground">
+                {c.meta.tolerance && <span>Tol: {c.meta.tolerance}</span>}
+                {c.meta.reference && <span>Ref: {c.meta.reference}</span>}
+              </div>
             )}
           </div>
           {c.children.size > 0 && <SnapBranch node={c} depth={depth + 1} />}
@@ -718,6 +773,13 @@ function TestSnapshot({
     return [...set].sort().reverse();
   }, [measurements, machineId, testId]);
 
+  const selectedTest = useMemo(() => {
+    const tpl = templates.find((t) => t.machineId === machineId);
+    return tpl?.tests.find((t) => t.id === testId);
+  }, [templates, machineId, testId]);
+
+  const metaMap = useMemo(() => buildMetaMap(selectedTest), [selectedTest]);
+
   const rows = useMemo(
     () =>
       measurements
@@ -731,7 +793,7 @@ function TestSnapshot({
     [measurements, machineId, testId, month],
   );
 
-  const tree = useMemo(() => buildSnapTree(rows), [rows]);
+  const tree = useMemo(() => buildSnapTree(rows, metaMap), [rows, metaMap]);
   const testName = tests.find((t) => t.id === testId)?.name ?? testId;
 
   return (
@@ -818,18 +880,36 @@ function TestSnapshot({
                       <TableHead className="text-xs">Parámetro</TableHead>
                       <TableHead className="text-xs">Fecha</TableHead>
                       <TableHead className="text-right text-xs">Valor</TableHead>
+                      <TableHead className="text-xs">Unidad</TableHead>
+                      <TableHead className="text-xs">Tolerancia</TableHead>
+                      <TableHead className="text-xs">Referencia</TableHead>
+                      <TableHead className="text-center text-xs">Estado</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rows.map((m) => (
-                      <TableRow key={m.id}>
-                        <TableCell className="text-xs">{m.cellLabel}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{m.date}</TableCell>
-                        <TableCell className="text-right font-mono text-xs tabular-nums">
-                          {fmtVal(m.value)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {rows.map((m) => {
+                      const meta = metaMap.get(m.cellLabel);
+                      const ok = meta?.parsedTolerance ? evaluateTolerance(meta.parsedTolerance, m.value).inTolerance : true;
+                      return (
+                        <TableRow key={m.id}>
+                          <TableCell className="text-xs">{m.cellLabel}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{m.date}</TableCell>
+                          <TableCell className={`text-right font-mono text-xs tabular-nums ${ok ? "" : "text-destructive font-medium"}`}>
+                            {fmtVal(m.value)}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{meta?.unit ?? "—"}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{meta?.tolerance ?? "—"}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{meta?.reference ?? "—"}</TableCell>
+                          <TableCell className="text-center text-xs">
+                            {meta?.parsedTolerance && meta.parsedTolerance.type !== "none" ? (
+                              ok ? <span className="text-emerald-600">✓</span> : <span className="text-destructive">✗</span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
