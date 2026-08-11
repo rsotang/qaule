@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMachineList } from "@/hooks/use-machine-list";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -109,6 +110,7 @@ function ImportsPage() {
 
 
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
+  const machineList = useMachineList();
   const imports = useQuery({ queryKey: ["imports-all"], queryFn: () => listImports() });
   const calendar = useQuery({ queryKey: ["calendar"], queryFn: getCalendar });
 
@@ -361,7 +363,7 @@ function ImportsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {MACHINES.map((m) => (
+                  {machineList.map((m) => (
                     <SelectItem key={m.id} value={m.id}>
                       {m.id} — {m.name}
                     </SelectItem>

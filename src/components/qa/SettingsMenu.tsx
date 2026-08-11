@@ -1,3 +1,4 @@
+import { useMachineList } from "@/hooks/use-machine-list";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Settings, Download, Upload, Database, Trash2, Save, X } from "lucide-react";
@@ -211,6 +212,7 @@ function DatabaseEditor({
   onOpenChange: (v: boolean) => void;
 }) {
   const qc = useQueryClient();
+  const machineList = useMachineList();
   const [machineId, setMachineId] = useState<MachineId | "all">("all");
   const [importId, setImportId] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState("");
@@ -350,7 +352,7 @@ function DatabaseEditor({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas</SelectItem>
-                {MACHINES.map((m) => (
+                {machineList.map((m) => (
                   <SelectItem key={m.id} value={m.id}>
                     {m.id} — {m.name}
                   </SelectItem>

@@ -1,14 +1,25 @@
-export type MachineId = "TB1" | "TB2" | "TB3" | "IMG1" | "IMG2" | "IMG3" | "CTSIM";
+/** Machine identifier. Base machines are seeded, but users can add their own. */
+export type MachineId = string;
 
-export const MACHINES: { id: MachineId; name: string }[] = [
-  { id: "TB1", name: "TrueBeam 1" },
-  { id: "TB2", name: "TrueBeam 2" },
-  { id: "TB3", name: "TrueBeam 3" },
-  { id: "IMG1", name: "Sistema de Imagen TB1" },
-  { id: "IMG2", name: "Sistema de Imagen TB2" },
-  { id: "IMG3", name: "Sistema de Imagen TB3" },
-  { id: "CTSIM", name: "CT Simulador" },
+export type MachineKind = "linac" | "imaging" | "ct" | "other";
+
+export const MACHINE_KIND_LABELS: Record<MachineKind, string> = {
+  linac: "Acelerador lineal",
+  imaging: "Sistema de imagen",
+  ct: "TC / Simulador",
+  other: "Otro",
+};
+
+export const MACHINES: { id: MachineId; name: string; kind: MachineKind }[] = [
+  { id: "TB1", name: "TrueBeam 1", kind: "linac" },
+  { id: "TB2", name: "TrueBeam 2", kind: "linac" },
+  { id: "TB3", name: "TrueBeam 3", kind: "linac" },
+  { id: "IMG1", name: "Sistema de Imagen TB1", kind: "imaging" },
+  { id: "IMG2", name: "Sistema de Imagen TB2", kind: "imaging" },
+  { id: "IMG3", name: "Sistema de Imagen TB3", kind: "imaging" },
+  { id: "CTSIM", name: "CT Simulador", kind: "ct" },
 ];
+
 
 export type Frequency = "monthly" | "quarterly" | "semiannual" | "annual";
 export type Category =
@@ -118,6 +129,7 @@ export type MachineState = "ok" | "warning" | "critical";
 export interface MachineRecord {
   id: MachineId;
   name: string;
+  kind?: MachineKind;
   activeTemplateId?: string;
   state?: MachineState;
   stateNote?: string;
@@ -476,4 +488,17 @@ export function calendarTaskId(ym: string, testName: string, machineId?: string)
   const base = `${ym}::${testName.trim().toLowerCase()}`;
   return machineId ? `${base}::${machineId.toLowerCase()}` : base;
 
+}
+
+/** Seeded machines plus any user-created ones from the database. */
+export function mergeMachineList(
+  rows?: { id: MachineId; name: string; kind?: MachineKind }[],
+): { id: MachineId; name: string; kind: MachineKind }[] {
+  const out = (rows ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    kind: (r.kind ?? MACHINES.find((m) => m.id === r.id)?.kind ?? "other") as MachineKind,
+  }));
+  for (const m of MACHINES) if (!out.some((o) => o.id === m.id)) out.push({ ...m });
+  return out;
 }

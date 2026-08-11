@@ -10,10 +10,14 @@ import {
   getCalendar,
   listCalendarTasks,
   setCalendarTask,
+  createMachine,
+  deleteMachine,
 } from "@/lib/qa/db";
 
 import {
   MACHINES,
+  MACHINE_KIND_LABELS,
+  mergeMachineList,
   walkDataPoints,
   calendarTaskId,
 
@@ -21,6 +25,7 @@ import {
   evaluateTolerance,
   type MachineId,
   type MachineState,
+  type MachineKind,
   type MachineRecord,
   type Template,
   type ImportRecord,
@@ -43,6 +48,105 @@ import {
 } from "@/components/ui/select";
 import { AlertTriangle, CheckCircle2, ShieldAlert, ChevronLeft, ChevronRight, CalendarDays, ChevronDown, ChevronUp } from "lucide-react";
 import { MachineGlyph } from "@/components/qa/MachineGlyph";
+import { toast } from "sonner";
+import { Plus, Trash2 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
+function NewMachineDialog({ onCreated }: { onCreated: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [id, setId] = useState("");
+  const [name, setName] = useState("");
+  const [kind, setKind] = useState<MachineKind>("linac");
+  const [saving, setSaving] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const cleanId = id.trim().toUpperCase().replace(/\s+/g, "");
+    if (!cleanId || !name.trim()) return;
+    setSaving(true);
+    try {
+      await createMachine({ id: cleanId, name: name.trim(), kind });
+      toast.success(`Máquina ${cleanId} creada`);
+      setId("");
+      setName("");
+      setKind("linac");
+      setOpen(false);
+      onCreated();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" className="gap-1.5">
+          <Plus className="size-4" /> Nueva máquina
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Nueva máquina</DialogTitle>
+        </DialogHeader>
+        <form className="space-y-3" onSubmit={submit}>
+          <div className="space-y-1.5">
+            <Label htmlFor="mid">Identificador</Label>
+            <Input
+              id="mid"
+              required
+              placeholder="TB4"
+              value={id}
+              onChange={(e) => setId(e.target.value)}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Código corto y único (se usa en importaciones, plantillas y calendario).
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="mname">Nombre</Label>
+            <Input
+              id="mname"
+              required
+              placeholder="TrueBeam 4"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Tipo de máquina</Label>
+            <Select value={kind} onValueChange={(v) => setKind(v as MachineKind)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(MACHINE_KIND_LABELS).map(([k, label]) => (
+                  <SelectItem key={k} value={k}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={saving}>
+              {saving ? "Creando…" : "Crear máquina"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export const Route = createFileRoute("/_authenticated/")({ component: Dashboard });
 
@@ -65,29 +169,47 @@ function Dashboard() {
     qc.invalidateQueries({ queryKey: ["machines"] });
   }
 
+  /** DB machines take priority; fall back to the seeded list when empty. */
+  const machineList = useMemo(() => {
+    const rows = machines.data ?? [];
+    const out = rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      kind: r.kind ?? (MACHINES.find((m) => m.id === r.id)?.kind ?? "other"),
+    }));
+    for (const m of MACHINES) if (!out.some((o) => o.id === m.id)) out.push({ ...m });
+    return out;
+  }, [machines.data]);
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold sm:text-2xl tracking-tight">Panel QA</h1>
-        <p className="text-sm text-muted-foreground">
-          Resumen del estado de las máquinas y de las últimas importaciones
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold sm:text-2xl tracking-tight">Panel QA</h1>
+          <p className="text-sm text-muted-foreground">
+            Resumen del estado de las máquinas y de las últimas importaciones
+          </p>
+        </div>
+        <NewMachineDialog onCreated={() => qc.invalidateQueries({ queryKey: ["machines"] })} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {MACHINES.map((m) => (
+        {machineList.map((m) => (
           <MachineCard
             key={m.id}
             machineId={m.id}
             machineName={m.name}
+            machineKind={m.kind as MachineKind}
             machine={machines.data?.find((x) => x.id === m.id)}
             templates={templates.data ?? []}
             imports={imports.data ?? []}
             measurements={measurements.data ?? []}
             onSetState={setState}
+            onDeleted={() => qc.invalidateQueries({ queryKey: ["machines"] })}
           />
         ))}
       </div>
+
 
       <MonthlySummary
         calendar={calendar.data}
@@ -108,20 +230,25 @@ function Dashboard() {
 function MachineCard({
   machineId,
   machineName,
+  machineKind,
   machine,
   templates,
   imports,
   measurements,
   onSetState,
+  onDeleted,
 }: {
   machineId: MachineId;
   machineName: string;
+  machineKind?: MachineKind;
   machine?: MachineRecord;
   templates: Template[];
   imports: ImportRecord[];
   measurements: Measurement[];
   onSetState: (id: MachineId, s: MachineState) => void;
+  onDeleted: () => void;
 }) {
+  const isCustom = !MACHINES.some((m) => m.id === machineId);
   const tpls = templates.filter((t) => t.machineId === machineId);
   const tpl = tpls.find((t) => t.id === machine?.activeTemplateId) ?? tpls[0];
   const myImports = imports.filter((i) => i.machineId === machineId);
@@ -161,18 +288,45 @@ function MachineCard({
           <div className="flex items-center gap-2.5">
             <MachineGlyph
               machineId={machineId}
+              kind={machineKind}
               className="h-20 w-24 shrink-0 rounded-md bg-primary/10 object-contain p-1.5"
             />
 
             <div>
               <CardTitle className="text-sm">{machineId}</CardTitle>
               <p className="text-xs text-muted-foreground">{machineName}</p>
+              {machineKind && (
+                <p className="text-[10px] text-muted-foreground">{MACHINE_KIND_LABELS[machineKind]}</p>
+              )}
             </div>
           </div>
-          <Badge variant="outline" className={`gap-1 ${meta.cls}`}>
-            <meta.Icon className="size-3" /> {meta.label}
-          </Badge>
+          <div className="flex items-center gap-1">
+            <Badge variant="outline" className={`gap-1 ${meta.cls}`}>
+              <meta.Icon className="size-3" /> {meta.label}
+            </Badge>
+            {isCustom && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                title="Eliminar máquina"
+                onClick={async () => {
+                  if (!confirm(`¿Eliminar la máquina ${machineId}? Las plantillas y datos asociados dejarán de mostrarse.`)) return;
+                  try {
+                    await deleteMachine(machineId);
+                    toast.success("Máquina eliminada");
+                    onDeleted();
+                  } catch (e) {
+                    toast.error((e as Error).message);
+                  }
+                }}
+              >
+                <Trash2 className="size-3.5 text-destructive" />
+              </Button>
+            )}
+          </div>
         </div>
+
       </CardHeader>
       <CardContent className="space-y-3">
         <div>
@@ -235,7 +389,7 @@ function OOTPanel({
 }) {
   const alerts = useMemo(() => {
     const rows: { machineId: MachineId; testName: string; cellLabel: string; value: number; date: string }[] = [];
-    for (const m of MACHINES) {
+    for (const m of mergeMachineList(machines)) {
       const machine = machines.find((x) => x.id === m.id);
       const tpls = templates.filter((t) => t.machineId === m.id);
       const tpl = tpls.find((t) => t.id === machine?.activeTemplateId) ?? tpls[0];

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useMachineList } from "@/hooks/use-machine-list";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
@@ -159,6 +160,7 @@ function VisualizationPage() {
   const [showReference, setShowReference] = useState(true);
 
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
+  const machineList = useMachineList();
   const allTemplates = useQuery({ queryKey: ["templates-all"], queryFn: () => listTemplates() });
   const allMeasurements = useQuery({
     queryKey: ["measurements-all"],
@@ -411,7 +413,7 @@ function VisualizationPage() {
                       >
                         <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecciona máquina" /></SelectTrigger>
                         <SelectContent>
-                          {MACHINES.map((m) => (
+                          {machineList.map((m) => (
                             <SelectItem key={m.id} value={m.id}>{m.id} — {m.name}</SelectItem>
                           ))}
                         </SelectContent>
@@ -692,6 +694,7 @@ function TestSnapshot({
   measurements: Measurement[];
   templates: Template[];
 }) {
+  const machineList = useMachineList();
   const [machineId, setMachineId] = useState<MachineId | "">("");
   const [testId, setTestId] = useState("");
   const [month, setMonth] = useState("");
@@ -753,7 +756,7 @@ function TestSnapshot({
             >
               <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecciona máquina" /></SelectTrigger>
               <SelectContent>
-                {MACHINES.map((m) => (
+                {machineList.map((m) => (
                   <SelectItem key={m.id} value={m.id}>{m.id} — {m.name}</SelectItem>
                 ))}
               </SelectContent>

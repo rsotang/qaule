@@ -132,6 +132,7 @@ export type Database = {
         Row: {
           active_template_id: string | null
           id: string
+          kind: string
           name: string
           state: string | null
           state_note: string | null
@@ -139,6 +140,7 @@ export type Database = {
         Insert: {
           active_template_id?: string | null
           id: string
+          kind?: string
           name: string
           state?: string | null
           state_note?: string | null
@@ -146,6 +148,7 @@ export type Database = {
         Update: {
           active_template_id?: string | null
           id?: string
+          kind?: string
           name?: string
           state?: string | null
           state_note?: string | null

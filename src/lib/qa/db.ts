@@ -24,9 +24,11 @@ type MachineRow = {
   active_template_id: string | null;
   state: string | null;
   state_note: string | null;
+  kind?: string | null;
 };
 function machineFromRow(r: MachineRow): MachineRecord {
   const rec: MachineRecord = { id: r.id as MachineId, name: r.name };
+  if (r.kind) rec.kind = r.kind as MachineRecord["kind"];
   if (r.active_template_id) rec.activeTemplateId = r.active_template_id;
   if (r.state) rec.state = r.state as MachineState;
   if (r.state_note) rec.stateNote = r.state_note;
@@ -135,6 +137,24 @@ export async function getMachine(id: string): Promise<MachineRecord | undefined>
   if (error) throw new Error(error.message);
   return data ? machineFromRow(data) : undefined;
 }
+export async function createMachine(rec: {
+  id: string;
+  name: string;
+  kind: string;
+}): Promise<void> {
+  const existing = await getMachine(rec.id);
+  if (existing) throw new Error(`Ya existe una máquina con el identificador ${rec.id}`);
+  const { error } = await supabase
+    .from("machines")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .insert({ id: rec.id, name: rec.name, kind: rec.kind } as any);
+  if (error) throw new Error(error.message);
+}
+export async function deleteMachine(id: string): Promise<void> {
+  const { error } = await supabase.from("machines").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 export async function setActiveTemplate(machineId: string, templateId: string) {
   const { error } = await supabase
     .from("machines")
