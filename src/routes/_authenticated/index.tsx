@@ -17,6 +17,7 @@ import {
 import {
   MACHINES,
   MACHINE_KIND_LABELS,
+  mergeMachineList,
   walkDataPoints,
   calendarTaskId,
 
@@ -388,7 +389,7 @@ function OOTPanel({
 }) {
   const alerts = useMemo(() => {
     const rows: { machineId: MachineId; testName: string; cellLabel: string; value: number; date: string }[] = [];
-    for (const m of MACHINES) {
+    for (const m of mergeMachineList(machines)) {
       const machine = machines.find((x) => x.id === m.id);
       const tpls = templates.filter((t) => t.machineId === m.id);
       const tpl = tpls.find((t) => t.id === machine?.activeTemplateId) ?? tpls[0];
