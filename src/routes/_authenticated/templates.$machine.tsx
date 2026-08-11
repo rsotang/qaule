@@ -244,27 +244,34 @@ function TemplateEditor() {
               </SelectContent>
             </Select>
           )}
-          <label className="cursor-pointer">
-            <input
-              type="file"
-              accept=".xlsm,.xlsx,.xls"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleSampleFile(e.target.files[0])}
-            />
-            <Button variant="outline" asChild>
-              <span><Upload className="size-4" /> Archivo referencia</span>
-            </Button>
-          </label>
-          <Button variant="outline" onClick={handleAutoDetect} disabled={!parsed}>
-            <Wand2 className="size-4" /> Auto-detectar
-          </Button>
-          <Button variant="outline" onClick={handleApplyToAll}>
-            <Copy className="size-4" /> Aplicar a todas
-          </Button>
-          <Button onClick={handleSave}>
-            <Save className="size-4" /> Guardar y activar
-          </Button>
+          {isAdmin ? (
+            <>
+              <label className="cursor-pointer">
+                <input
+                  type="file"
+                  accept=".xlsm,.xlsx,.xls"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && handleSampleFile(e.target.files[0])}
+                />
+                <Button variant="outline" asChild>
+                  <span><Upload className="size-4" /> Archivo referencia</span>
+                </Button>
+              </label>
+              <Button variant="outline" onClick={handleAutoDetect} disabled={!parsed}>
+                <Wand2 className="size-4" /> Auto-detectar
+              </Button>
+              <Button variant="outline" onClick={handleApplyToAll}>
+                <Copy className="size-4" /> Aplicar a todas
+              </Button>
+              <Button onClick={handleSave}>
+                <Save className="size-4" /> Guardar y activar
+              </Button>
+            </>
+          ) : (
+            <Badge variant="secondary" className="self-center">Solo lectura</Badge>
+          )}
         </div>
+
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
