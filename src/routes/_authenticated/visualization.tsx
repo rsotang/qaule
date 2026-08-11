@@ -658,7 +658,7 @@ type MetaEntry = {
   unit?: string;
   tolerance?: string;
   reference?: string;
-  parsedTolerance?: import("@/lib/qa/types").Tolerance;
+  parsedTolerance?: Tolerance;
 };
 
 function buildMetaMap(test: TestDef | undefined): Map<string, MetaEntry> {
