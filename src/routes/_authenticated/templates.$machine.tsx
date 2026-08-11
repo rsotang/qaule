@@ -79,6 +79,8 @@ function TemplateEditor() {
   const machineId = machine as MachineId;
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const isAdmin = useIsAdmin();
+
 
   const templates = useQuery({
     queryKey: ["templates", machineId],
