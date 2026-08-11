@@ -399,6 +399,5 @@ export function entryIsInMonth(entry: CalendarEntry, ym: string): boolean {
 export function entryDatesInMonth(entry: CalendarEntry, ym: string): string {
   const inMonth = entry.dates.filter((d) => d.startsWith(ym)).map((d) => d.slice(8));
   if (inMonth.length) return `días ${inMonth.join(", ")}`;
-  if (entry.months.includes(ym)) return "mes completo";
   return "";
 }

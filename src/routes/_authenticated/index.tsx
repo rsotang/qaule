@@ -740,6 +740,7 @@ function MonthlySummary({
                                 <p className="truncate text-xs text-muted-foreground">
                                   {r.entry.category ? `${r.entry.category} · ` : ""}
                                   {r.scheduleLabel}
+                                  {r.entry.detail ? ` · nota: ${r.entry.detail}` : ""}
                                   {r.entry.patientId ? ` · paciente ${r.entry.patientId}` : ""}
                                   {r.entry.course ? ` · curso ${r.entry.course}` : ""}
                                   {r.entry.plan ? ` · plan ${r.entry.plan}` : ""}

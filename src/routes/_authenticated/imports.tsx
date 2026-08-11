@@ -632,6 +632,9 @@ function ImportsPage() {
                           {e.category && (
                             <span className="block text-[10px] text-muted-foreground">{e.category}</span>
                           )}
+                          {e.detail && (
+                            <span className="block text-[10px] text-muted-foreground">nota: {e.detail}</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {[
