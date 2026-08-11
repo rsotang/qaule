@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Settings, Download, Upload, Database, Trash2, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,7 @@ import {
   exportAll,
   importAll,
   listImports,
-  listMeasurements,
+  queryMeasurements,
   updateMeasurement,
 } from "@/lib/qa/db";
 import type { MachineId, Measurement } from "@/lib/qa/types";
@@ -201,6 +201,8 @@ export function SettingsMenu() {
   );
 }
 
+const PAGE_SIZE = 50;
+
 function DatabaseEditor({
   open,
   onOpenChange,
@@ -210,18 +212,47 @@ function DatabaseEditor({
 }) {
   const qc = useQueryClient();
   const [machineId, setMachineId] = useState<MachineId | "all">("all");
+  const [importId, setImportId] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
   const [drafts, setDrafts] = useState<Record<string, { value: string; date: string }>>({});
 
+  // Debounce the free-text search so each keystroke doesn't hit the database.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(0);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  const filter = useMemo(
+    () => ({
+      machineId: machineId === "all" ? undefined : machineId,
+      importId: importId === "all" ? undefined : importId,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+      search: search || undefined,
+    }),
+    [machineId, importId, dateFrom, dateTo, search],
+  );
+
   const measurements = useQuery({
-    queryKey: ["all-measurements"],
-    queryFn: () => listMeasurements(),
+    queryKey: ["measurements-page", filter, page],
+    queryFn: () => queryMeasurements(filter, page, PAGE_SIZE),
     enabled: open,
+    placeholderData: (prev) => prev,
+    staleTime: 30_000,
   });
+
   const imports = useQuery({
     queryKey: ["imports-all"],
     queryFn: () => listImports(),
     enabled: open,
+    staleTime: 60_000,
   });
 
   const importsById = useMemo(() => {
@@ -230,25 +261,14 @@ function DatabaseEditor({
     return map;
   }, [imports.data]);
 
-  const rows = useMemo(() => {
-    let list = measurements.data ?? [];
-    if (machineId !== "all") list = list.filter((m) => m.machineId === machineId);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (m) =>
-          m.cellLabel.toLowerCase().includes(q) ||
-          m.testId.toLowerCase().includes(q) ||
-          m.machineId.toLowerCase().includes(q),
-      );
-    }
-    return [...list].sort(
-      (a, b) =>
-        a.machineId.localeCompare(b.machineId) ||
-        a.date.localeCompare(b.date) ||
-        a.cellLabel.localeCompare(b.cellLabel),
-    );
-  }, [measurements.data, machineId, search]);
+  const importOptions = useMemo(() => {
+    const list = imports.data ?? [];
+    return machineId === "all" ? list : list.filter((i) => i.machineId === machineId);
+  }, [imports.data, machineId]);
+
+  const rows = measurements.data?.rows ?? [];
+  const total = measurements.data?.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   function draftFor(m: Measurement) {
     return drafts[m.id] ?? { value: String(m.value), date: m.date };
@@ -259,6 +279,12 @@ function DatabaseEditor({
       ...d,
       [id]: { ...(d[id] ?? { value: "", date: "" }), ...patch },
     }));
+  }
+
+  function invalidate() {
+    qc.invalidateQueries({ queryKey: ["measurements-page"] });
+    qc.invalidateQueries({ queryKey: ["measurements-all"] });
+    qc.invalidateQueries({ queryKey: ["all-measurements"] });
   }
 
   async function saveRow(m: Measurement) {
@@ -274,13 +300,23 @@ function DatabaseEditor({
       return rest;
     });
     toast.success("Medida actualizada");
-    qc.invalidateQueries();
+    invalidate();
   }
 
   async function removeRow(m: Measurement) {
     await deleteMeasurement(m.id);
     toast.success("Medida eliminada");
-    qc.invalidateQueries();
+    invalidate();
+  }
+
+  function resetFilters() {
+    setMachineId("all");
+    setImportId("all");
+    setDateFrom("");
+    setDateTo("");
+    setSearchInput("");
+    setSearch("");
+    setPage(0);
   }
 
   function isDirty(m: Measurement) {
@@ -301,8 +337,15 @@ function DatabaseEditor({
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Máquina</label>
-            <Select value={machineId} onValueChange={(v) => setMachineId(v as MachineId | "all")}>
-              <SelectTrigger className="w-[180px]">
+            <Select
+              value={machineId}
+              onValueChange={(v) => {
+                setMachineId(v as MachineId | "all");
+                setImportId("all");
+                setPage(0);
+              }}
+            >
+              <SelectTrigger className="w-[160px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -315,18 +358,93 @@ function DatabaseEditor({
               </SelectContent>
             </Select>
           </div>
+
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Importación</label>
+            <Select
+              value={importId}
+              onValueChange={(v) => {
+                setImportId(v);
+                setPage(0);
+              }}
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {importOptions.map((i) => (
+                  <SelectItem key={i.id} value={i.id}>
+                    {i.fileName} ({i.sourceDate})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Desde</label>
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => {
+                setDateFrom(e.target.value);
+                setPage(0);
+              }}
+              className="w-[150px]"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Hasta</label>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => {
+                setDateTo(e.target.value);
+                setPage(0);
+              }}
+              className="w-[150px]"
+            />
+          </div>
+
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Buscar serie / test</label>
             <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               placeholder="ej. PDD, 6x, beam center..."
-              className="w-[260px]"
+              className="w-[220px]"
             />
           </div>
-          <p className="ml-auto text-xs text-muted-foreground">
-            {rows.length} medidas
-          </p>
+
+          <Button variant="outline" size="sm" onClick={resetFilters}>
+            Limpiar filtros
+          </Button>
+        </div>
+
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>
+            {measurements.isFetching ? "Cargando…" : `${total} medidas`}
+            {total > 0 && ` · página ${page + 1} de ${pageCount}`}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page === 0 || measurements.isFetching}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+            >
+              Anterior
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page + 1 >= pageCount || measurements.isFetching}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Siguiente
+            </Button>
+          </div>
         </div>
 
         <div className="max-h-[60vh] overflow-auto rounded border">
@@ -346,7 +464,7 @@ function DatabaseEditor({
               {rows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="py-6 text-center text-sm text-muted-foreground">
-                    No hay medidas.
+                    {measurements.isLoading ? "Cargando…" : "No hay medidas."}
                   </TableCell>
                 </TableRow>
               ) : (
