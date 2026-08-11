@@ -126,20 +126,25 @@ function Dashboard() {
 function MachineCard({
   machineId,
   machineName,
+  machineKind,
   machine,
   templates,
   imports,
   measurements,
   onSetState,
+  onDeleted,
 }: {
   machineId: MachineId;
   machineName: string;
+  machineKind?: MachineKind;
   machine?: MachineRecord;
   templates: Template[];
   imports: ImportRecord[];
   measurements: Measurement[];
   onSetState: (id: MachineId, s: MachineState) => void;
+  onDeleted: () => void;
 }) {
+  const isCustom = !MACHINES.some((m) => m.id === machineId);
   const tpls = templates.filter((t) => t.machineId === machineId);
   const tpl = tpls.find((t) => t.id === machine?.activeTemplateId) ?? tpls[0];
   const myImports = imports.filter((i) => i.machineId === machineId);
