@@ -29,7 +29,12 @@ export type Category =
   | "mlc"
   | "dosimetric_photon"
   | "dosimetric_electron"
-  | "monitor_system";
+  | "monitor_system"
+  | "image_geometry"
+  | "image_registration"
+  | "image_quality_mv"
+  | "image_quality_cbct"
+  | "image_sgrt";
 
 export const CATEGORY_LABELS: Record<Category, string> = {
   mechanical_unit: "Mecánico Unidad",
@@ -39,6 +44,11 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   dosimetric_photon: "Dosimétrico Fotones",
   dosimetric_electron: "Dosimétrico Electrones",
   monitor_system: "Sistema Monitor",
+  image_geometry: "Geometría",
+  image_registration: "Sistema de Registro",
+  image_quality_mv: "Calidad Imagen MV",
+  image_quality_cbct: "Calidad Imagen CBCT",
+  image_sgrt: "QC SGRT",
 };
 
 export type Tolerance =
