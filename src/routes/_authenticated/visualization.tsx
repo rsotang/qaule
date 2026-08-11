@@ -18,12 +18,12 @@ import {
   displayTextOrRef,
   toleranceBand,
   type MachineId,
-  type TestDef,
   type Template,
   type Nest,
   type TreeNode,
   type DataPoint,
   type TextOrRef,
+  type Measurement,
 } from "@/lib/qa/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -45,7 +45,7 @@ interface SeriesSel {
   id: string;
   machineId: MachineId | "";
   testId: string;
-  /** ordered child node ids picked from root downward (each must exist in tree) */
+  /** ordered label segments picked from the DB parameter tree */
   path: string[];
 }
 
@@ -55,32 +55,76 @@ function newSeries(): SeriesSel {
   return { id: `s-${Math.random().toString(36).slice(2, 9)}`, machineId: "", testId: "", path: [] };
 }
 
-function nodeName(n: TreeNode): string {
-  return displayTextOrRef(n.name, "?");
+/** Node of the parameter tree derived from measurement labels in the DB. */
+interface LabelNode {
+  name: string;
+  children: Map<string, LabelNode>;
+  isLeaf: boolean;
 }
 
-/** Walk tree following picked child ids; returns the chain of nodes (excluding root). */
-function resolveChain(root: Nest, path: string[]): TreeNode[] {
-  const chain: TreeNode[] = [];
-  let current: TreeNode = root;
-  for (const id of path) {
-    if (current.kind !== "nest") break;
-    const next: TreeNode | undefined = current.children.find((c) => c.id === id);
+function emptyNode(name: string): LabelNode {
+  return { name, children: new Map(), isLeaf: false };
+}
+
+/** machineId -> testId -> tree built from `cellLabel` segments ("a / b / c"). */
+function buildLabelIndex(measurements: Measurement[]) {
+  const index = new Map<string, Map<string, LabelNode>>();
+  for (const m of measurements) {
+    let byTest = index.get(m.machineId);
+    if (!byTest) {
+      byTest = new Map();
+      index.set(m.machineId, byTest);
+    }
+    let root = byTest.get(m.testId);
+    if (!root) {
+      root = emptyNode("");
+      byTest.set(m.testId, root);
+    }
+    const segs = m.cellLabel.split(" / ").map((s) => s.trim()).filter(Boolean);
+    if (segs.length === 0) continue;
+    let cur = root;
+    segs.forEach((seg, i) => {
+      let next = cur.children.get(seg);
+      if (!next) {
+        next = emptyNode(seg);
+        cur.children.set(seg, next);
+      }
+      if (i === segs.length - 1) next.isLeaf = true;
+      cur = next;
+    });
+  }
+  return index;
+}
+
+/** Walk the label tree following the picked segment names. */
+function resolveLabelChain(root: LabelNode | undefined, path: string[]): LabelNode[] {
+  const chain: LabelNode[] = [];
+  let cur = root;
+  if (!cur) return chain;
+  for (const name of path) {
+    const next: LabelNode | undefined = cur.children.get(name);
     if (!next) break;
     chain.push(next);
-    current = next;
+    cur = next;
   }
   return chain;
 }
 
-function chainLeaf(chain: TreeNode[]): DataPoint | null {
-  const last = chain[chain.length - 1];
-  return last && last.kind === "data" ? last : null;
-}
-
-function chainSeriesKey(chain: TreeNode[]): string {
-  // matches dpSeriesLabel: join all node names (excluding root) with " / "
-  return chain.map((n) => displayTextOrRef(n.name, "?")).join(" / ");
+/** Find a template data point whose resolved name matches the chain's last segment. */
+function findDataPointByNames(root: Nest | undefined, names: string[]): DataPoint | null {
+  if (!root || names.length === 0) return null;
+  const target = names[names.length - 1].toLowerCase();
+  let found: DataPoint | null = null;
+  const walk = (node: TreeNode) => {
+    if (found) return;
+    if (node.kind === "data") {
+      if (displayTextOrRef(node.name, "").trim().toLowerCase() === target) found = node;
+      return;
+    }
+    for (const c of node.children) walk(c);
+  };
+  walk(root);
+  return found;
 }
 
 function parseRefNumber(v: TextOrRef | undefined): number | null {
@@ -112,11 +156,28 @@ function VisualizationPage() {
     queryFn: () => listMeasurements(),
   });
 
+  const labelIndex = useMemo(
+    () => buildLabelIndex(allMeasurements.data ?? []),
+    [allMeasurements.data],
+  );
+
   const templateFor = (mid: MachineId | ""): Template | null => {
     if (!mid || !machines.data || !allTemplates.data) return null;
     const m = machines.data.find((x) => x.id === mid);
     const tpls = allTemplates.data.filter((t) => t.machineId === mid);
     return tpls.find((t) => t.id === m?.activeTemplateId) ?? tpls[0] ?? null;
+  };
+
+  /** Test options for a machine come from the DB (tests with imported data). */
+  const testsFor = (mid: MachineId | "") => {
+    const byTest = mid ? labelIndex.get(mid) : undefined;
+    const tpl = templateFor(mid);
+    return [...(byTest?.keys() ?? [])]
+      .map((testId) => ({
+        id: testId,
+        name: tpl?.tests.find((t) => t.id === testId)?.name ?? testId,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   };
 
   function updateSeries(id: string, patch: Partial<SeriesSel>) {
@@ -131,9 +192,12 @@ function VisualizationPage() {
     return series.map((s, i) => {
       const tpl = templateFor(s.machineId);
       const test = tpl?.tests.find((t) => t.id === s.testId) ?? null;
-      const chain = test ? resolveChain(test.root, s.path) : [];
-      const leaf = chainLeaf(chain);
-      const key = test && leaf ? chainSeriesKey(chain) : "";
+      const root = s.machineId ? labelIndex.get(s.machineId)?.get(s.testId) : undefined;
+      const chain = resolveLabelChain(root, s.path);
+      const last = chain[chain.length - 1];
+      const isLeaf = !!last && last.isLeaf;
+      const key = isLeaf ? chain.map((n) => n.name).join(" / ") : "";
+      const leaf = isLeaf ? findDataPointByNames(test?.root, s.path) : null;
       const color = COLORS[i % COLORS.length];
       const measurements = (allMeasurements.data ?? []).filter(
         (m) =>
@@ -143,15 +207,15 @@ function VisualizationPage() {
           (!dateFrom || m.date >= dateFrom) &&
           (!dateTo || m.date <= dateTo),
       );
-      return { sel: s, test, chain, leaf, key, color, measurements };
+      return { sel: s, test, chain, leaf, isLeaf, key, color, measurements };
     });
-  }, [series, machines.data, allTemplates.data, allMeasurements.data, dateFrom, dateTo]);
+  }, [series, machines.data, allTemplates.data, allMeasurements.data, labelIndex, dateFrom, dateTo]);
 
   // Build chart data: one row per date, with each series key as column
   const chartData = useMemo(() => {
     const byDate = new Map<string, { date: string; sums: Map<string, { sum: number; n: number }> }>();
     for (const r of resolved) {
-      if (!r.leaf) continue;
+      if (!r.isLeaf) continue;
       const seriesId = r.sel.id;
       for (const m of r.measurements) {
         let row = byDate.get(m.date);
@@ -293,22 +357,25 @@ function VisualizationPage() {
         {/* Parameter selectors — each row stacks vertically; dropdowns inside flow horizontally */}
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           {series.map((s, idx) => {
-            const tpl = templateFor(s.machineId);
-            const test = tpl?.tests.find((t) => t.id === s.testId) ?? null;
-            const chain = test ? resolveChain(test.root, s.path) : [];
-            const leaf = chainLeaf(chain);
+            const tests = testsFor(s.machineId);
+            const root = s.machineId ? labelIndex.get(s.machineId)?.get(s.testId) : undefined;
+            const chain = resolveLabelChain(root, s.path);
+            const last = chain[chain.length - 1];
+            const isLeaf = !!last && last.isLeaf;
+            const r = resolved.find((x) => x.sel.id === s.id);
+            const leaf = r?.leaf ?? null;
 
-            const levels: { current: Nest; selectedId: string | undefined; depth: number }[] = [];
-            if (test) {
-              let nest: Nest | null = test.root;
+            const levels: { current: LabelNode; selectedId: string | undefined; depth: number }[] = [];
+            if (root) {
+              let node: LabelNode | undefined = root;
               let depth = 0;
-              while (nest) {
+              while (node) {
                 const selectedId = s.path[depth];
-                levels.push({ current: nest, selectedId, depth });
+                levels.push({ current: node, selectedId, depth });
                 if (!selectedId) break;
-                const child: TreeNode | undefined = nest.children.find((c) => c.id === selectedId);
-                if (!child || child.kind !== "nest") break;
-                nest = child;
+                const child: LabelNode | undefined = node.children.get(selectedId);
+                if (!child || child.children.size === 0) break;
+                node = child;
                 depth += 1;
               }
             }
@@ -342,7 +409,7 @@ function VisualizationPage() {
                       </Select>
                     </div>
 
-                    {tpl && (
+                    {s.machineId && (
                       <div className="w-full space-y-1 sm:w-[200px]">
                         <Label className="text-[10px] uppercase text-muted-foreground">Test</Label>
                         <Select
@@ -351,16 +418,20 @@ function VisualizationPage() {
                         >
                           <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecciona test" /></SelectTrigger>
                           <SelectContent>
-                            {tpl.tests.map((t) => (
-                              <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                            ))}
+                            {tests.length === 0 ? (
+                              <div className="px-2 py-1.5 text-xs text-muted-foreground">Sin datos importados</div>
+                            ) : (
+                              tests.map((t) => (
+                                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                              ))
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
                     )}
 
                     {levels.map(({ current, selectedId, depth }) => {
-                      if (current.children.length === 0) return null;
+                      if (current.children.size === 0) return null;
                       return (
                         <div key={depth} className="w-full space-y-1 sm:w-[180px]">
                           <Label className="text-[10px] uppercase text-muted-foreground">
@@ -377,10 +448,10 @@ function VisualizationPage() {
                               <SelectValue placeholder="Selecciona..." />
                             </SelectTrigger>
                             <SelectContent>
-                              {current.children.map((c) => (
-                                <SelectItem key={c.id} value={c.id}>
-                                  {nodeName(c)}
-                                  {c.kind === "data" ? " ●" : ""}
+                              {[...current.children.values()].map((c) => (
+                                <SelectItem key={c.name} value={c.name}>
+                                  {c.name}
+                                  {c.isLeaf ? " ●" : ""}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -390,22 +461,22 @@ function VisualizationPage() {
                     })}
                   </div>
 
-                  {leaf && (
+                  {isLeaf && (
                     <div className="mt-2 rounded border border-dashed bg-muted/30 p-2 text-[10px] text-muted-foreground">
-                      <div className="font-medium text-foreground">{chainSeriesKey(chain)}</div>
-                      {leaf.unit && <div>Unidad: {displayTextOrRef(leaf.unit, "—")}</div>}
-                      {leaf.parsedTolerance && leaf.parsedTolerance.type !== "none" && (
+                      <div className="font-medium text-foreground">{chain.map((n) => n.name).join(" / ")}</div>
+                      {leaf?.unit && <div>Unidad: {displayTextOrRef(leaf.unit, "—")}</div>}
+                      {leaf?.parsedTolerance && leaf.parsedTolerance.type !== "none" && (
                         <div>Tolerancia: {displayTextOrRef(leaf.tolerance, "—")}</div>
                       )}
-                      {leaf.reference && <div>Referencia: {displayTextOrRef(leaf.reference, "—")}</div>}
+                      {leaf?.reference && <div>Referencia: {displayTextOrRef(leaf.reference, "—")}</div>}
                     </div>
                   )}
-                  {!leaf && test && (
+                  {!isLeaf && s.testId && (
                     <div className="mt-2 rounded border border-dashed bg-muted/30 p-2 text-[10px] text-muted-foreground">
                       Continúa eligiendo hasta llegar a un punto de dato (●) para graficar.
                     </div>
                   )}
-                  {leaf && resolved.find((r) => r.sel.id === s.id)?.measurements.length === 0 && (
+                  {isLeaf && r?.measurements.length === 0 && (
                     <div className="mt-2 rounded border border-dashed border-destructive/40 bg-destructive/5 p-2 text-[10px] text-destructive">
                       Sin mediciones importadas para este punto en el rango de fechas seleccionado.
                     </div>
@@ -436,7 +507,7 @@ function VisualizationPage() {
             <CardContent>
               {chartData.length === 0 ? (
                 <div className="flex h-[360px] flex-col items-center justify-center gap-1 text-sm text-muted-foreground">
-                  {resolved.every((r) => !r.leaf) ? (
+                  {resolved.every((r) => !r.isLeaf) ? (
                     <span>Selecciona al menos un parámetro completo (hasta un punto ●) para visualizar datos.</span>
                   ) : (
                     <>
@@ -479,7 +550,7 @@ function VisualizationPage() {
                       />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
                       {resolved.flatMap((r) => {
-                        if (!r.leaf) return [];
+                        if (!r.isLeaf || !r.leaf) return [];
                         const band = showTolerance ? toleranceBand(r.leaf.parsedTolerance) : null;
                         const refVal = showReference ? parseRefNumber(r.leaf.reference) : null;
                         const lines = [];
@@ -518,9 +589,9 @@ function VisualizationPage() {
                         }
                         return lines;
                       })}
-                      {resolved.map((r, i) => {
-                        if (!r.leaf) return null;
-                        const name = `${r.sel.machineId} · ${r.test?.name ?? ""} · ${r.key}`;
+                      {resolved.map((r) => {
+                        if (!r.isLeaf) return null;
+                        const name = `${r.sel.machineId} · ${r.test?.name ?? r.sel.testId} · ${r.key}`;
                         return (
                           <Line
                             key={r.sel.id}
