@@ -31,6 +31,7 @@ import { autoBuildTemplate, buildSeedTemplate, cloneTemplateForMachine } from "@
 import {
   MACHINES,
   CATEGORY_LABELS,
+  CATEGORIES_BY_KIND,
   emptyNest,
   newDataPoint,
   newNest,
@@ -82,6 +83,8 @@ function TemplateEditor() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const isAdmin = useIsAdmin();
+  const machineKind = MACHINES.find((m) => m.id === machineId)?.kind ?? "other";
+  const availableCategories: Category[] = CATEGORIES_BY_KIND[machineKind];
 
 
   const templates = useQuery({
@@ -342,6 +345,7 @@ function TemplateEditor() {
                 onDelete={() => deleteTest(editingTest.id)}
                 target={target}
                 setTarget={setTarget}
+                availableCategories={availableCategories}
               />
             ) : (
               <Card>
@@ -426,6 +430,7 @@ function TestEditor({
   onDelete,
   target,
   setTarget,
+  availableCategories,
 }: {
   test: TestDef;
   onChange: (patch: Partial<TestDef>) => void;
@@ -433,6 +438,7 @@ function TestEditor({
   onDelete: () => void;
   target: TargetSlot | null;
   setTarget: (t: TargetSlot | null) => void;
+  availableCategories: Category[];
 }) {
   async function importJson(file: File) {
     try {
@@ -506,8 +512,8 @@ function TestEditor({
             <Select value={test.category} onValueChange={(v) => onChange({ category: v as Category })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {Object.entries(CATEGORY_LABELS).map(([v, l]) => (
-                  <SelectItem key={v} value={v}>{l}</SelectItem>
+                {availableCategories.map((v) => (
+                  <SelectItem key={v} value={v}>{CATEGORY_LABELS[v]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

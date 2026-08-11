@@ -51,6 +51,44 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   image_sgrt: "QC SGRT",
 };
 
+/** Categorías disponibles según el tipo de máquina (los sistemas de imagen no comparten las de los aceleradores). */
+export const CATEGORIES_BY_KIND: Record<MachineKind, Category[]> = {
+  linac: [
+    "mechanical_unit",
+    "mechanical_table",
+    "geometric",
+    "mlc",
+    "dosimetric_photon",
+    "dosimetric_electron",
+    "monitor_system",
+  ],
+  imaging: [
+    "image_geometry",
+    "image_registration",
+    "image_quality_mv",
+    "image_quality_cbct",
+    "image_sgrt",
+  ],
+  ct: [
+    "mechanical_unit",
+    "mechanical_table",
+    "geometric",
+    "mlc",
+    "dosimetric_photon",
+    "dosimetric_electron",
+    "monitor_system",
+  ],
+  other: [
+    "mechanical_unit",
+    "mechanical_table",
+    "geometric",
+    "mlc",
+    "dosimetric_photon",
+    "dosimetric_electron",
+    "monitor_system",
+  ],
+};
+
 export type Tolerance =
   | { type: "pm"; nominal: number; delta: number }
   | { type: "range"; min: number; max: number }

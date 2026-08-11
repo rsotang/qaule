@@ -15,7 +15,12 @@ function inferCategory(sheetName: string): Category {
   if (n.includes("electr")) return "dosimetric_electron";
   if (n.includes("fot") || n.includes("dosim") || n.includes("haz") || n.includes("cuba"))
     return "dosimetric_photon";
+  if (n.includes("geometría") || n.includes("geometria")) return "image_geometry";
   if (n.includes("geom")) return "geometric";
+  if (n.includes("registro")) return "image_registration";
+  if (n.includes("sgrt")) return "image_sgrt";
+  if (n.includes("calidad") && n.includes("cbct")) return "image_quality_cbct";
+  if (n.includes("calidad") && n.includes("mv")) return "image_quality_mv";
   return "mechanical_unit";
 }
 
