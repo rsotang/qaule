@@ -28,6 +28,8 @@ import {
   type DataPoint,
   type TextOrRef,
   type Measurement,
+  type TestDef,
+  type Tolerance,
 } from "@/lib/qa/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
