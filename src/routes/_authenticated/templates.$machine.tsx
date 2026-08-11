@@ -385,7 +385,9 @@ function TemplateEditor() {
               )}
             </CardContent>
           </Card>
-        </div>
+          )}
+        </fieldset>
+
       </div>
     </div>
   );
