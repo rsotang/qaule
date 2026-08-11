@@ -179,18 +179,45 @@ function MachineCard({
           <div className="flex items-center gap-2.5">
             <MachineGlyph
               machineId={machineId}
+              kind={machineKind}
               className="h-20 w-24 shrink-0 rounded-md bg-primary/10 object-contain p-1.5"
             />
 
             <div>
               <CardTitle className="text-sm">{machineId}</CardTitle>
               <p className="text-xs text-muted-foreground">{machineName}</p>
+              {machineKind && (
+                <p className="text-[10px] text-muted-foreground">{MACHINE_KIND_LABELS[machineKind]}</p>
+              )}
             </div>
           </div>
-          <Badge variant="outline" className={`gap-1 ${meta.cls}`}>
-            <meta.Icon className="size-3" /> {meta.label}
-          </Badge>
+          <div className="flex items-center gap-1">
+            <Badge variant="outline" className={`gap-1 ${meta.cls}`}>
+              <meta.Icon className="size-3" /> {meta.label}
+            </Badge>
+            {isCustom && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                title="Eliminar máquina"
+                onClick={async () => {
+                  if (!confirm(`¿Eliminar la máquina ${machineId}? Las plantillas y datos asociados dejarán de mostrarse.`)) return;
+                  try {
+                    await deleteMachine(machineId);
+                    toast.success("Máquina eliminada");
+                    onDeleted();
+                  } catch (e) {
+                    toast.error((e as Error).message);
+                  }
+                }}
+              >
+                <Trash2 className="size-3.5 text-destructive" />
+              </Button>
+            )}
+          </div>
         </div>
+
       </CardHeader>
       <CardContent className="space-y-3">
         <div>
