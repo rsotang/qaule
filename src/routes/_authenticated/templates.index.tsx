@@ -15,7 +15,9 @@ import { useIsAdmin } from "@/hooks/use-is-admin";
 export const Route = createFileRoute("/_authenticated/templates/")({ component: TemplatesIndex });
 
 function TemplatesIndex() {
+  const isAdmin = useIsAdmin();
   const qc = useQueryClient();
+
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
   const machineList = useMachineList();
   const templates = useQuery({ queryKey: ["templates-all"], queryFn: () => listTemplates() });
