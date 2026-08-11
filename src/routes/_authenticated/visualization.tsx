@@ -89,9 +89,18 @@ function parseRefNumber(v: TextOrRef | undefined): number | null {
   return isFinite(n) ? n : null;
 }
 
+/** Default range: last 12 months up to today (yyyy-mm-dd). */
+function defaultRange() {
+  const today = new Date();
+  const from = new Date(today);
+  from.setFullYear(from.getFullYear() - 1);
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  return { from: iso(from), to: iso(today) };
+}
+
 function VisualizationPage() {
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState(() => defaultRange().from);
+  const [dateTo, setDateTo] = useState(() => defaultRange().to);
   const [series, setSeries] = useState<SeriesSel[]>([newSeries()]);
   const [showTolerance, setShowTolerance] = useState(true);
   const [showReference, setShowReference] = useState(true);
