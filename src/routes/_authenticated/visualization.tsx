@@ -613,6 +613,224 @@ function VisualizationPage() {
             </CardContent>
           </Card>
       </div>
+
+      <TestSnapshot
+        measurements={allMeasurements.data ?? []}
+        templates={allTemplates.data ?? []}
+      />
     </div>
   );
 }
+
+// ---------------- Vista completa de una prueba (mes concreto) ----------------
+
+interface SnapNode {
+  name: string;
+  children: Map<string, SnapNode>;
+  value?: number;
+  date?: string;
+}
+
+function buildSnapTree(rows: Measurement[]): SnapNode {
+  const root: SnapNode = { name: "", children: new Map() };
+  for (const m of rows) {
+    const segs = m.cellLabel.split(" / ").map((s) => s.trim()).filter(Boolean);
+    let cur = root;
+    segs.forEach((seg, i) => {
+      let next = cur.children.get(seg);
+      if (!next) {
+        next = { name: seg, children: new Map() };
+        cur.children.set(seg, next);
+      }
+      if (i === segs.length - 1) {
+        next.value = m.value;
+        next.date = m.date;
+      }
+      cur = next;
+    });
+  }
+  return root;
+}
+
+function fmtVal(v: number): string {
+  const abs = Math.abs(v);
+  if (abs !== 0 && (abs >= 1e6 || abs < 1e-4)) return v.toExponential(2);
+  return String(Math.round(v * 10000) / 10000);
+}
+
+function SnapBranch({ node, depth }: { node: SnapNode; depth: number }) {
+  return (
+    <ul className={depth === 0 ? "space-y-0.5" : "space-y-0.5 border-l pl-3"}>
+      {[...node.children.values()].map((c) => (
+        <li key={c.name}>
+          <div className="flex items-baseline justify-between gap-3 py-0.5">
+            <span className={c.children.size === 0 ? "text-xs" : "text-xs font-medium"}>{c.name}</span>
+            {c.value != null && (
+              <span className="font-mono text-xs tabular-nums text-primary">{fmtVal(c.value)}</span>
+            )}
+          </div>
+          {c.children.size > 0 && <SnapBranch node={c} depth={depth + 1} />}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function TestSnapshot({
+  measurements,
+  templates,
+}: {
+  measurements: Measurement[];
+  templates: Template[];
+}) {
+  const [machineId, setMachineId] = useState<MachineId | "">("");
+  const [testId, setTestId] = useState("");
+  const [month, setMonth] = useState("");
+
+  const tests = useMemo(() => {
+    const ids = new Set(
+      measurements.filter((m) => m.machineId === machineId).map((m) => m.testId),
+    );
+    const tplTests = templates.filter((t) => t.machineId === machineId).flatMap((t) => t.tests);
+    return [...ids]
+      .map((id) => ({ id, name: tplTests.find((t) => t.id === id)?.name ?? id }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [measurements, templates, machineId]);
+
+  const months = useMemo(() => {
+    const set = new Set(
+      measurements
+        .filter((m) => m.machineId === machineId && m.testId === testId)
+        .map((m) => m.date.slice(0, 7)),
+    );
+    return [...set].sort().reverse();
+  }, [measurements, machineId, testId]);
+
+  const rows = useMemo(
+    () =>
+      measurements
+        .filter(
+          (m) =>
+            m.machineId === machineId &&
+            m.testId === testId &&
+            (!month || m.date.slice(0, 7) === month),
+        )
+        .sort((a, b) => a.cellLabel.localeCompare(b.cellLabel)),
+    [measurements, machineId, testId, month],
+  );
+
+  const tree = useMemo(() => buildSnapTree(rows), [rows]);
+  const testName = tests.find((t) => t.id === testId)?.name ?? testId;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">Vista de prueba (mes concreto)</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Muestra todos los parámetros de una prueba en un mes, en tabla o en árbol.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="w-full space-y-1 sm:w-[180px]">
+            <Label className="text-[10px] uppercase text-muted-foreground">Máquina</Label>
+            <Select
+              value={machineId || undefined}
+              onValueChange={(v) => {
+                setMachineId(v as MachineId);
+                setTestId("");
+                setMonth("");
+              }}
+            >
+              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecciona máquina" /></SelectTrigger>
+              <SelectContent>
+                {MACHINES.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>{m.id} — {m.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {machineId && (
+            <div className="w-full space-y-1 sm:w-[220px]">
+              <Label className="text-[10px] uppercase text-muted-foreground">Prueba</Label>
+              <Select value={testId || undefined} onValueChange={(v) => { setTestId(v); setMonth(""); }}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecciona prueba" /></SelectTrigger>
+                <SelectContent>
+                  {tests.length === 0 ? (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">Sin datos importados</div>
+                  ) : (
+                    tests.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {testId && (
+            <div className="w-full space-y-1 sm:w-[160px]">
+              <Label className="text-[10px] uppercase text-muted-foreground">Mes</Label>
+              <Select value={month || undefined} onValueChange={setMonth}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecciona mes" /></SelectTrigger>
+                <SelectContent>
+                  {months.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+
+        {!testId || !month ? (
+          <div className="rounded border border-dashed bg-muted/30 p-4 text-center text-xs text-muted-foreground">
+            Selecciona máquina, prueba y mes para ver todos los datos de esa prueba.
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="rounded border border-dashed bg-muted/30 p-4 text-center text-xs text-muted-foreground">
+            No hay datos para esa prueba en el mes seleccionado.
+          </div>
+        ) : (
+          <Tabs defaultValue="table">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">{testName}</span> · {machineId} · {month} ·{" "}
+                {rows.length} valores
+              </div>
+              <TabsList className="h-8">
+                <TabsTrigger value="table" className="text-xs">Tabla</TabsTrigger>
+                <TabsTrigger value="tree" className="text-xs">Árbol</TabsTrigger>
+              </TabsList>
+            </div>
+            <TabsContent value="table" className="mt-2">
+              <div className="max-h-[420px] overflow-auto rounded border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs">Parámetro</TableHead>
+                      <TableHead className="text-xs">Fecha</TableHead>
+                      <TableHead className="text-right text-xs">Valor</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((m) => (
+                      <TableRow key={m.id}>
+                        <TableCell className="text-xs">{m.cellLabel}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{m.date}</TableCell>
+                        <TableCell className="text-right font-mono text-xs tabular-nums">
+                          {fmtVal(m.value)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </TabsContent>
+            <TabsContent value="tree" className="mt-2">
+              <div className="max-h-[420px] overflow-auto rounded border p-3">
+                <SnapBranch node={tree} depth={0} />
+              </div>
+            </TabsContent>
+          </Tabs>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
