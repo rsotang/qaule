@@ -39,6 +39,9 @@ export function AppShell() {
       <NavLink to="/imports" icon={<Upload className="size-4" />} label="Importaciones" />
       <NavLink to="/templates" icon={<Settings2 className="size-4" />} label="Plantillas" />
       {me.data?.isAdmin && <NavLink to="/admin" icon={<Users className="size-4" />} label="Usuarios" />}
+      {me.data?.isAdmin && (
+        <NavLink to="/admin/machines" icon={<Settings2 className="size-4" />} label="Máquinas" />
+      )}
     </>
   );
 

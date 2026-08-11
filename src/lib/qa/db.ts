@@ -12,6 +12,8 @@ import type {
   CalendarTask,
   MachineId,
   MachineState,
+  MachineKindDef,
+  CategoryDef,
 } from "./types";
 import { calendarTaskId } from "./types";
 
@@ -178,6 +180,91 @@ export async function updateMachineState(
     .from("machines")
     .update({ state: state ?? null, state_note: note ?? null })
     .eq("id", machineId);
+  if (error) throw new Error(error.message);
+}
+
+/** Actualiza nombre y/o tipo de una máquina existente. */
+export async function updateMachine(id: string, patch: { name?: string; kind?: string }): Promise<void> {
+  const { error } = await supabase.from("machines").update(patch).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// ---------- machine kinds + category catalog ----------
+
+type MachineKindRow = { id: string; name: string; builtin: boolean };
+
+export async function listMachineKinds(): Promise<MachineKindDef[]> {
+  const { data, error } = await supabase
+    .from("machine_kinds")
+    .select("id, name, builtin, machine_kind_categories(category_id)")
+    .order("id");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    builtin: r.builtin,
+    categories: (r.machine_kind_categories ?? []).map((c) => c.category_id),
+  }));
+}
+
+export async function createMachineKind(rec: { id: string; name: string; categories: string[] }): Promise<void> {
+  const { error } = await supabase.from("machine_kinds").insert({ id: rec.id, name: rec.name });
+  if (error) throw new Error(error.message);
+  if (rec.categories.length > 0) {
+    const { error: linkErr } = await supabase.from("machine_kind_categories").insert(
+      rec.categories.map((categoryId) => ({ kind_id: rec.id, category_id: categoryId })),
+    );
+    if (linkErr) throw new Error(linkErr.message);
+  }
+}
+
+export async function updateMachineKind(
+  id: string,
+  patch: { name?: string; categories?: string[] },
+): Promise<void> {
+  if (patch.name !== undefined) {
+    const { error } = await supabase.from("machine_kinds").update({ name: patch.name }).eq("id", id);
+    if (error) throw new Error(error.message);
+  }
+  if (patch.categories !== undefined) {
+    const { error: delErr } = await supabase.from("machine_kind_categories").delete().eq("kind_id", id);
+    if (delErr) throw new Error(delErr.message);
+    if (patch.categories.length > 0) {
+      const { error: linkErr } = await supabase.from("machine_kind_categories").insert(
+        patch.categories.map((categoryId) => ({ kind_id: id, category_id: categoryId })),
+      );
+      if (linkErr) throw new Error(linkErr.message);
+    }
+  }
+}
+
+export async function deleteMachineKind(id: string): Promise<void> {
+  const { error } = await supabase.from("machine_kinds").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function listCategories(): Promise<CategoryDef[]> {
+  const { data, error } = await supabase.from("categories").select("*").order("id");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    builtin: r.builtin,
+  }));
+}
+
+export async function createCategory(rec: { id: string; name: string }): Promise<void> {
+  const { error } = await supabase.from("categories").insert({ id: rec.id, name: rec.name });
+  if (error) throw new Error(error.message);
+}
+
+export async function updateCategory(id: string, name: string): Promise<void> {
+  const { error } = await supabase.from("categories").update({ name }).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteCategory(id: string): Promise<void> {
+  const { error } = await supabase.from("categories").delete().eq("id", id);
   if (error) throw new Error(error.message);
 }
 

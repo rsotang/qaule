@@ -13,10 +13,10 @@ import {
   createMachine,
   deleteMachine,
 } from "@/lib/qa/db";
+import { useMachineCatalog } from "@/hooks/use-machine-catalog";
 
 import {
   MACHINES,
-  MACHINE_KIND_LABELS,
   mergeMachineList,
   walkDataPoints,
   calendarTaskId,
@@ -66,6 +66,7 @@ function NewMachineDialog({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState("");
   const [kind, setKind] = useState<MachineKind>("linac");
   const [saving, setSaving] = useState(false);
+  const catalog = useMachineCatalog();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -77,7 +78,7 @@ function NewMachineDialog({ onCreated }: { onCreated: () => void }) {
       toast.success(`Máquina ${cleanId} creada`);
       setId("");
       setName("");
-      setKind("linac");
+      setKind(catalog.kinds[0]?.id ?? "linac");
       setOpen(false);
       onCreated();
     } catch (err) {
@@ -129,9 +130,9 @@ function NewMachineDialog({ onCreated }: { onCreated: () => void }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(MACHINE_KIND_LABELS).map(([k, label]) => (
-                  <SelectItem key={k} value={k}>
-                    {label}
+                {catalog.kinds.map((k) => (
+                  <SelectItem key={k.id} value={k.id}>
+                    {k.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -249,6 +250,7 @@ function MachineCard({
   onDeleted: () => void;
 }) {
   const isCustom = !MACHINES.some((m) => m.id === machineId);
+  const catalog = useMachineCatalog();
   const tpls = templates.filter((t) => t.machineId === machineId);
   const tpl = tpls.find((t) => t.id === machine?.activeTemplateId) ?? tpls[0];
   const myImports = imports.filter((i) => i.machineId === machineId);
@@ -296,7 +298,7 @@ function MachineCard({
               <CardTitle className="text-sm">{machineId}</CardTitle>
               <p className="text-xs text-muted-foreground">{machineName}</p>
               {machineKind && (
-                <p className="text-[10px] text-muted-foreground">{MACHINE_KIND_LABELS[machineKind]}</p>
+                <p className="text-[10px] text-muted-foreground">{catalog.kindName(machineKind)}</p>
               )}
             </div>
           </div>

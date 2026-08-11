@@ -1,7 +1,7 @@
 /** Machine identifier. Base machines are seeded, but users can add their own. */
 export type MachineId = string;
 
-export type MachineKind = "linac" | "imaging" | "ct" | "other";
+export type MachineKind = "linac" | "imaging" | "ct" | "other" | (string & {});
 
 export const MACHINE_KIND_LABELS: Record<MachineKind, string> = {
   linac: "Acelerador lineal",
@@ -9,6 +9,68 @@ export const MACHINE_KIND_LABELS: Record<MachineKind, string> = {
   ct: "TC / Simulador",
   other: "Otro",
 };
+
+/** Un tipo de máquina configurable (persistido en la BD). */
+export interface MachineKindDef {
+  id: string;
+  name: string;
+  builtin: boolean;
+  categories: string[];
+}
+
+/** Una categoría de prueba del catálogo (persistida en la BD). */
+export interface CategoryDef {
+  id: string;
+  name: string;
+  builtin: boolean;
+}
+
+/** Catálogo de tipos y categorías de fábrica (fallback si la BD aún no tiene datos). */
+export const BUILTIN_KINDS: MachineKindDef[] = [
+  { id: "linac", name: "Acelerador lineal", builtin: true, categories: ["mechanical_unit", "mechanical_table", "geometric", "mlc", "dosimetric_photon", "dosimetric_electron", "monitor_system"] },
+  { id: "imaging", name: "Sistema de imagen", builtin: true, categories: ["image_geometry", "image_registration", "image_quality_mv", "image_quality_cbct", "image_sgrt"] },
+  { id: "ct", name: "TC / Simulador", builtin: true, categories: ["mechanical_unit", "mechanical_table", "geometric", "mlc", "dosimetric_photon", "dosimetric_electron", "monitor_system"] },
+  { id: "other", name: "Otro", builtin: true, categories: ["mechanical_unit", "mechanical_table", "geometric", "mlc", "dosimetric_photon", "dosimetric_electron", "monitor_system"] },
+];
+
+export const BUILTIN_CATEGORIES: CategoryDef[] = [
+  { id: "mechanical_unit", name: "Mecánico Unidad", builtin: true },
+  { id: "mechanical_table", name: "Mecánico Mesa", builtin: true },
+  { id: "geometric", name: "Geométrico Haz", builtin: true },
+  { id: "mlc", name: "MLC", builtin: true },
+  { id: "dosimetric_photon", name: "Dosimétrico Fotones", builtin: true },
+  { id: "dosimetric_electron", name: "Dosimétrico Electrones", builtin: true },
+  { id: "monitor_system", name: "Sistema Monitor", builtin: true },
+  { id: "image_geometry", name: "Geometría", builtin: true },
+  { id: "image_registration", name: "Sistema de Registro", builtin: true },
+  { id: "image_quality_mv", name: "Calidad Imagen MV", builtin: true },
+  { id: "image_quality_cbct", name: "Calidad Imagen CBCT", builtin: true },
+  { id: "image_sgrt", name: "QC SGRT", builtin: true },
+];
+
+/** Nombre de un tipo de máquina; si no existe, devuelve el id. */
+export function machineKindLabel(kind: MachineKind | undefined, kinds?: MachineKindDef[]): string {
+  if (!kind) return "—";
+  return kinds?.find((k) => k.id === kind)?.name ?? MACHINE_KIND_LABELS[kind] ?? kind;
+}
+
+/** Nombre de una categoría; si no existe, devuelve el id. */
+export function categoryLabel(cat: string | undefined, cats?: CategoryDef[]): string {
+  if (!cat) return "—";
+  return cats?.find((c) => c.id === cat)?.name ?? CATEGORY_LABELS[cat as Category] ?? cat;
+}
+
+/** Categorías permitidas para un tipo de máquina (BD primero, fallback a catálogo de fábrica). */
+export function categoriesForKind(
+  kind: MachineKind | undefined,
+  kinds?: MachineKindDef[],
+  cats?: CategoryDef[],
+): Category[] {
+  const def = kinds?.find((k) => k.id === kind);
+  if (def?.categories.length) return def.categories as Category[];
+  return (CATEGORIES_BY_KIND[kind as keyof typeof CATEGORIES_BY_KIND] ??
+    (cats ? cats.map((c) => c.id) : [])) as Category[];
+}
 
 export const MACHINES: { id: MachineId; name: string; kind: MachineKind }[] = [
   { id: "TB1", name: "TrueBeam 1", kind: "linac" },
@@ -34,7 +96,8 @@ export type Category =
   | "image_registration"
   | "image_quality_mv"
   | "image_quality_cbct"
-  | "image_sgrt";
+  | "image_sgrt"
+  | (string & {});
 
 export const CATEGORY_LABELS: Record<Category, string> = {
   mechanical_unit: "Mecánico Unidad",

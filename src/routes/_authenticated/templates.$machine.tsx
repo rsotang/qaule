@@ -22,8 +22,9 @@ import {
 import { toast } from "sonner";
 import { CellPicker } from "@/components/qa/CellPicker";
 import { parseTestJson, testToJson, testJsonFileName } from "@/lib/qa/test-json";
-import { listTemplates, saveTemplate, setActiveTemplate } from "@/lib/qa/db";
+import { listTemplates, saveTemplate, setActiveTemplate, listMachines } from "@/lib/qa/db";
 import { useIsAdmin } from "@/hooks/use-is-admin";
+import { useMachineCatalog } from "@/hooks/use-machine-catalog";
 
 
 import { readFile, type ParsedWorkbook } from "@/lib/qa/excel";
@@ -31,7 +32,6 @@ import { autoBuildTemplate, buildSeedTemplate, cloneTemplateForMachine } from "@
 import {
   MACHINES,
   CATEGORY_LABELS,
-  CATEGORIES_BY_KIND,
   emptyNest,
   newDataPoint,
   newNest,
@@ -83,8 +83,13 @@ function TemplateEditor() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const isAdmin = useIsAdmin();
-  const machineKind = MACHINES.find((m) => m.id === machineId)?.kind ?? "other";
-  const availableCategories: Category[] = CATEGORIES_BY_KIND[machineKind];
+  const catalog = useMachineCatalog();
+  const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
+  const machineKind =
+    machines.data?.find((m) => m.id === machineId)?.kind ??
+    MACHINES.find((m) => m.id === machineId)?.kind ??
+    "other";
+  const availableCategories: Category[] = catalog.categoriesFor(machineKind);
 
 
   const templates = useQuery({
@@ -323,7 +328,7 @@ function TemplateEditor() {
                     <span className="shrink-0 text-[10px] text-muted-foreground">{dpCount} dato(s)</span>
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1">
-                    <Badge variant="secondary" className="text-[9px]">{CATEGORY_LABELS[t.category]}</Badge>
+                    <Badge variant="secondary" className="text-[9px]">{CATEGORY_LABELS[t.category] ?? t.category}</Badge>
                     <Badge variant="outline" className="text-[9px]">
                       {t.frequency === "monthly" ? "M" : t.frequency === "quarterly" ? "T" : t.frequency === "semiannual" ? "S" : "A"}
                     </Badge>
@@ -442,7 +447,7 @@ function TestEditor({
 }) {
   async function importJson(file: File) {
     try {
-      const next = parseTestJson(await file.text(), test);
+      const next = parseTestJson(await file.text(), test, availableCategories);
       onChange({
         name: next.name,
         category: next.category,
@@ -512,8 +517,11 @@ function TestEditor({
             <Select value={test.category} onValueChange={(v) => onChange({ category: v as Category })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {availableCategories.map((v) => (
-                  <SelectItem key={v} value={v}>{CATEGORY_LABELS[v]}</SelectItem>
+                {(availableCategories.includes(test.category)
+                  ? availableCategories
+                  : [...availableCategories, test.category]
+                ).map((v) => (
+                  <SelectItem key={v} value={v}>{CATEGORY_LABELS[v] ?? v}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

@@ -98,6 +98,27 @@ export type Database = {
         }
         Relationships: []
       }
+      categories: {
+        Row: {
+          builtin: boolean
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          builtin?: boolean
+          created_at?: string
+          id: string
+          name: string
+        }
+        Update: {
+          builtin?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       imports: {
         Row: {
           created_by: string | null
@@ -125,6 +146,57 @@ export type Database = {
           imported_at?: string
           machine_id?: string
           source_date?: string
+        }
+        Relationships: []
+      }
+      machine_kind_categories: {
+        Row: {
+          category_id: string
+          kind_id: string
+        }
+        Insert: {
+          category_id: string
+          kind_id: string
+        }
+        Update: {
+          category_id?: string
+          kind_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machine_kind_categories_kind_id_fkey"
+            columns: ["kind_id"]
+            isOneToOne: false
+            referencedRelation: "machine_kinds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_kind_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      machine_kinds: {
+        Row: {
+          builtin: boolean
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          builtin?: boolean
+          created_at?: string
+          id: string
+          name: string
+        }
+        Update: {
+          builtin?: boolean
+          created_at?: string
+          id?: string
+          name?: string
         }
         Relationships: []
       }

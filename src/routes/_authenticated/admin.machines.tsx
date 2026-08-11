@@ -1,0 +1,613 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
+import {
+  Trash2,
+  Plus,
+  Pencil,
+  Layers,
+  Boxes,
+  Check,
+  X,
+} from "lucide-react";
+import {
+  listMachines,
+  createMachine,
+  updateMachine,
+  deleteMachine,
+  listMachineKinds,
+  createMachineKind,
+  updateMachineKind,
+  deleteMachineKind,
+  listCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+} from "@/lib/qa/db";
+import { useMachineCatalog } from "@/hooks/use-machine-catalog";
+import { MACHINES, type MachineKind } from "@/lib/qa/types";
+import { useIsAdmin } from "@/hooks/use-is-admin";
+
+export const Route = createFileRoute("/_authenticated/admin/machines")({ component: MachinesAdminPage });
+
+function MachinesAdminPage() {
+  const isAdmin = useIsAdmin();
+  if (!isAdmin) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Acceso restringido</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">Solo los administradores pueden configurar máquinas.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-semibold sm:text-2xl">Máquinas y tipos</h1>
+        <p className="text-sm text-muted-foreground">
+          Configura las máquinas, los tipos de máquina y las categorías de prueba de cada tipo.
+        </p>
+      </div>
+      <MachinesSection />
+      <MachineKindsSection />
+      <CategoriesSection />
+    </div>
+  );
+}
+
+// ---------------- Machines ----------------
+
+function MachinesSection() {
+  const qc = useQueryClient();
+  const catalog = useMachineCatalog();
+  const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
+
+  const [newId, setNewId] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newKind, setNewKind] = useState<string>("linac");
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editKind, setEditKind] = useState<string>("linac");
+
+  const create = useMutation({
+    mutationFn: () => createMachine({ id: newId.trim().toUpperCase().replace(/\s+/g, ""), name: newName.trim(), kind: newKind }),
+    onSuccess: () => {
+      toast.success("Máquina creada");
+      setNewId("");
+      setNewName("");
+      qc.invalidateQueries({ queryKey: ["machines"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const saveEdit = useMutation({
+    mutationFn: () => updateMachine(editId!, { name: editName.trim(), kind: editKind }),
+    onSuccess: () => {
+      toast.success("Máquina actualizada");
+      setEditId(null);
+      qc.invalidateQueries({ queryKey: ["machines"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => deleteMachine(id),
+    onSuccess: () => {
+      toast.success("Máquina eliminada");
+      qc.invalidateQueries({ queryKey: ["machines"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const rows = machines.data ?? [];
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Layers className="size-4" /> Máquinas
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <form
+          className="flex flex-wrap items-end gap-2 rounded-md border bg-muted/30 p-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (newId.trim() && newName.trim()) create.mutate();
+          }}
+        >
+          <div className="space-y-1">
+            <Label className="text-xs">Identificador</Label>
+            <Input className="h-8 w-24" placeholder="TB4" value={newId} onChange={(e) => setNewId(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Nombre</Label>
+            <Input className="h-8 w-48" placeholder="TrueBeam 4" value={newName} onChange={(e) => setNewName(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Tipo</Label>
+            <Select value={newKind} onValueChange={setNewKind}>
+              <SelectTrigger className="h-8 w-44 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {catalog.kinds.map((k) => (
+                  <SelectItem key={k.id} value={k.id}>{k.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button type="submit" size="sm" disabled={create.isPending}>
+            <Plus className="size-4" /> Añadir
+          </Button>
+        </form>
+
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>ID</TableHead>
+              <TableHead>Nombre</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((m) => (
+              <TableRow key={m.id}>
+                {editId === m.id ? (
+                  <>
+                    <TableCell className="text-xs font-mono">{m.id}</TableCell>
+                    <TableCell>
+                      <Input className="h-8" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                    </TableCell>
+                    <TableCell>
+                      <Select value={editKind} onValueChange={setEditKind}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {catalog.kinds.map((k) => (
+                            <SelectItem key={k.id} value={k.id}>{k.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button size="icon" variant="ghost" className="size-7" onClick={() => saveEdit.mutate()} disabled={!editName.trim()}>
+                          <Check className="size-3" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="size-7" onClick={() => setEditId(null)}>
+                          <X className="size-3" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </>
+                ) : (
+                  <>
+                    <TableCell className="text-xs font-mono">{m.id}</TableCell>
+                    <TableCell className="text-sm">{m.name}</TableCell>
+                    <TableCell className="text-xs">{catalog.kindName(m.kind)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="size-7"
+                          onClick={() => {
+                            setEditId(m.id);
+                            setEditName(m.name);
+                            setEditKind(m.kind ?? "other");
+                          }}
+                        >
+                          <Pencil className="size-3" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="size-7"
+                          onClick={() => {
+                            if (confirm(`¿Eliminar la máquina ${m.id}? Las plantillas y datos asociados dejarán de mostrarse.`)) {
+                              remove.mutate(m.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="size-3 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </>
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------- Machine kinds ----------------
+
+function MachineKindsSection() {
+  const qc = useQueryClient();
+  const catalog = useMachineCatalog();
+  const kinds = useQuery({ queryKey: ["machine-kinds"], queryFn: listMachineKinds });
+  const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
+
+  const [newId, setNewId] = useState("");
+  const [newName, setNewName] = useState("");
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editCats, setEditCats] = useState<string[]>([]);
+
+  const create = useMutation({
+    mutationFn: () =>
+      createMachineKind({
+        id: newId.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
+        name: newName.trim(),
+        categories: [],
+      }),
+    onSuccess: () => {
+      toast.success("Tipo creado (sin categorías; edítalo para asignarlas)");
+      setNewId("");
+      setNewName("");
+      qc.invalidateQueries({ queryKey: ["machine-kinds"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const saveEdit = useMutation({
+    mutationFn: () => updateMachineKind(editId!, { name: editName.trim(), categories: editCats }),
+    onSuccess: () => {
+      toast.success("Tipo actualizado");
+      setEditId(null);
+      qc.invalidateQueries({ queryKey: ["machine-kinds"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => deleteMachineKind(id),
+    onSuccess: () => {
+      toast.success("Tipo eliminado");
+      qc.invalidateQueries({ queryKey: ["machine-kinds"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  function toggleCat(cat: string) {
+    setEditCats((prev) => (prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]));
+  }
+
+  const rows = kinds.data ?? [];
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Boxes className="size-4" /> Tipos de máquina
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Cada tipo define qué categorías de prueba pueden usar sus máquinas. Si editas las categorías de un tipo
+          que ya tiene plantillas, las pruebas existentes conservan su categoría (solo cambia el selector).
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <form
+          className="flex flex-wrap items-end gap-2 rounded-md border bg-muted/30 p-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (newId.trim() && newName.trim()) create.mutate();
+          }}
+        >
+          <div className="space-y-1">
+            <Label className="text-xs">Identificador</Label>
+            <Input className="h-8 w-40" placeholder="brachy" value={newId} onChange={(e) => setNewId(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Nombre</Label>
+            <Input className="h-8 w-48" placeholder="Braquiterapia" value={newName} onChange={(e) => setNewName(e.target.value)} />
+          </div>
+          <Button type="submit" size="sm" disabled={create.isPending}>
+            <Plus className="size-4" /> Añadir tipo
+          </Button>
+        </form>
+
+        <div className="space-y-2">
+          {rows.map((k) => {
+            const inUse = machines.data?.filter((m) => m.kind === k.id).length ?? 0;
+            return (
+              <div key={k.id} className="rounded-md border p-3">
+                {editId === k.id ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-end gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Nombre</Label>
+                        <Input className="h-8 w-56" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                      </div>
+                      <Button size="sm" onClick={() => saveEdit.mutate()} disabled={!editName.trim()}>
+                        <Check className="size-4" /> Guardar
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditId(null)}>
+                        <X className="size-4" /> Cancelar
+                      </Button>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-xs font-medium">Categorías de prueba</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {catalog.categories.map((c) => {
+                          const on = editCats.includes(c.id);
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => toggleCat(c.id)}
+                              className={`rounded-full border px-2.5 py-0.5 text-[11px] transition-colors ${
+                                on
+                                  ? "border-primary bg-primary/10 text-primary"
+                                  : "text-muted-foreground hover:bg-accent"
+                              }`}
+                            >
+                              {c.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{k.name}</span>
+                        {k.builtin && <Badge variant="outline" className="text-[9px]">Fábrica</Badge>}
+                        <span className="text-[10px] text-muted-foreground font-mono">{k.id}</span>
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {k.categories.map((c) => (
+                          <span key={c} className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                            {catalog.categoryName(c)}
+                          </span>
+                        ))}
+                        {k.categories.length === 0 && (
+                          <span className="text-[10px] text-muted-foreground italic">Sin categorías</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {inUse > 0 && (
+                        <span className="text-[10px] text-muted-foreground">
+                          {inUse} máquina{inUse > 1 ? "s" : ""}
+                        </span>
+                      )}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="size-7"
+                        onClick={() => {
+                          setEditId(k.id);
+                          setEditName(k.name);
+                          setEditCats(k.categories);
+                        }}
+                      >
+                        <Pencil className="size-3" />
+                      </Button>
+                      {!k.builtin && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="size-7"
+                          onClick={() => {
+                            if (inUse > 0) {
+                              toast.error(
+                                `No se puede eliminar: ${inUse} máquina(s) usan este tipo. Reasigna esas máquinas primero.`,
+                              );
+                              return;
+                            }
+                            if (confirm(`¿Eliminar el tipo "${k.name}"?`)) remove.mutate(k.id);
+                          }}
+                        >
+                          <Trash2 className="size-3 text-destructive" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------- Categories ----------------
+
+function CategoriesSection() {
+  const qc = useQueryClient();
+  const catalog = useMachineCatalog();
+  const cats = useQuery({ queryKey: ["categories"], queryFn: listCategories });
+  const kinds = useQuery({ queryKey: ["machine-kinds"], queryFn: listMachineKinds });
+
+  const [newId, setNewId] = useState("");
+  const [newName, setNewName] = useState("");
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+
+  const create = useMutation({
+    mutationFn: () =>
+      createCategory({
+        id: newId.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, ""),
+        name: newName.trim(),
+      }),
+    onSuccess: () => {
+      toast.success("Categoría creada");
+      setNewId("");
+      setNewName("");
+      qc.invalidateQueries({ queryKey: ["categories"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const saveEdit = useMutation({
+    mutationFn: () => updateCategory(editId!, editName.trim()),
+    onSuccess: () => {
+      toast.success("Categoría actualizada");
+      setEditId(null);
+      qc.invalidateQueries({ queryKey: ["categories"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => deleteCategory(id),
+    onSuccess: () => {
+      toast.success("Categoría eliminada");
+      qc.invalidateQueries({ queryKey: ["categories"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const rows = cats.data ?? [];
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Layers className="size-4" /> Categorías de prueba
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Catálogo global de categorías. Al borrar una categoría se quita de todos los tipos que la usen; las
+          plantillas que la tengan conservan el texto, pero dejará de ofrecerse en el selector.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <form
+          className="flex flex-wrap items-end gap-2 rounded-md border bg-muted/30 p-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (newId.trim() && newName.trim()) create.mutate();
+          }}
+        >
+          <div className="space-y-1">
+            <Label className="text-xs">Identificador</Label>
+            <Input className="h-8 w-48" placeholder="brachy_dosimetric" value={newId} onChange={(e) => setNewId(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Nombre</Label>
+            <Input className="h-8 w-48" placeholder="Dosimétrico Braquiterapia" value={newName} onChange={(e) => setNewName(e.target.value)} />
+          </div>
+          <Button type="submit" size="sm" disabled={create.isPending}>
+            <Plus className="size-4" /> Añadir categoría
+          </Button>
+        </form>
+
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>ID</TableHead>
+              <TableHead>Nombre</TableHead>
+              <TableHead>Usada por</TableHead>
+              <TableHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((c) => {
+              const usedBy = (kinds.data ?? []).filter((k) => k.categories.includes(c.id));
+              return (
+                <TableRow key={c.id}>
+                  {editId === c.id ? (
+                    <>
+                      <TableCell className="text-xs font-mono">{c.id}</TableCell>
+                      <TableCell>
+                        <Input className="h-8" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {usedBy.map((k) => k.name).join(", ") || "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button size="icon" variant="ghost" className="size-7" onClick={() => saveEdit.mutate()} disabled={!editName.trim()}>
+                            <Check className="size-3" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="size-7" onClick={() => setEditId(null)}>
+                            <X className="size-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </>
+                  ) : (
+                    <>
+                      <TableCell className="text-xs font-mono">{c.id}</TableCell>
+                      <TableCell className="text-sm">
+                        {c.name}
+                        {c.builtin && <Badge variant="outline" className="ml-2 text-[9px]">Fábrica</Badge>}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {usedBy.map((k) => k.name).join(", ") || "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="size-7"
+                            onClick={() => {
+                              setEditId(c.id);
+                              setEditName(c.name);
+                            }}
+                          >
+                            <Pencil className="size-3" />
+                          </Button>
+                          {!c.builtin && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="size-7"
+                              onClick={() => {
+                                if (confirm(`¿Eliminar la categoría "${c.name}"?`)) remove.mutate(c.id);
+                              }}
+                            >
+                              <Trash2 className="size-3 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </>
+                  )}
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}

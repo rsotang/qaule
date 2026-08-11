@@ -32,7 +32,6 @@ export function testJsonFileName(test: TestDef): string {
 
 // ---------- parsing ----------
 
-const CATEGORIES = Object.keys(CATEGORY_LABELS) as Category[];
 const FREQUENCIES: Frequency[] = ["monthly", "quarterly", "semiannual", "annual"];
 
 function rid(prefix: string) {
@@ -157,7 +156,11 @@ function rootFromAny(value: unknown): Nest {
  * Accepts a full exported test, a bare TestDef, or a free-form nested object
  * describing the parameter tree.
  */
-export function parseTestJson(raw: string, current: TestDef): TestDef {
+export function parseTestJson(
+  raw: string,
+  current: TestDef,
+  validCategories: string[] = Object.keys(CATEGORY_LABELS),
+): TestDef {
   let data: unknown;
   try {
     data = JSON.parse(raw);
@@ -172,7 +175,7 @@ export function parseTestJson(raw: string, current: TestDef): TestDef {
   }
 
   const name = typeof obj.name === "string" && obj.name.trim() ? obj.name : current.name;
-  const category = CATEGORIES.includes(obj.category as Category)
+  const category = validCategories.includes(obj.category as string)
     ? (obj.category as Category)
     : current.category;
   const frequency = FREQUENCIES.includes(obj.frequency as Frequency)
