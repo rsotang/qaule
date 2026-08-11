@@ -101,61 +101,76 @@ function ImportsPage() {
   const imports = useQuery({ queryKey: ["imports-all"], queryFn: () => listImports() });
   const calendar = useQuery({ queryKey: ["calendar"], queryFn: getCalendar });
 
-  async function handleFile(file: File) {
-    try {
-      const machine = machines.data?.find((m) => m.id === machineId);
-      const templates = await listTemplates(machineId);
-      const tpl = templates.find((t) => t.id === machine?.activeTemplateId) ?? templates[0];
-      if (!tpl) {
-        toast.error(`No hay plantilla para ${machineId}. Crea una primero.`);
-        return;
-      }
-      const { parsed, hash } = await readFile(file);
-      const date = resolveImportDate(tpl, parsed) ?? new Date().toISOString().slice(0, 10);
-      const values = extractFromTemplate(tpl, parsed);
-      const rows = values.map((v) => {
-        const test = tpl.tests.find((t) => t.id === v.testId)!;
-        return {
-          testId: v.testId,
-          name: test.name,
-          cellLabel: v.cellLabel,
-          value: v.value,
-          inTol: v.value != null ? evaluateTolerance(v.parsedTolerance, v.value).inTolerance : null,
-        };
-      });
-      setPreview({ machineId, fileName: file.name, fileHash: hash, sourceDate: date, rows });
-    } catch (e) {
-      toast.error(`Error leyendo archivo: ${(e as Error).message}`);
+  async function handleFiles(files: File[]) {
+    const machine = machines.data?.find((m) => m.id === machineId);
+    const templates = await listTemplates(machineId);
+    const tpl = templates.find((t) => t.id === machine?.activeTemplateId) ?? templates[0];
+    if (!tpl) {
+      toast.error(`No hay plantilla para ${machineId}. Crea una primero.`);
+      return;
     }
+    const added: Preview[] = [];
+    for (const file of files) {
+      try {
+        const { parsed, hash } = await readFile(file);
+        const date = resolveImportDate(tpl, parsed) ?? new Date().toISOString().slice(0, 10);
+        const values = extractFromTemplate(tpl, parsed);
+        const rows = values
+          // no guardamos celdas vacías / N/A / errores de Excel
+          .filter((v) => v.value != null && Number.isFinite(v.value))
+          .map((v) => {
+            const test = tpl.tests.find((t) => t.id === v.testId)!;
+            return {
+              testId: v.testId,
+              name: test.name,
+              cellLabel: v.cellLabel,
+              value: v.value,
+              inTol: evaluateTolerance(v.parsedTolerance, v.value as number).inTolerance,
+            };
+          });
+        added.push({ machineId, fileName: file.name, fileHash: hash, sourceDate: date, rows });
+      } catch (e) {
+        toast.error(`${file.name}: ${(e as Error).message}`);
+      }
+    }
+    if (added.length === 0) return;
+    setPreviews((prev) => {
+      const seen = new Set(prev.map((p) => `${p.machineId}-${p.fileHash}`));
+      return [...prev, ...added.filter((p) => !seen.has(`${p.machineId}-${p.fileHash}`))];
+    });
   }
 
-  async function commitPreview() {
-    if (!preview) return;
-    const importId = `${preview.machineId}-${preview.fileHash.slice(0, 12)}`;
-    const measurements: Measurement[] = preview.rows
-      .filter((r) => r.value != null)
-      .map((r, idx) => ({
-        id: `${importId}:${r.testId}:${idx}`,
-        importId,
-        machineId: preview.machineId,
-        testId: r.testId,
-        cellLabel: r.cellLabel,
-        date: preview.sourceDate,
-        value: r.value as number,
-      }));
-    await saveImport(
-      {
-        id: importId,
-        machineId: preview.machineId,
-        fileName: preview.fileName,
-        importedAt: new Date().toISOString(),
-        sourceDate: preview.sourceDate,
-        fileHash: preview.fileHash,
-      },
-      measurements,
-    );
-    toast.success(`${measurements.length} medidas importadas`);
-    setPreview(null);
+  async function commitPreviews() {
+    if (previews.length === 0) return;
+    let total = 0;
+    for (const preview of previews) {
+      const importId = `${preview.machineId}-${preview.fileHash.slice(0, 12)}`;
+      const measurements: Measurement[] = preview.rows
+        .filter((r) => r.value != null && Number.isFinite(r.value))
+        .map((r, idx) => ({
+          id: `${importId}:${r.testId}:${idx}`,
+          importId,
+          machineId: preview.machineId,
+          testId: r.testId,
+          cellLabel: r.cellLabel,
+          date: preview.sourceDate,
+          value: r.value as number,
+        }));
+      await saveImport(
+        {
+          id: importId,
+          machineId: preview.machineId,
+          fileName: preview.fileName,
+          importedAt: new Date().toISOString(),
+          sourceDate: preview.sourceDate,
+          fileHash: preview.fileHash,
+        },
+        measurements,
+      );
+      total += measurements.length;
+    }
+    toast.success(`${total} medidas importadas de ${previews.length} archivo(s)`);
+    setPreviews([]);
     if (fileRef.current) fileRef.current.value = "";
     qc.invalidateQueries();
   }
