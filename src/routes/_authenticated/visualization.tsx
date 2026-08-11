@@ -643,13 +643,43 @@ interface SnapNode {
   children: Map<string, SnapNode>;
   value?: number;
   date?: string;
+  /** Template metadata for the leaf data point, if found. */
+  meta?: {
+    unit?: string;
+    tolerance?: string;
+    reference?: string;
+    inTolerance?: boolean;
+  };
 }
 
-function buildSnapTree(rows: Measurement[]): SnapNode {
+type MetaEntry = {
+  unit?: string;
+  tolerance?: string;
+  reference?: string;
+  parsedTolerance?: import("@/lib/qa/types").Tolerance;
+};
+
+function buildMetaMap(test: TestDef | undefined): Map<string, MetaEntry> {
+  const map = new Map<string, MetaEntry>();
+  if (!test) return map;
+  for (const w of walkDataPoints(test)) {
+    const label = dpSeriesLabel(w);
+    map.set(label, {
+      unit: displayTextOrRef(w.dp.unit, "").trim() || undefined,
+      tolerance: displayTextOrRef(w.dp.tolerance, "").trim() || undefined,
+      reference: displayTextOrRef(w.dp.reference, "").trim() || undefined,
+      parsedTolerance: w.dp.parsedTolerance,
+    });
+  }
+  return map;
+}
+
+function buildSnapTree(rows: Measurement[], metaMap: Map<string, MetaEntry>): SnapNode {
   const root: SnapNode = { name: "", children: new Map() };
   for (const m of rows) {
     const segs = m.cellLabel.split(" / ").map((s) => s.trim()).filter(Boolean);
     let cur = root;
+    const meta = metaMap.get(m.cellLabel);
     segs.forEach((seg, i) => {
       let next = cur.children.get(seg);
       if (!next) {
@@ -659,6 +689,15 @@ function buildSnapTree(rows: Measurement[]): SnapNode {
       if (i === segs.length - 1) {
         next.value = m.value;
         next.date = m.date;
+        if (meta) {
+          const ok = meta.parsedTolerance ? evaluateTolerance(meta.parsedTolerance, m.value).inTolerance : true;
+          next.meta = {
+            unit: meta.unit,
+            tolerance: meta.tolerance,
+            reference: meta.reference,
+            inTolerance: ok,
+          };
+        }
       }
       cur = next;
     });
@@ -677,15 +716,29 @@ function SnapBranch({ node, depth }: { node: SnapNode; depth: number }) {
     <ul className={depth === 0 ? "space-y-0.5" : "space-y-0.5 border-l pl-3"}>
       {[...node.children.values()].map((c) => (
         <li key={c.name}>
-          <div className="flex items-baseline justify-between gap-3 py-0.5">
-            <span className={c.children.size === 0 ? "text-xs" : "text-xs font-medium"}>{c.name}</span>
-            {c.value != null && (
-              <span className="font-mono text-xs tabular-nums text-primary">{fmtVal(c.value)}</span>
+          <div className="flex flex-col gap-0.5 py-0.5">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className={c.children.size === 0 ? "text-xs" : "text-xs font-medium"}>{c.name}</span>
+              {c.value != null && (
+                <span className={`font-mono text-xs tabular-nums ${c.meta && !c.meta.inTolerance ? "text-destructive" : "text-primary"}`}>
+                  {fmtVal(c.value)}
+                  {c.meta?.unit ? ` ${c.meta.unit}` : ""}
+                </span>
+              )}
+            </div>
+            {c.meta && (c.meta.tolerance || c.meta.reference) && (
+              <div className="flex flex-wrap gap-x-2 text-[10px] text-muted-foreground">
+                {c.meta.tolerance && <span>Tol: {c.meta.tolerance}</span>}
+                {c.meta.reference && <span>Ref: {c.meta.reference}</span>}
+              </div>
             )}
           </div>
           {c.children.size > 0 && <SnapBranch node={c} depth={depth + 1} />}
         </li>
       ))}
+    </ul>
+  );
+}
     </ul>
   );
 }
