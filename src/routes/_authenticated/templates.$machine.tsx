@@ -331,7 +331,7 @@ function TemplateEditor() {
         </Card>
 
         {/* Editor + picker */}
-        <div className="min-w-0 space-y-4">
+        <fieldset disabled={!isAdmin} className="min-w-0 space-y-4">
           {editingTest ? (
             <TestEditor
               test={editingTest}
@@ -344,12 +344,14 @@ function TemplateEditor() {
           ) : (
             <Card>
               <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                Selecciona o añade un test
+                Selecciona {isAdmin ? "o añade " : ""}un test
               </CardContent>
             </Card>
           )}
 
+          {isAdmin && (
           <Card>
+
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Selector de celdas</CardTitle>
