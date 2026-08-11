@@ -186,6 +186,7 @@ function TemplateEditor() {
   }
 
   function onPickCell(ref: { sheet: string; address: string }) {
+    if (!isAdmin) return;
     if (!editingTest || !target) {
       toast.info("Activa un destino (📍) antes de elegir celda");
       return;
@@ -248,19 +249,19 @@ function TemplateEditor() {
               </SelectContent>
             </Select>
           )}
+          <label className="cursor-pointer">
+            <input
+              type="file"
+              accept=".xlsm,.xlsx,.xls"
+              className="hidden"
+              onChange={(e) => e.target.files?.[0] && handleSampleFile(e.target.files[0])}
+            />
+            <Button variant="outline" asChild>
+              <span><Upload className="size-4" /> Archivo referencia</span>
+            </Button>
+          </label>
           {isAdmin ? (
             <>
-              <label className="cursor-pointer">
-                <input
-                  type="file"
-                  accept=".xlsm,.xlsx,.xls"
-                  className="hidden"
-                  onChange={(e) => e.target.files?.[0] && handleSampleFile(e.target.files[0])}
-                />
-                <Button variant="outline" asChild>
-                  <span><Upload className="size-4" /> Archivo referencia</span>
-                </Button>
-              </label>
               <Button variant="outline" onClick={handleAutoDetect} disabled={!parsed}>
                 <Wand2 className="size-4" /> Auto-detectar
               </Button>
@@ -331,31 +332,31 @@ function TemplateEditor() {
         </Card>
 
         {/* Editor + picker */}
-        <fieldset disabled={!isAdmin} className="min-w-0 space-y-4">
-          {editingTest ? (
-            <TestEditor
-              test={editingTest}
-              onChange={(patch) => patchTest(editingTest.id, (t) => ({ ...t, ...patch }))}
-              onTreeChange={(root) => patchTest(editingTest.id, (t) => ({ ...t, root }))}
-              onDelete={() => deleteTest(editingTest.id)}
-              target={target}
-              setTarget={setTarget}
-            />
-          ) : (
-            <Card>
-              <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                Selecciona {isAdmin ? "o añade " : ""}un test
-              </CardContent>
-            </Card>
-          )}
+        <div className="min-w-0 space-y-4">
+          <fieldset disabled={!isAdmin}>
+            {editingTest ? (
+              <TestEditor
+                test={editingTest}
+                onChange={(patch) => patchTest(editingTest.id, (t) => ({ ...t, ...patch }))}
+                onTreeChange={(root) => patchTest(editingTest.id, (t) => ({ ...t, root }))}
+                onDelete={() => deleteTest(editingTest.id)}
+                target={target}
+                setTarget={setTarget}
+              />
+            ) : (
+              <Card>
+                <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                  Selecciona {isAdmin ? "o añade " : ""}un test
+                </CardContent>
+              </Card>
+            )}
+          </fieldset>
 
-          {isAdmin && (
           <Card>
-
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Selector de celdas</CardTitle>
-                {target && (
+                <CardTitle className="text-base">Mapa de celdas</CardTitle>
+                {target && isAdmin && (
                   <Badge variant="default" className="gap-1 text-[10px]">
                     <Target className="size-3" /> {describeTarget(target, editingTest)}
                     <button onClick={() => setTarget(null)} className="ml-1">
@@ -366,10 +367,12 @@ function TemplateEditor() {
               </div>
               <p className="text-xs text-muted-foreground">
                 {parsed
-                  ? target
-                    ? "Haz clic en una celda para asignarla al destino activo"
-                    : "Activa un destino (📍) en el editor para empezar a asignar celdas"
-                  : "Carga un archivo .xlsm de referencia para empezar"}
+                  ? isAdmin
+                    ? target
+                      ? "Haz clic en una celda para asignarla al destino activo"
+                      : "Activa un destino (📍) en el editor para empezar a asignar celdas"
+                    : "Vista de solo lectura: las celdas asignadas en la plantilla están resaltadas"
+                  : "Carga un archivo .xlsm de referencia para ver el mapa de celdas"}
               </p>
             </CardHeader>
             <CardContent>
@@ -385,8 +388,7 @@ function TemplateEditor() {
               )}
             </CardContent>
           </Card>
-          )}
-        </fieldset>
+        </div>
 
       </div>
     </div>
