@@ -138,6 +138,23 @@ function resolveTolerance(
   return parseToleranceText(String(v));
 }
 
+/** Resolve a TextOrRef to its real value: text as-is, cellRef -> the cell's content. */
+export function resolveTextOrRef(v: TextOrRef | undefined, parsed: ParsedWorkbook, placeholder = ""): string {
+  if (!v) return placeholder;
+  if (v.kind === "text") return v.text || placeholder;
+  const raw = readCell(parsed, { sheet: v.sheet, address: v.address });
+  if (raw == null) return displayTextOrRef(v, placeholder);
+  const s = String(raw).trim();
+  return s || displayTextOrRef(v, placeholder);
+}
+
+/** Series label with cell references replaced by their workbook values. */
+export function resolvedSeriesLabel(w: WalkedDataPoint, parsed: ParsedWorkbook): string {
+  return [...w.path.map((p) => resolveTextOrRef(p, parsed, "?")), resolveTextOrRef(w.dp.name, parsed, "?")]
+    .filter(Boolean)
+    .join(" / ");
+}
+
 export function extractFromTemplate(template: Template, parsed: ParsedWorkbook): ExtractedValue[] {
   const out: ExtractedValue[] = [];
   for (const t of template.tests) {
@@ -146,7 +163,7 @@ export function extractFromTemplate(template: Template, parsed: ParsedWorkbook):
       out.push({
         testId: t.id,
         dataPointId: w.dp.id,
-        cellLabel: dpSeriesLabel(w),
+        cellLabel: resolvedSeriesLabel(w, parsed) || dpSeriesLabel(w),
         value,
         parsedTolerance: resolveTolerance(w.dp.tolerance, parsed) ?? w.dp.parsedTolerance,
       });
