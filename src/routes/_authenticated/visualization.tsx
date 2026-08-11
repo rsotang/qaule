@@ -880,18 +880,36 @@ function TestSnapshot({
                       <TableHead className="text-xs">Parámetro</TableHead>
                       <TableHead className="text-xs">Fecha</TableHead>
                       <TableHead className="text-right text-xs">Valor</TableHead>
+                      <TableHead className="text-xs">Unidad</TableHead>
+                      <TableHead className="text-xs">Tolerancia</TableHead>
+                      <TableHead className="text-xs">Referencia</TableHead>
+                      <TableHead className="text-center text-xs">Estado</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rows.map((m) => (
-                      <TableRow key={m.id}>
-                        <TableCell className="text-xs">{m.cellLabel}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{m.date}</TableCell>
-                        <TableCell className="text-right font-mono text-xs tabular-nums">
-                          {fmtVal(m.value)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {rows.map((m) => {
+                      const meta = metaMap.get(m.cellLabel);
+                      const ok = meta?.parsedTolerance ? evaluateTolerance(meta.parsedTolerance, m.value).inTolerance : true;
+                      return (
+                        <TableRow key={m.id}>
+                          <TableCell className="text-xs">{m.cellLabel}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{m.date}</TableCell>
+                          <TableCell className={`text-right font-mono text-xs tabular-nums ${ok ? "" : "text-destructive font-medium"}`}>
+                            {fmtVal(m.value)}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{meta?.unit ?? "—"}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{meta?.tolerance ?? "—"}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{meta?.reference ?? "—"}</TableCell>
+                          <TableCell className="text-center text-xs">
+                            {meta?.parsedTolerance && meta.parsedTolerance.type !== "none" ? (
+                              ok ? <span className="text-emerald-600">✓</span> : <span className="text-destructive">✗</span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
