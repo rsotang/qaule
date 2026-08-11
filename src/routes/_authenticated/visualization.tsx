@@ -739,9 +739,6 @@ function SnapBranch({ node, depth }: { node: SnapNode; depth: number }) {
     </ul>
   );
 }
-    </ul>
-  );
-}
 
 function TestSnapshot({
   measurements,
