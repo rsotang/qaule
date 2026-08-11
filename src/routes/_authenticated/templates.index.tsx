@@ -117,7 +117,7 @@ function TemplatesIndex() {
                           </span>
                         </div>
                         <div className="flex gap-1">
-                          {machine?.activeTemplateId !== t.id && (
+                          {isAdmin && machine?.activeTemplateId !== t.id && (
                             <Button
                               size="sm"
                               variant="ghost"
@@ -134,56 +134,69 @@ function TemplatesIndex() {
                           >
                             <Download className="size-4" />
                           </Button>
-                          <Button asChild size="sm" variant="ghost">
+                          <Button asChild size="sm" variant="ghost" title={isAdmin ? "Editar" : "Ver"}>
                             <Link to="/templates/$machine" params={{ machine: m.id }}>
-                              <Pencil className="size-4" />
+                              {isAdmin ? <Pencil className="size-4" /> : <Eye className="size-4" />}
                             </Link>
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleDelete(m.id, t.id, machine?.activeTemplateId === t.id)}
-                          >
-                            <Trash2 className="size-4 text-destructive" />
-                          </Button>
+                          {isAdmin && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDelete(m.id, t.id, machine?.activeTemplateId === t.id)}
+                            >
+                              <Trash2 className="size-4 text-destructive" />
+                            </Button>
+                          )}
                         </div>
                       </li>
                     ))}
                   </ul>
                 )}
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" className="flex-1" onClick={() => seedOne(m.id)}>
-                    <Plus className="size-4" /> Plantilla inicial
-                  </Button>
-                  <Button asChild size="sm" className="flex-1">
+                {isAdmin ? (
+                  <>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" className="flex-1" onClick={() => seedOne(m.id)}>
+                        <Plus className="size-4" /> Plantilla inicial
+                      </Button>
+                      <Button asChild size="sm" className="flex-1">
+                        <Link to="/templates/$machine" params={{ machine: m.id }}>
+                          Editar
+                        </Link>
+                      </Button>
+                    </div>
+                    <div>
+                      <input
+                        ref={(el) => {
+                          importInputs.current[m.id] = el;
+                        }}
+                        type="file"
+                        accept="application/json,.json"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) void handleImport(m.id, f);
+                          e.target.value = "";
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => importInputs.current[m.id]?.click()}
+                      >
+                        <Upload className="size-4" /> Importar JSON
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <Button asChild size="sm" variant="outline" className="w-full">
                     <Link to="/templates/$machine" params={{ machine: m.id }}>
-                      Editar
+                      <Eye className="size-4" /> Ver plantilla
                     </Link>
                   </Button>
-                </div>
-                <div>
-                  <input
-                    ref={(el) => {
-                      importInputs.current[m.id] = el;
-                    }}
-                    type="file"
-                    accept="application/json,.json"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) void handleImport(m.id, f);
-                      e.target.value = "";
-                    }}
-                  />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => importInputs.current[m.id]?.click()}
-                  >
-                    <Upload className="size-4" /> Importar JSON
-                  </Button>
-                </div>
+                )}
+
               </CardContent>
             </Card>
           );
