@@ -620,7 +620,7 @@ function ImportsPage() {
                       <TableHead>Máquina</TableHead>
                       <TableHead>Test</TableHead>
                       <TableHead>Programación</TableHead>
-                      <TableHead>Responsable</TableHead>
+                      <TableHead>Paciente · Curso · Plan</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -639,7 +639,9 @@ function ImportsPage() {
                             ...e.dates,
                           ].join(" · ") || "—"}
                         </TableCell>
-                        <TableCell className="text-xs">{e.performer ?? "—"}</TableCell>
+                        <TableCell className="text-xs">
+                          {[e.patientId, e.course, e.plan].filter(Boolean).join(" · ") || "—"}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
