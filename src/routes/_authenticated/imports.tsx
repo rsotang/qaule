@@ -72,7 +72,7 @@ interface Preview {
 function ImportsPage() {
   const qc = useQueryClient();
   const [machineId, setMachineId] = useState<MachineId>("TB1");
-  const [preview, setPreview] = useState<Preview | null>(null);
+  const [previews, setPreviews] = useState<Preview[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const calFileRef = useRef<HTMLInputElement>(null);
   const [calYear, setCalYear] = useState<number>(new Date().getFullYear());
