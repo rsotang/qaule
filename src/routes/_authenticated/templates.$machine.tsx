@@ -23,6 +23,8 @@ import { toast } from "sonner";
 import { CellPicker } from "@/components/qa/CellPicker";
 import { parseTestJson, testToJson, testJsonFileName } from "@/lib/qa/test-json";
 import { listTemplates, saveTemplate, setActiveTemplate } from "@/lib/qa/db";
+import { useIsAdmin } from "@/hooks/use-is-admin";
+
 
 import { readFile, type ParsedWorkbook } from "@/lib/qa/excel";
 import { autoBuildTemplate, buildSeedTemplate, cloneTemplateForMachine } from "@/lib/qa/seed";
