@@ -34,7 +34,7 @@ export function AppShell() {
 
   const links = (
     <>
-      <NavLink to="/" label="Resumen" />
+      <NavLink to="/" label="Panel QA" />
       <NavLink to="/visualization" icon={<LineChart className="size-4" />} label="Visualización" />
       <NavLink to="/imports" icon={<Upload className="size-4" />} label="Importaciones" />
       <NavLink to="/templates" icon={<Settings2 className="size-4" />} label="Plantillas" />
