@@ -694,6 +694,7 @@ function TestSnapshot({
   measurements: Measurement[];
   templates: Template[];
 }) {
+  const machineList = useMachineList();
   const [machineId, setMachineId] = useState<MachineId | "">("");
   const [testId, setTestId] = useState("");
   const [month, setMonth] = useState("");
