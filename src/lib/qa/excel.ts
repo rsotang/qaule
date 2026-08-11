@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
-import type { CellRef, Template, ToleranceValue, Tolerance } from "./types";
-import { walkDataPoints, dpSeriesLabel, parseToleranceText } from "./types";
+import type { CellRef, Template, ToleranceValue, Tolerance, TextOrRef, WalkedDataPoint } from "./types";
+import { walkDataPoints, dpSeriesLabel, parseToleranceText, displayTextOrRef } from "./types";
 
 export interface ParsedWorkbook {
   sheets: ParsedSheet[];
@@ -37,7 +37,7 @@ function parseSheet(name: string, ws: XLSX.WorkSheet): ParsedSheet {
       else if (cell.t === "e") row.push(null); // Excel error (#DIV/0!, #REF!, #N/A, etc.)
       else if (cell.v == null) row.push(null);
       else if (typeof cell.v === "string" && cell.v.trim() === "") row.push(null);
-      else if (typeof cell.v === "string" && /^#(DIV\/0!|REF!|N\/A|NAME\?|VALUE!|NULL!|NUM!|GETTING_DATA)$/i.test(cell.v.trim())) row.push(null);
+      else if (typeof cell.v === "string" && /^#?(DIV\/0!|REF!|N\s*\/\s*A|NA|NAME\?|VALUE!|NULL!|NUM!|GETTING_DATA)$/i.test(cell.v.trim())) row.push(null);
       else if (cell.v instanceof Date) row.push(cell.v.toISOString());
       else row.push(cell.v as string | number);
     }
@@ -138,6 +138,23 @@ function resolveTolerance(
   return parseToleranceText(String(v));
 }
 
+/** Resolve a TextOrRef to its real value: text as-is, cellRef -> the cell's content. */
+export function resolveTextOrRef(v: TextOrRef | undefined, parsed: ParsedWorkbook, placeholder = ""): string {
+  if (!v) return placeholder;
+  if (v.kind === "text") return v.text || placeholder;
+  const raw = readCell(parsed, { sheet: v.sheet, address: v.address });
+  if (raw == null) return displayTextOrRef(v, placeholder);
+  const s = String(raw).trim();
+  return s || displayTextOrRef(v, placeholder);
+}
+
+/** Series label with cell references replaced by their workbook values. */
+export function resolvedSeriesLabel(w: WalkedDataPoint, parsed: ParsedWorkbook): string {
+  return [...w.path.map((p) => resolveTextOrRef(p, parsed, "?")), resolveTextOrRef(w.dp.name, parsed, "?")]
+    .filter(Boolean)
+    .join(" / ");
+}
+
 export function extractFromTemplate(template: Template, parsed: ParsedWorkbook): ExtractedValue[] {
   const out: ExtractedValue[] = [];
   for (const t of template.tests) {
@@ -146,7 +163,7 @@ export function extractFromTemplate(template: Template, parsed: ParsedWorkbook):
       out.push({
         testId: t.id,
         dataPointId: w.dp.id,
-        cellLabel: dpSeriesLabel(w),
+        cellLabel: resolvedSeriesLabel(w, parsed) || dpSeriesLabel(w),
         value,
         parsedTolerance: resolveTolerance(w.dp.tolerance, parsed) ?? w.dp.parsedTolerance,
       });

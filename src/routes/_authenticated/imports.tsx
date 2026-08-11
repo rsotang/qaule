@@ -72,7 +72,7 @@ interface Preview {
 function ImportsPage() {
   const qc = useQueryClient();
   const [machineId, setMachineId] = useState<MachineId>("TB1");
-  const [preview, setPreview] = useState<Preview | null>(null);
+  const [previews, setPreviews] = useState<Preview[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const calFileRef = useRef<HTMLInputElement>(null);
   const [calYear, setCalYear] = useState<number>(new Date().getFullYear());
@@ -101,61 +101,76 @@ function ImportsPage() {
   const imports = useQuery({ queryKey: ["imports-all"], queryFn: () => listImports() });
   const calendar = useQuery({ queryKey: ["calendar"], queryFn: getCalendar });
 
-  async function handleFile(file: File) {
-    try {
-      const machine = machines.data?.find((m) => m.id === machineId);
-      const templates = await listTemplates(machineId);
-      const tpl = templates.find((t) => t.id === machine?.activeTemplateId) ?? templates[0];
-      if (!tpl) {
-        toast.error(`No hay plantilla para ${machineId}. Crea una primero.`);
-        return;
-      }
-      const { parsed, hash } = await readFile(file);
-      const date = resolveImportDate(tpl, parsed) ?? new Date().toISOString().slice(0, 10);
-      const values = extractFromTemplate(tpl, parsed);
-      const rows = values.map((v) => {
-        const test = tpl.tests.find((t) => t.id === v.testId)!;
-        return {
-          testId: v.testId,
-          name: test.name,
-          cellLabel: v.cellLabel,
-          value: v.value,
-          inTol: v.value != null ? evaluateTolerance(v.parsedTolerance, v.value).inTolerance : null,
-        };
-      });
-      setPreview({ machineId, fileName: file.name, fileHash: hash, sourceDate: date, rows });
-    } catch (e) {
-      toast.error(`Error leyendo archivo: ${(e as Error).message}`);
+  async function handleFiles(files: File[]) {
+    const machine = machines.data?.find((m) => m.id === machineId);
+    const templates = await listTemplates(machineId);
+    const tpl = templates.find((t) => t.id === machine?.activeTemplateId) ?? templates[0];
+    if (!tpl) {
+      toast.error(`No hay plantilla para ${machineId}. Crea una primero.`);
+      return;
     }
+    const added: Preview[] = [];
+    for (const file of files) {
+      try {
+        const { parsed, hash } = await readFile(file);
+        const date = resolveImportDate(tpl, parsed) ?? new Date().toISOString().slice(0, 10);
+        const values = extractFromTemplate(tpl, parsed);
+        const rows = values
+          // no guardamos celdas vacías / N/A / errores de Excel
+          .filter((v) => v.value != null && Number.isFinite(v.value))
+          .map((v) => {
+            const test = tpl.tests.find((t) => t.id === v.testId)!;
+            return {
+              testId: v.testId,
+              name: test.name,
+              cellLabel: v.cellLabel,
+              value: v.value,
+              inTol: evaluateTolerance(v.parsedTolerance, v.value as number).inTolerance,
+            };
+          });
+        added.push({ machineId, fileName: file.name, fileHash: hash, sourceDate: date, rows });
+      } catch (e) {
+        toast.error(`${file.name}: ${(e as Error).message}`);
+      }
+    }
+    if (added.length === 0) return;
+    setPreviews((prev) => {
+      const seen = new Set(prev.map((p) => `${p.machineId}-${p.fileHash}`));
+      return [...prev, ...added.filter((p) => !seen.has(`${p.machineId}-${p.fileHash}`))];
+    });
   }
 
-  async function commitPreview() {
-    if (!preview) return;
-    const importId = `${preview.machineId}-${preview.fileHash.slice(0, 12)}`;
-    const measurements: Measurement[] = preview.rows
-      .filter((r) => r.value != null)
-      .map((r, idx) => ({
-        id: `${importId}:${r.testId}:${idx}`,
-        importId,
-        machineId: preview.machineId,
-        testId: r.testId,
-        cellLabel: r.cellLabel,
-        date: preview.sourceDate,
-        value: r.value as number,
-      }));
-    await saveImport(
-      {
-        id: importId,
-        machineId: preview.machineId,
-        fileName: preview.fileName,
-        importedAt: new Date().toISOString(),
-        sourceDate: preview.sourceDate,
-        fileHash: preview.fileHash,
-      },
-      measurements,
-    );
-    toast.success(`${measurements.length} medidas importadas`);
-    setPreview(null);
+  async function commitPreviews() {
+    if (previews.length === 0) return;
+    let total = 0;
+    for (const preview of previews) {
+      const importId = `${preview.machineId}-${preview.fileHash.slice(0, 12)}`;
+      const measurements: Measurement[] = preview.rows
+        .filter((r) => r.value != null && Number.isFinite(r.value))
+        .map((r, idx) => ({
+          id: `${importId}:${r.testId}:${idx}`,
+          importId,
+          machineId: preview.machineId,
+          testId: r.testId,
+          cellLabel: r.cellLabel,
+          date: preview.sourceDate,
+          value: r.value as number,
+        }));
+      await saveImport(
+        {
+          id: importId,
+          machineId: preview.machineId,
+          fileName: preview.fileName,
+          importedAt: new Date().toISOString(),
+          sourceDate: preview.sourceDate,
+          fileHash: preview.fileHash,
+        },
+        measurements,
+      );
+      total += measurements.length;
+    }
+    toast.success(`${total} medidas importadas de ${previews.length} archivo(s)`);
+    setPreviews([]);
     if (fileRef.current) fileRef.current.value = "";
     qc.invalidateQueries();
   }
@@ -344,69 +359,98 @@ function ImportsPage() {
               </Select>
             </div>
             <div className="w-full space-y-1 sm:w-auto">
-              <label className="text-xs text-muted-foreground">Archivo .xlsm / .xlsx</label>
+              <label className="text-xs text-muted-foreground">Archivos .xlsm / .xlsx (varios)</label>
               <Input
                 ref={fileRef}
                 type="file"
+                multiple
                 accept=".xlsm,.xlsx,.xls"
-                onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+                onChange={(e) => {
+                  const fs = Array.from(e.target.files ?? []);
+                  if (fs.length) handleFiles(fs);
+                }}
                 className="w-full sm:w-[320px]"
               />
             </div>
           </div>
 
-          {preview && (
-            <div className="space-y-3 rounded-md border bg-muted/30 p-4">
+          {previews.length > 0 && (
+            <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-sm font-medium">{preview.fileName}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {preview.machineId} • fecha: {preview.sourceDate} •{" "}
-                    {preview.rows.filter((r) => r.value != null).length} valores extraídos
-                  </p>
-                </div>
+                <p className="text-xs text-muted-foreground">
+                  {previews.length} archivo(s) ·{" "}
+                  {previews.reduce((n, p) => n + p.rows.length, 0)} valores válidos
+                </p>
                 <div className="flex gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => setPreview(null)}>
+                  <Button variant="ghost" size="sm" onClick={() => setPreviews([])}>
                     Cancelar
                   </Button>
-                  <Button size="sm" onClick={commitPreview}>
-                    Confirmar importación
+                  <Button size="sm" onClick={commitPreviews}>
+                    Confirmar importación ({previews.length})
                   </Button>
                 </div>
               </div>
-              <div className="max-h-[300px] overflow-auto rounded border bg-background">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Máquina</TableHead>
-                      <TableHead>Test</TableHead>
-                      <TableHead>Serie</TableHead>
-                      <TableHead className="text-right">Valor</TableHead>
-                      <TableHead>Tol.</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {preview.rows.map((r, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="text-xs">{r.name}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{r.cellLabel}</TableCell>
-                        <TableCell className="text-right text-xs font-mono">
-                          {r.value == null ? <span className="text-muted-foreground">—</span> : r.value.toFixed(4)}
-                        </TableCell>
-                        <TableCell>
-                          {r.inTol === null ? (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          ) : r.inTol ? (
-                            <span className="text-xs text-green-600">✓</span>
-                          ) : (
-                            <span className="text-xs font-medium text-destructive">✗</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+
+              {previews.map((preview) => (
+                <div
+                  key={`${preview.machineId}-${preview.fileHash}`}
+                  className="space-y-3 rounded-md border bg-muted/30 p-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-medium">{preview.fileName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {preview.machineId} • fecha: {preview.sourceDate} • {preview.rows.length} valores extraídos
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setPreviews((prev) => prev.filter((p) => p.fileHash !== preview.fileHash))
+                      }
+                    >
+                      <Trash2 className="size-4 text-destructive" />
+                    </Button>
+                  </div>
+                  <div className="max-h-[300px] overflow-auto rounded border bg-background">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Test</TableHead>
+                          <TableHead>Serie</TableHead>
+                          <TableHead className="text-right">Valor</TableHead>
+                          <TableHead>Tol.</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {preview.rows.map((r, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="text-xs">{r.name}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{r.cellLabel}</TableCell>
+                            <TableCell className="text-right text-xs font-mono">
+                              {r.value == null ? (
+                                <span className="text-muted-foreground">—</span>
+                              ) : (
+                                r.value.toFixed(4)
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {r.inTol === null ? (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              ) : r.inTol ? (
+                                <span className="text-xs text-green-600">✓</span>
+                              ) : (
+                                <span className="text-xs font-medium text-destructive">✗</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
