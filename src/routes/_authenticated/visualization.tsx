@@ -773,6 +773,13 @@ function TestSnapshot({
     return [...set].sort().reverse();
   }, [measurements, machineId, testId]);
 
+  const selectedTest = useMemo(() => {
+    const tpl = templates.find((t) => t.machineId === machineId);
+    return tpl?.tests.find((t) => t.id === testId);
+  }, [templates, machineId, testId]);
+
+  const metaMap = useMemo(() => buildMetaMap(selectedTest), [selectedTest]);
+
   const rows = useMemo(
     () =>
       measurements
@@ -786,7 +793,7 @@ function TestSnapshot({
     [measurements, machineId, testId, month],
   );
 
-  const tree = useMemo(() => buildSnapTree(rows), [rows]);
+  const tree = useMemo(() => buildSnapTree(rows, metaMap), [rows, metaMap]);
   const testName = tests.find((t) => t.id === testId)?.name ?? testId;
 
   return (
