@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMachineList } from "@/hooks/use-machine-list";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -83,7 +84,7 @@ function TemplatesIndex() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        {MACHINES.map((m) => {
+        {machineList.map((m) => {
           const machine = machines.data?.find((x) => x.id === m.id);
           const machineTemplates = templates.data?.filter((t) => t.machineId === m.id) ?? [];
           return (

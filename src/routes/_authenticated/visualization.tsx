@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useMachineList } from "@/hooks/use-machine-list";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
@@ -411,7 +412,7 @@ function VisualizationPage() {
                       >
                         <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecciona máquina" /></SelectTrigger>
                         <SelectContent>
-                          {MACHINES.map((m) => (
+                          {machineList.map((m) => (
                             <SelectItem key={m.id} value={m.id}>{m.id} — {m.name}</SelectItem>
                           ))}
                         </SelectContent>
@@ -753,7 +754,7 @@ function TestSnapshot({
             >
               <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecciona máquina" /></SelectTrigger>
               <SelectContent>
-                {MACHINES.map((m) => (
+                {machineList.map((m) => (
                   <SelectItem key={m.id} value={m.id}>{m.id} — {m.name}</SelectItem>
                 ))}
               </SelectContent>
