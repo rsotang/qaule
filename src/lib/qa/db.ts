@@ -244,6 +244,46 @@ export async function listMeasurements(machineId?: string): Promise<Measurement[
   return all;
 }
 
+export type MeasurementFilter = {
+  machineId?: string;
+  importId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  search?: string;
+};
+
+/** Server-side filtered + paginated measurements (fast for large tables). */
+export async function queryMeasurements(
+  filter: MeasurementFilter,
+  page: number,
+  pageSize: number,
+): Promise<{ rows: Measurement[]; total: number }> {
+  let q = supabase
+    .from("measurements")
+    .select("*", { count: "exact" })
+    .order("machine_id")
+    .order("date", { ascending: false })
+    .order("cell_label")
+    .range(page * pageSize, page * pageSize + pageSize - 1);
+
+  if (filter.machineId) q = q.eq("machine_id", filter.machineId);
+  if (filter.importId) q = q.eq("import_id", filter.importId);
+  if (filter.dateFrom) q = q.gte("date", filter.dateFrom);
+  if (filter.dateTo) q = q.lte("date", filter.dateTo);
+  const s = filter.search?.trim();
+  if (s) {
+    const esc = s.replace(/[%,()]/g, " ");
+    q = q.or(`cell_label.ilike.%${esc}%,test_id.ilike.%${esc}%`);
+  }
+
+  const { data, error, count } = await q;
+  if (error) throw new Error(error.message);
+  return {
+    rows: ((data ?? []) as MeasurementRow[]).map(measurementFromRow),
+    total: count ?? 0,
+  };
+}
+
 export async function updateMeasurement(m: Measurement) {
   const { error } = await supabase.from("measurements").update(measurementToRow(m)).eq("id", m.id);
   if (error) throw new Error(error.message);
