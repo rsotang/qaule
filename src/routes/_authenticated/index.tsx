@@ -65,29 +65,47 @@ function Dashboard() {
     qc.invalidateQueries({ queryKey: ["machines"] });
   }
 
+  /** DB machines take priority; fall back to the seeded list when empty. */
+  const machineList = useMemo(() => {
+    const rows = machines.data ?? [];
+    const out = rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      kind: r.kind ?? (MACHINES.find((m) => m.id === r.id)?.kind ?? "other"),
+    }));
+    for (const m of MACHINES) if (!out.some((o) => o.id === m.id)) out.push({ ...m });
+    return out;
+  }, [machines.data]);
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold sm:text-2xl tracking-tight">Panel QA</h1>
-        <p className="text-sm text-muted-foreground">
-          Resumen del estado de las máquinas y de las últimas importaciones
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold sm:text-2xl tracking-tight">Panel QA</h1>
+          <p className="text-sm text-muted-foreground">
+            Resumen del estado de las máquinas y de las últimas importaciones
+          </p>
+        </div>
+        <NewMachineDialog onCreated={() => qc.invalidateQueries({ queryKey: ["machines"] })} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {MACHINES.map((m) => (
+        {machineList.map((m) => (
           <MachineCard
             key={m.id}
             machineId={m.id}
             machineName={m.name}
+            machineKind={m.kind as MachineKind}
             machine={machines.data?.find((x) => x.id === m.id)}
             templates={templates.data ?? []}
             imports={imports.data ?? []}
             measurements={measurements.data ?? []}
             onSetState={setState}
+            onDeleted={() => qc.invalidateQueries({ queryKey: ["machines"] })}
           />
         ))}
       </div>
+
 
       <MonthlySummary
         calendar={calendar.data}
