@@ -212,6 +212,7 @@ function DatabaseEditor({
   onOpenChange: (v: boolean) => void;
 }) {
   const qc = useQueryClient();
+  const machineList = useMachineList();
   const [machineId, setMachineId] = useState<MachineId | "all">("all");
   const [importId, setImportId] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState("");

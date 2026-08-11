@@ -110,6 +110,7 @@ function ImportsPage() {
 
 
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
+  const machineList = useMachineList();
   const imports = useQuery({ queryKey: ["imports-all"], queryFn: () => listImports() });
   const calendar = useQuery({ queryKey: ["calendar"], queryFn: getCalendar });
 

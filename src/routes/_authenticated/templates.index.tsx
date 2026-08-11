@@ -15,6 +15,7 @@ export const Route = createFileRoute("/_authenticated/templates/")({ component: 
 function TemplatesIndex() {
   const qc = useQueryClient();
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
+  const machineList = useMachineList();
   const templates = useQuery({ queryKey: ["templates-all"], queryFn: () => listTemplates() });
   const importInputs = useRef<Record<string, HTMLInputElement | null>>({});
 

@@ -160,6 +160,7 @@ function VisualizationPage() {
   const [showReference, setShowReference] = useState(true);
 
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
+  const machineList = useMachineList();
   const allTemplates = useQuery({ queryKey: ["templates-all"], queryFn: () => listTemplates() });
   const allMeasurements = useQuery({
     queryKey: ["measurements-all"],
