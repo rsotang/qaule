@@ -129,6 +129,7 @@ export type MachineState = "ok" | "warning" | "critical";
 export interface MachineRecord {
   id: MachineId;
   name: string;
+  kind?: MachineKind;
   activeTemplateId?: string;
   state?: MachineState;
   stateNote?: string;
