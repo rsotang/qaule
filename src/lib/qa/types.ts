@@ -489,3 +489,16 @@ export function calendarTaskId(ym: string, testName: string, machineId?: string)
   return machineId ? `${base}::${machineId.toLowerCase()}` : base;
 
 }
+
+/** Seeded machines plus any user-created ones from the database. */
+export function mergeMachineList(
+  rows?: { id: MachineId; name: string; kind?: MachineKind }[],
+): { id: MachineId; name: string; kind: MachineKind }[] {
+  const out = (rows ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    kind: (r.kind ?? MACHINES.find((m) => m.id === r.id)?.kind ?? "other") as MachineKind,
+  }));
+  for (const m of MACHINES) if (!out.some((o) => o.id === m.id)) out.push({ ...m });
+  return out;
+}
