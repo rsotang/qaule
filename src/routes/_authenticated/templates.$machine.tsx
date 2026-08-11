@@ -23,6 +23,8 @@ import { toast } from "sonner";
 import { CellPicker } from "@/components/qa/CellPicker";
 import { parseTestJson, testToJson, testJsonFileName } from "@/lib/qa/test-json";
 import { listTemplates, saveTemplate, setActiveTemplate } from "@/lib/qa/db";
+import { useIsAdmin } from "@/hooks/use-is-admin";
+
 
 import { readFile, type ParsedWorkbook } from "@/lib/qa/excel";
 import { autoBuildTemplate, buildSeedTemplate, cloneTemplateForMachine } from "@/lib/qa/seed";
@@ -79,6 +81,8 @@ function TemplateEditor() {
   const machineId = machine as MachineId;
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const isAdmin = useIsAdmin();
+
 
   const templates = useQuery({
     queryKey: ["templates", machineId],
@@ -244,27 +248,34 @@ function TemplateEditor() {
               </SelectContent>
             </Select>
           )}
-          <label className="cursor-pointer">
-            <input
-              type="file"
-              accept=".xlsm,.xlsx,.xls"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleSampleFile(e.target.files[0])}
-            />
-            <Button variant="outline" asChild>
-              <span><Upload className="size-4" /> Archivo referencia</span>
-            </Button>
-          </label>
-          <Button variant="outline" onClick={handleAutoDetect} disabled={!parsed}>
-            <Wand2 className="size-4" /> Auto-detectar
-          </Button>
-          <Button variant="outline" onClick={handleApplyToAll}>
-            <Copy className="size-4" /> Aplicar a todas
-          </Button>
-          <Button onClick={handleSave}>
-            <Save className="size-4" /> Guardar y activar
-          </Button>
+          {isAdmin ? (
+            <>
+              <label className="cursor-pointer">
+                <input
+                  type="file"
+                  accept=".xlsm,.xlsx,.xls"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && handleSampleFile(e.target.files[0])}
+                />
+                <Button variant="outline" asChild>
+                  <span><Upload className="size-4" /> Archivo referencia</span>
+                </Button>
+              </label>
+              <Button variant="outline" onClick={handleAutoDetect} disabled={!parsed}>
+                <Wand2 className="size-4" /> Auto-detectar
+              </Button>
+              <Button variant="outline" onClick={handleApplyToAll}>
+                <Copy className="size-4" /> Aplicar a todas
+              </Button>
+              <Button onClick={handleSave}>
+                <Save className="size-4" /> Guardar y activar
+              </Button>
+            </>
+          ) : (
+            <Badge variant="secondary" className="self-center">Solo lectura</Badge>
+          )}
         </div>
+
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
@@ -273,18 +284,23 @@ function TemplateEditor() {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Tests ({template.tests.length})</CardTitle>
-              <Button size="sm" variant="outline" onClick={addTest}>
-                <Plus className="size-4" /> Añadir
-              </Button>
+              {isAdmin && (
+                <Button size="sm" variant="outline" onClick={addTest}>
+                  <Plus className="size-4" /> Añadir
+                </Button>
+              )}
             </div>
             <div className="space-y-1 pt-2">
               <Label className="text-xs">Nombre plantilla</Label>
               <Input
                 value={template.name}
+                readOnly={!isAdmin}
+                disabled={!isAdmin}
                 onChange={(e) => setTemplate({ ...template, name: e.target.value })}
                 className="h-8 text-sm"
               />
             </div>
+
           </CardHeader>
           <CardContent className="space-y-2">
             {template.tests.map((t) => {
@@ -315,7 +331,7 @@ function TemplateEditor() {
         </Card>
 
         {/* Editor + picker */}
-        <div className="min-w-0 space-y-4">
+        <fieldset disabled={!isAdmin} className="min-w-0 space-y-4">
           {editingTest ? (
             <TestEditor
               test={editingTest}
@@ -328,12 +344,14 @@ function TemplateEditor() {
           ) : (
             <Card>
               <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                Selecciona o añade un test
+                Selecciona {isAdmin ? "o añade " : ""}un test
               </CardContent>
             </Card>
           )}
 
+          {isAdmin && (
           <Card>
+
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Selector de celdas</CardTitle>
@@ -367,7 +385,9 @@ function TemplateEditor() {
               )}
             </CardContent>
           </Card>
-        </div>
+          )}
+        </fieldset>
+
       </div>
     </div>
   );

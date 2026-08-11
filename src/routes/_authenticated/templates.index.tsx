@@ -8,12 +8,16 @@ import { listMachines, listTemplates, saveTemplate, setActiveTemplate, deleteTem
 import { MACHINES, type MachineId, type Template } from "@/lib/qa/types";
 import { buildSeedTemplate } from "@/lib/qa/seed";
 import { toast } from "sonner";
-import { Plus, Pencil, CheckCircle2, Trash2, Download, Upload } from "lucide-react";
+import { Plus, Pencil, CheckCircle2, Trash2, Download, Upload, Eye } from "lucide-react";
+import { useIsAdmin } from "@/hooks/use-is-admin";
+
 
 export const Route = createFileRoute("/_authenticated/templates/")({ component: TemplatesIndex });
 
 function TemplatesIndex() {
+  const isAdmin = useIsAdmin();
   const qc = useQueryClient();
+
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
   const machineList = useMachineList();
   const templates = useQuery({ queryKey: ["templates-all"], queryFn: () => listTemplates() });
@@ -117,7 +121,7 @@ function TemplatesIndex() {
                           </span>
                         </div>
                         <div className="flex gap-1">
-                          {machine?.activeTemplateId !== t.id && (
+                          {isAdmin && machine?.activeTemplateId !== t.id && (
                             <Button
                               size="sm"
                               variant="ghost"
@@ -134,56 +138,69 @@ function TemplatesIndex() {
                           >
                             <Download className="size-4" />
                           </Button>
-                          <Button asChild size="sm" variant="ghost">
+                          <Button asChild size="sm" variant="ghost" title={isAdmin ? "Editar" : "Ver"}>
                             <Link to="/templates/$machine" params={{ machine: m.id }}>
-                              <Pencil className="size-4" />
+                              {isAdmin ? <Pencil className="size-4" /> : <Eye className="size-4" />}
                             </Link>
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleDelete(m.id, t.id, machine?.activeTemplateId === t.id)}
-                          >
-                            <Trash2 className="size-4 text-destructive" />
-                          </Button>
+                          {isAdmin && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDelete(m.id, t.id, machine?.activeTemplateId === t.id)}
+                            >
+                              <Trash2 className="size-4 text-destructive" />
+                            </Button>
+                          )}
                         </div>
                       </li>
                     ))}
                   </ul>
                 )}
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" className="flex-1" onClick={() => seedOne(m.id)}>
-                    <Plus className="size-4" /> Plantilla inicial
-                  </Button>
-                  <Button asChild size="sm" className="flex-1">
+                {isAdmin ? (
+                  <>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" className="flex-1" onClick={() => seedOne(m.id)}>
+                        <Plus className="size-4" /> Plantilla inicial
+                      </Button>
+                      <Button asChild size="sm" className="flex-1">
+                        <Link to="/templates/$machine" params={{ machine: m.id }}>
+                          Editar
+                        </Link>
+                      </Button>
+                    </div>
+                    <div>
+                      <input
+                        ref={(el) => {
+                          importInputs.current[m.id] = el;
+                        }}
+                        type="file"
+                        accept="application/json,.json"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) void handleImport(m.id, f);
+                          e.target.value = "";
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => importInputs.current[m.id]?.click()}
+                      >
+                        <Upload className="size-4" /> Importar JSON
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <Button asChild size="sm" variant="outline" className="w-full">
                     <Link to="/templates/$machine" params={{ machine: m.id }}>
-                      Editar
+                      <Eye className="size-4" /> Ver plantilla
                     </Link>
                   </Button>
-                </div>
-                <div>
-                  <input
-                    ref={(el) => {
-                      importInputs.current[m.id] = el;
-                    }}
-                    type="file"
-                    accept="application/json,.json"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) void handleImport(m.id, f);
-                      e.target.value = "";
-                    }}
-                  />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => importInputs.current[m.id]?.click()}
-                  >
-                    <Upload className="size-4" /> Importar JSON
-                  </Button>
-                </div>
+                )}
+
               </CardContent>
             </Card>
           );
