@@ -10,10 +10,13 @@ import {
   getCalendar,
   listCalendarTasks,
   setCalendarTask,
+  createMachine,
+  deleteMachine,
 } from "@/lib/qa/db";
 
 import {
   MACHINES,
+  MACHINE_KIND_LABELS,
   walkDataPoints,
   calendarTaskId,
 
@@ -21,6 +24,7 @@ import {
   evaluateTolerance,
   type MachineId,
   type MachineState,
+  type MachineKind,
   type MachineRecord,
   type Template,
   type ImportRecord,
@@ -43,6 +47,105 @@ import {
 } from "@/components/ui/select";
 import { AlertTriangle, CheckCircle2, ShieldAlert, ChevronLeft, ChevronRight, CalendarDays, ChevronDown, ChevronUp } from "lucide-react";
 import { MachineGlyph } from "@/components/qa/MachineGlyph";
+import { toast } from "sonner";
+import { Plus, Trash2 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
+function NewMachineDialog({ onCreated }: { onCreated: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [id, setId] = useState("");
+  const [name, setName] = useState("");
+  const [kind, setKind] = useState<MachineKind>("linac");
+  const [saving, setSaving] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const cleanId = id.trim().toUpperCase().replace(/\s+/g, "");
+    if (!cleanId || !name.trim()) return;
+    setSaving(true);
+    try {
+      await createMachine({ id: cleanId, name: name.trim(), kind });
+      toast.success(`Máquina ${cleanId} creada`);
+      setId("");
+      setName("");
+      setKind("linac");
+      setOpen(false);
+      onCreated();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" className="gap-1.5">
+          <Plus className="size-4" /> Nueva máquina
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Nueva máquina</DialogTitle>
+        </DialogHeader>
+        <form className="space-y-3" onSubmit={submit}>
+          <div className="space-y-1.5">
+            <Label htmlFor="mid">Identificador</Label>
+            <Input
+              id="mid"
+              required
+              placeholder="TB4"
+              value={id}
+              onChange={(e) => setId(e.target.value)}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Código corto y único (se usa en importaciones, plantillas y calendario).
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="mname">Nombre</Label>
+            <Input
+              id="mname"
+              required
+              placeholder="TrueBeam 4"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Tipo de máquina</Label>
+            <Select value={kind} onValueChange={(v) => setKind(v as MachineKind)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(MACHINE_KIND_LABELS).map(([k, label]) => (
+                  <SelectItem key={k} value={k}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={saving}>
+              {saving ? "Creando…" : "Crear máquina"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export const Route = createFileRoute("/_authenticated/")({ component: Dashboard });
 
