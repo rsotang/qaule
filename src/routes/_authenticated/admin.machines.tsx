@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +44,7 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  listTemplates,
 } from "@/lib/qa/db";
 import { useMachineCatalog } from "@/hooks/use-machine-catalog";
 import { MACHINES, type MachineKind } from "@/lib/qa/types";
@@ -455,6 +456,8 @@ function CategoriesSection() {
   const catalog = useMachineCatalog();
   const cats = useQuery({ queryKey: ["categories"], queryFn: listCategories });
   const kinds = useQuery({ queryKey: ["machine-kinds"], queryFn: listMachineKinds });
+  const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
+  const templates = useQuery({ queryKey: ["templates-all"], queryFn: () => listTemplates() });
 
   const [newId, setNewId] = useState("");
   const [newName, setNewName] = useState("");
@@ -496,6 +499,23 @@ function CategoriesSection() {
   });
 
   const rows = cats.data ?? [];
+
+  // Máquinas concretas (y nº de plantillas) cuyas plantillas usan cada categoría.
+  const machinesByCategory = useMemo(() => {
+    const map = new Map<string, { machines: string[]; templates: number }>();
+    for (const t of templates.data ?? []) {
+      const machineId = t.machineId;
+      for (const test of t.tests) {
+        const cat = test.category;
+        if (!cat) continue;
+        const entry = map.get(cat) ?? { machines: [], templates: 0 };
+        if (!entry.machines.includes(machineId)) entry.machines.push(machineId);
+        entry.templates++;
+        map.set(cat, entry);
+      }
+    }
+    return map;
+  }, [templates.data]);
 
   return (
     <Card>
@@ -541,6 +561,10 @@ function CategoriesSection() {
           <TableBody>
             {rows.map((c) => {
               const usedBy = (kinds.data ?? []).filter((k) => k.categories.includes(c.id));
+              const inUse = machinesByCategory.get(c.id);
+              const machineNames = (inUse?.machines ?? [])
+                .map((mid) => machines.data?.find((m) => m.id === mid)?.name ?? mid)
+                .join(", ");
               return (
                 <TableRow key={c.id}>
                   {editId === c.id ? (
@@ -570,8 +594,15 @@ function CategoriesSection() {
                         {c.name}
                         {c.builtin && <Badge variant="outline" className="ml-2 text-[9px]">Fábrica</Badge>}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {usedBy.map((k) => k.name).join(", ") || "—"}
+                      <TableCell className="text-xs">
+                        <span className="block text-muted-foreground">
+                          {usedBy.map((k) => k.name).join(", ") || "—"}
+                        </span>
+                        {inUse && (
+                          <span className="mt-0.5 block text-[10px] text-muted-foreground/80">
+                            {inUse.templates} prueba{inUse.templates > 1 ? "s" : ""} en {machineNames}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
