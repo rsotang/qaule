@@ -748,6 +748,16 @@ function TreeNodeView({
   onDuplicate: (id: string) => void;
 }) {
   const [open, setOpen] = useState(true);
+  const MAX_DEPTH = 20;
+
+  if (depth > MAX_DEPTH) {
+    return (
+      <div className="rounded border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-[11px] text-muted-foreground">
+        Profundidad máxima alcanzada ({MAX_DEPTH} niveles)
+      </div>
+    );
+  }
+
   const pad = { paddingLeft: `${depth * 16}px` };
 
 
@@ -936,9 +946,15 @@ function TextOrRefField({
     <div className={`flex items-center gap-1 ${className ?? ""}`}>
       <button
         type="button"
-        onClick={() =>
-          onChange(isText ? { kind: "cellRef", sheet: "", address: "" } : textValue(""))
-        }
+        onClick={() => {
+          if (isText) {
+            onActivate();
+          } else {
+            onChange(textValue(
+              (v as { kind: "cellRef"; sheet: string; address: string }).address || ""
+            ));
+          }
+        }}
         className="rounded border bg-card p-1 text-muted-foreground hover:text-foreground"
         title={isText ? "Cambiar a celda" : "Cambiar a texto"}
       >
