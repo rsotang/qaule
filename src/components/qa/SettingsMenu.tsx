@@ -40,7 +40,6 @@ import {
   updateMeasurement,
 } from "@/lib/qa/db";
 import type { MachineId, Measurement } from "@/lib/qa/types";
-import { MACHINES } from "@/lib/qa/types";
 
 export function SettingsMenu() {
   const [open, setOpen] = useState(false);

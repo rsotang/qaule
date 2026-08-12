@@ -5,7 +5,7 @@ import { useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { listMachines, listTemplates, saveTemplate, setActiveTemplate, deleteTemplate, clearActiveTemplate, getTemplate } from "@/lib/qa/db";
-import { MACHINES, type MachineId, type Template } from "@/lib/qa/types";
+import { type MachineId, type Template } from "@/lib/qa/types";
 import { buildSeedTemplate } from "@/lib/qa/seed";
 import { toast } from "sonner";
 import { Plus, Pencil, CheckCircle2, Trash2, Download, Upload, Eye } from "lucide-react";

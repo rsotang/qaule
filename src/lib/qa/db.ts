@@ -192,8 +192,6 @@ export async function updateMachine(id: string, patch: { name?: string; kind?: s
 
 // ---------- machine kinds + category catalog ----------
 
-type MachineKindRow = { id: string; name: string; builtin: boolean };
-
 export async function listMachineKinds(): Promise<MachineKindDef[]> {
   const { data, error } = await supabase
     .from("machine_kinds")

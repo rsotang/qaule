@@ -15,7 +15,6 @@ import {
 } from "recharts";
 import { listMachines, listMeasurements, listTemplates } from "@/lib/qa/db";
 import {
-  MACHINES,
   displayTextOrRef,
   toleranceBand,
   evaluateTolerance,

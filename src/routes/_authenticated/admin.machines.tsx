@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,24 +36,22 @@ import {
   createMachine,
   updateMachine,
   deleteMachine,
-  listMachineKinds,
   createMachineKind,
   updateMachineKind,
   deleteMachineKind,
-  listCategories,
   createCategory,
   updateCategory,
   deleteCategory,
   listTemplates,
 } from "@/lib/qa/db";
 import { useMachineCatalog } from "@/hooks/use-machine-catalog";
-import { MACHINES, type MachineKind } from "@/lib/qa/types";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 
 export const Route = createFileRoute("/_authenticated/admin/machines")({ component: MachinesAdminPage });
 
 function MachinesAdminPage() {
   const { isAdmin } = useIsAdmin();
+  const catalog = useMachineCatalog();
   if (!isAdmin) {
     return (
       <Card>
@@ -74,9 +72,19 @@ function MachinesAdminPage() {
           Configura las máquinas, los tipos de máquina y las categorías de prueba de cada tipo.
         </p>
       </div>
+      {catalog.isError && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700">
+          <p className="font-medium">El catálogo de la base de datos no está disponible.</p>
+          <p className="mt-0.5 text-amber-700/80">
+            Se muestran los tipos y categorías de fábrica. Es posible que la migración de
+            "machine_kinds / categories" aún no se haya aplicado en Lovable Cloud; hasta entonces no
+            se pueden crear tipos ni categorías nuevos.
+          </p>
+        </div>
+      )}
       <MachinesSection />
-      <MachineKindsSection />
-      <CategoriesSection />
+      <MachineKindsSection catalogUnavailable={catalog.isError} />
+      <CategoriesSection catalogUnavailable={catalog.isError} />
     </div>
   );
 }
@@ -257,10 +265,9 @@ function MachinesSection() {
 
 // ---------------- Machine kinds ----------------
 
-function MachineKindsSection() {
+function MachineKindsSection({ catalogUnavailable }: { catalogUnavailable: boolean }) {
   const qc = useQueryClient();
   const catalog = useMachineCatalog();
-  const kinds = useQuery({ queryKey: ["machine-kinds"], queryFn: listMachineKinds });
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
 
   const [newId, setNewId] = useState("");
@@ -308,7 +315,7 @@ function MachineKindsSection() {
     setEditCats((prev) => (prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]));
   }
 
-  const rows = kinds.data ?? [];
+  const rows = catalog.kinds;
 
   return (
     <Card>
@@ -339,7 +346,7 @@ function MachineKindsSection() {
             <Label className="text-xs">Nombre</Label>
             <Input className="h-8 w-48" placeholder="Braquiterapia" value={newName} onChange={(e) => setNewName(e.target.value)} />
           </div>
-          <Button type="submit" size="sm" disabled={create.isPending}>
+          <Button type="submit" size="sm" disabled={create.isPending || catalogUnavailable}>
             <Plus className="size-4" /> Añadir tipo
           </Button>
         </form>
@@ -455,11 +462,9 @@ function MachineKindsSection() {
 
 // ---------------- Categories ----------------
 
-function CategoriesSection() {
+function CategoriesSection({ catalogUnavailable }: { catalogUnavailable: boolean }) {
   const qc = useQueryClient();
   const catalog = useMachineCatalog();
-  const cats = useQuery({ queryKey: ["categories"], queryFn: listCategories });
-  const kinds = useQuery({ queryKey: ["machine-kinds"], queryFn: listMachineKinds });
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
   const templates = useQuery({ queryKey: ["templates-all"], queryFn: () => listTemplates() });
 
@@ -502,7 +507,7 @@ function CategoriesSection() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const rows = cats.data ?? [];
+  const rows = catalog.categories;
 
   // Máquinas concretas (y nº de plantillas) cuyas plantillas usan cada categoría.
   const machinesByCategory = useMemo(() => {
@@ -550,7 +555,7 @@ function CategoriesSection() {
             <Label className="text-xs">Nombre</Label>
             <Input className="h-8 w-48" placeholder="Dosimétrico Braquiterapia" value={newName} onChange={(e) => setNewName(e.target.value)} />
           </div>
-          <Button type="submit" size="sm" disabled={create.isPending}>
+          <Button type="submit" size="sm" disabled={create.isPending || catalogUnavailable}>
             <Plus className="size-4" /> Añadir categoría
           </Button>
         </form>
@@ -566,7 +571,7 @@ function CategoriesSection() {
           </TableHeader>
           <TableBody>
             {rows.map((c) => {
-              const usedBy = (kinds.data ?? []).filter((k) => k.categories.includes(c.id));
+              const usedBy = catalog.kinds.filter((k) => k.categories.includes(c.id));
               const inUse = machinesByCategory.get(c.id);
               const machineNames = (inUse?.machines ?? [])
                 .map((mid) => machines.data?.find((m) => m.id === mid)?.name ?? mid)

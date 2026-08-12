@@ -57,7 +57,7 @@ import {
 } from "@/lib/qa/calendar-excel";
 import { CalendarMapper } from "@/components/qa/CalendarMapper";
 import type { MachineId, Measurement, CalendarEntry } from "@/lib/qa/types";
-import { MACHINES, evaluateTolerance } from "@/lib/qa/types";
+import { evaluateTolerance } from "@/lib/qa/types";
 
 const MAPPING_KEY = "qaule.calendarMapping";
 

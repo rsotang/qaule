@@ -208,7 +208,7 @@ export function TestChart({
               stroke={SERIES_COLORS[i % SERIES_COLORS.length]}
               strokeWidth={2}
               dot={false}
-              activeDot={(props) => {
+              activeDot={(props: unknown) => {
                 const { cx, cy, payload, key } = props as { cx?: number; cy?: number; payload: Record<string, unknown>; key?: string };
                 const v = payload[s.key];
                 if (cx == null || cy == null || typeof v !== "number") return <g key={key} />;
