@@ -70,7 +70,7 @@ function Dashboard() {
     qc.invalidateQueries({ queryKey: ["machines"] });
   }
 
-  /** DB machines take priority; fall back to the seeded list when empty. */
+  /** DB machines take priority; fall back to the seeded list when empty. Linacs first, then imaging, ct, other. */
   const machineList = useMemo(() => {
     const rows = machines.data ?? [];
     const out = rows.map((r) => ({
@@ -79,7 +79,11 @@ function Dashboard() {
       kind: r.kind ?? (MACHINES.find((m) => m.id === r.id)?.kind ?? "other"),
     }));
     for (const m of MACHINES) if (!out.some((o) => o.id === m.id)) out.push({ ...m });
-    return out;
+    const kindOrder: Record<string, number> = { linac: 0, imaging: 1, ct: 2, other: 3 };
+    return out.sort(
+      (a, b) =>
+        (kindOrder[a.kind] ?? 9) - (kindOrder[b.kind] ?? 9) || a.id.localeCompare(b.id),
+    );
   }, [machines.data]);
 
   return (
@@ -93,7 +97,7 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {machineList.map((m) => (
           <MachineCard
             key={m.id}
@@ -184,32 +188,32 @@ function MachineCard({
 
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2.5">
+      <CardHeader className="pb-1.5 pt-2.5">
+        <div className="flex items-start justify-between gap-1.5">
+          <div className="flex items-center gap-1.5">
             <MachineGlyph
               machineId={machineId}
               kind={machineKind}
-              className="h-20 w-24 shrink-0 rounded-md bg-primary/10 object-contain p-1.5"
+              className="h-14 w-16 shrink-0 rounded-md bg-primary/10 object-contain p-1"
             />
 
             <div>
-              <CardTitle className="text-sm">{machineId}</CardTitle>
-              <p className="text-xs text-muted-foreground">{machineName}</p>
+              <CardTitle className="text-xs">{machineId}</CardTitle>
+              <p className="text-[10px] text-muted-foreground">{machineName}</p>
               {machineKind && (
-                <p className="text-[10px] text-muted-foreground">{catalog.kindName(machineKind)}</p>
+                <p className="text-[9px] text-muted-foreground">{catalog.kindName(machineKind)}</p>
               )}
             </div>
           </div>
-          <div className="flex items-center gap-1">
-            <Badge variant="outline" className={`gap-1 ${meta.cls}`}>
-              <meta.Icon className="size-3" /> {meta.label}
+          <div className="flex items-center gap-0.5">
+            <Badge variant="outline" className={`gap-1 px-1.5 py-0 text-[9px] ${meta.cls}`}>
+              <meta.Icon className="size-2.5" /> {meta.label}
             </Badge>
             {isCustom && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-7"
+                className="size-6"
                 title="Eliminar máquina"
                 onClick={async () => {
                   if (!confirm(`¿Eliminar la máquina ${machineId}? Las plantillas y datos asociados dejarán de mostrarse.`)) return;
@@ -222,47 +226,47 @@ function MachineCard({
                   }
                 }}
               >
-                <Trash2 className="size-3.5 text-destructive" />
+                <Trash2 className="size-3 text-destructive" />
               </Button>
             )}
           </div>
         </div>
 
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-1.5 pt-1">
         <div>
-          <p className="text-[10px] uppercase text-muted-foreground">Plantilla activa</p>
-          <p className="text-sm font-medium">{tpl?.name ?? "—"}</p>
+          <p className="text-[9px] uppercase text-muted-foreground">Plantilla activa</p>
+          <p className="truncate text-xs font-medium">{tpl?.name ?? "—"}</p>
           {tpl ? (
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[10px] text-muted-foreground">
               {freq.total} tests · M:{freq.monthly} · T:{freq.quarterly} · S:{freq.semiannual} · A:{freq.annual}
             </p>
           ) : (
-            <Link to="/templates" className="text-[11px] text-primary underline">
+            <Link to="/templates" className="text-[10px] text-primary underline">
               Crear plantilla
             </Link>
           )}
         </div>
 
         <div>
-          <p className="text-[10px] uppercase text-muted-foreground">Última importación</p>
+          <p className="text-[9px] uppercase text-muted-foreground">Última importación</p>
           {lastImport ? (
             <>
-              <p className="text-sm font-medium">{lastImport.sourceDate}</p>
-              <p className="truncate text-[11px] text-muted-foreground">{lastImport.fileName}</p>
-              <p className={`text-[11px] font-medium ${ootCount > 0 ? "text-destructive" : "text-emerald-600"}`}>
+              <p className="text-xs font-medium">{lastImport.sourceDate}</p>
+              <p className="truncate text-[10px] text-muted-foreground">{lastImport.fileName}</p>
+              <p className={`text-[10px] font-medium ${ootCount > 0 ? "text-destructive" : "text-emerald-600"}`}>
                 {ootCount > 0 ? `${ootCount} fuera de tolerancia` : "Todo en tolerancia"}
               </p>
             </>
           ) : (
-            <p className="text-sm text-muted-foreground">Sin importaciones</p>
+            <p className="text-xs text-muted-foreground">Sin importaciones</p>
           )}
         </div>
 
         <div>
-          <p className="text-[10px] uppercase text-muted-foreground">Estado de la máquina</p>
+          <p className="text-[9px] uppercase text-muted-foreground">Estado de la máquina</p>
           <Select value={state} onValueChange={(v) => onSetState(machineId, v as MachineState)}>
-            <SelectTrigger className="h-8 text-xs">
+            <SelectTrigger className="h-7 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
