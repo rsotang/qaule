@@ -11,6 +11,7 @@ import {
 import type { CalendarMapping, Grid } from "@/lib/qa/calendar-excel";
 
 function colLetter(i: number): string {
+  if (typeof i !== "number" || isNaN(i) || i < 0) return "";
   let s = "";
   let n = i;
   do {

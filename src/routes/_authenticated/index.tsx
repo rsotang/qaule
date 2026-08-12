@@ -507,9 +507,13 @@ function MonthlySummary({
   }, [rows, taskById]);
 
   // Menús colapsados por defecto; el usuario expande los grupos que quiera ver
+  const groupsKey = useMemo(
+    () => groups.map((g) => g.key).join(","),
+    [groups],
+  );
   useEffect(() => {
     setExpanded(new Set());
-  }, [groups.map((g) => g.key).join(",")]);
+  }, [groupsKey]);
 
   function toggleGroup(key: string) {
     setExpanded((prev) => {

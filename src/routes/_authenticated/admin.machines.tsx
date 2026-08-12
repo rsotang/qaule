@@ -139,6 +139,8 @@ function MachinesSection() {
           className="flex flex-wrap items-end gap-2 rounded-md border bg-muted/30 p-3"
           onSubmit={(e) => {
             e.preventDefault();
+            const machineId = newId.trim().toUpperCase().replace(/\s+/g, "");
+            if (!machineId) { toast.error("El identificador no puede quedar vacío"); return; }
             if (newId.trim() && newName.trim()) create.mutate();
           }}
         >
@@ -324,6 +326,8 @@ function MachineKindsSection() {
           className="flex flex-wrap items-end gap-2 rounded-md border bg-muted/30 p-3"
           onSubmit={(e) => {
             e.preventDefault();
+            const kindId = newId.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+            if (!kindId) { toast.error("El identificador no puede quedar vacío"); return; }
             if (newId.trim() && newName.trim()) create.mutate();
           }}
         >
@@ -533,6 +537,8 @@ function CategoriesSection() {
           className="flex flex-wrap items-end gap-2 rounded-md border bg-muted/30 p-3"
           onSubmit={(e) => {
             e.preventDefault();
+            const catId = newId.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+            if (!catId) { toast.error("El identificador no puede quedar vacío"); return; }
             if (newId.trim() && newName.trim()) create.mutate();
           }}
         >

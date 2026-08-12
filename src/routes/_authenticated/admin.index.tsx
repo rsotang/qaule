@@ -18,6 +18,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Trash2, UserPlus } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { listUsers, createUser, deleteUser, setUserRole, meIsAdmin } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/")({ component: AdminPage });
@@ -120,7 +121,7 @@ function AdminPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="pw">Contraseña temporal</Label>
-              <Input id="pw" type="text" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
+              <Input id="pw" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
@@ -165,9 +166,16 @@ function AdminPage() {
                           {isAdmin ? <Badge>Admin</Badge> : <Badge variant="outline">User</Badge>}
                           <Switch
                             checked={isAdmin}
-                            onCheckedChange={(v) =>
-                              toggleAdmin.mutate({ userId: u.id, admin: v })
-                            }
+                            onCheckedChange={async (v) => {
+                              if (!v) {
+                                const { data: authData } = await supabase.auth.getUser();
+                                if (authData.user?.id === u.id) {
+                                  toast.error("No puedes quitarte a ti mismo el rol de administrador");
+                                  return;
+                                }
+                              }
+                              toggleAdmin.mutate({ userId: u.id, admin: v });
+                            }}
                           />
                         </div>
                       </TableCell>

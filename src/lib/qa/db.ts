@@ -125,7 +125,8 @@ function measurementToRow(m: Measurement) {
 
 function must<T>(data: T | null, error: { message: string } | null): T {
   if (error) throw new Error(error.message);
-  return data as T;
+  if (data == null) throw new Error("Unexpected: both data and error are null");
+  return data;
 }
 
 // ---------- machines ----------
@@ -302,10 +303,14 @@ export async function listImports(machineId?: string): Promise<ImportRecord[]> {
 }
 
 export async function saveImport(rec: ImportRecord, measurements: Measurement[]) {
-  // upsert import row (cascade-deletes existing measurements via FK on delete; but
-  // we want to replace, so explicitly clear old measurements for this import).
+  // Delete old measurements for this import first (from a previous import of
+  // the same file). Measurement IDs now include crypto.randomUUID() so they
+  // never collide with existing rows.
   const { error: delErr } = await supabase.from("measurements").delete().eq("import_id", rec.id);
   if (delErr) throw new Error(delErr.message);
+
+  // Upsert import row. If this fails no data is lost (old measurements already
+  // deleted, but the file can be re-imported).
   const { error: impErr } = await supabase.from("imports").upsert({
     id: rec.id,
     machine_id: rec.machineId,
@@ -315,13 +320,25 @@ export async function saveImport(rec: ImportRecord, measurements: Measurement[])
     file_hash: rec.fileHash,
   });
   if (impErr) throw new Error(impErr.message);
+
+  // Insert new measurements chunked. If insertion fails roll back the import
+  // row so the UI doesn't show a broken import — the user can re-import.
   if (measurements.length > 0) {
-    // chunk to keep payload small
     const rows = measurements.map(measurementToRow);
     const chunkSize = 500;
+    let inserted = 0;
     for (let i = 0; i < rows.length; i += chunkSize) {
       const { error } = await supabase.from("measurements").insert(rows.slice(i, i + chunkSize));
-      if (error) throw new Error(error.message);
+      if (error) {
+        // Best-effort compensation: remove the import row, then delete any
+        // measurements we already inserted.
+        await supabase.from("imports").delete().eq("id", rec.id);
+        if (inserted > 0) {
+          await supabase.from("measurements").delete().eq("import_id", rec.id);
+        }
+        throw new Error(error.message);
+      }
+      inserted += rows.slice(i, i + chunkSize).length;
     }
   }
 }
@@ -402,14 +419,26 @@ export async function deleteMeasurement(id: string) {
 }
 
 export async function clearAllData() {
-  // Keep machines (seeded), drop user data.
-  await supabase.from("measurements").delete().neq("id", "");
-  await supabase.from("imports").delete().neq("id", "");
-  await supabase.from("templates").delete().neq("id", "");
-  await supabase
+  const errs: string[] = [];
+
+  const { error: e1 } = await supabase.from("measurements").delete().neq("id", "");
+  if (e1) errs.push(`measurements: ${e1.message}`);
+
+  const { error: e2 } = await supabase.from("imports").delete().neq("id", "");
+  if (e2) errs.push(`imports: ${e2.message}`);
+
+  const { error: e3 } = await supabase.from("templates").delete().neq("id", "");
+  if (e3) errs.push(`templates: ${e3.message}`);
+
+  const { error: e4 } = await supabase
     .from("machines")
     .update({ active_template_id: null, state: null, state_note: null })
     .neq("id", "");
+  if (e4) errs.push(`machines: ${e4.message}`);
+
+  if (errs.length > 0) {
+    throw new Error(`No se pudieron eliminar todos los datos: ${errs.join("; ")}`);
+  }
 }
 
 // ---------- backup ----------
@@ -423,6 +452,13 @@ export async function exportAll() {
   };
 }
 export async function importAll(data: Awaited<ReturnType<typeof exportAll>>) {
+  if (!data || typeof data !== "object") {
+    throw new Error("Datos de importación no válidos: se esperaba un objeto");
+  }
+  if (!Array.isArray(data.machines) || !Array.isArray(data.templates) || !Array.isArray(data.imports) || !Array.isArray(data.measurements)) {
+    throw new Error("Datos de importación no válidos: faltan arrays requeridos (machines, templates, imports, measurements)");
+  }
+
   await clearAllData();
   for (const m of data.machines) {
     await supabase.from("machines").upsert({

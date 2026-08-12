@@ -161,7 +161,7 @@ function ImportsPage() {
       const measurements: Measurement[] = preview.rows
         .filter((r) => r.value != null && Number.isFinite(r.value))
         .map((r, idx) => ({
-          id: `${importId}:${r.testId}:${idx}`,
+          id: `${importId}:${r.testId}:${idx}:${crypto.randomUUID().slice(0, 8)}`,
           importId,
           machineId: preview.machineId,
           testId: r.testId,
