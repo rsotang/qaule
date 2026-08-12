@@ -296,15 +296,15 @@ export interface Measurement {
 // ---------- tree helpers ----------
 
 export function emptyNest(name = "raíz"): Nest {
-  return { id: `nest-${Math.random().toString(36).slice(2, 9)}`, kind: "nest", name: textValue(name), children: [] };
+  return { id: `nest-${crypto.randomUUID().slice(0, 7)}`, kind: "nest", name: textValue(name), children: [] };
 }
 
 export function newNest(name = "Nuevo grupo"): Nest {
-  return { id: `nest-${Math.random().toString(36).slice(2, 9)}`, kind: "nest", name: textValue(name), children: [] };
+  return { id: `nest-${crypto.randomUUID().slice(0, 7)}`, kind: "nest", name: textValue(name), children: [] };
 }
 
 export function newDataPoint(name = "Nuevo dato"): DataPoint {
-  return { id: `dp-${Math.random().toString(36).slice(2, 9)}`, kind: "data", name: textValue(name) };
+  return { id: `dp-${crypto.randomUUID().slice(0, 7)}`, kind: "data", name: textValue(name) };
 }
 
 export interface WalkedDataPoint {
@@ -379,7 +379,7 @@ export function removeNode(root: Nest, id: string): Nest {
 export function cloneNodeDeep(node: TreeNode): TreeNode {
   if (node.kind === "nest") {
     return {
-      id: `nest-${Math.random().toString(36).slice(2, 9)}`,
+      id: `nest-${crypto.randomUUID().slice(0, 7)}`,
       kind: "nest",
       name: node.name,
       children: node.children.map(cloneNodeDeep),
@@ -387,7 +387,7 @@ export function cloneNodeDeep(node: TreeNode): TreeNode {
   }
   return {
     ...node,
-    id: `dp-${Math.random().toString(36).slice(2, 9)}`,
+    id: `dp-${crypto.randomUUID().slice(0, 7)}`,
     cell: node.cell ? { ...node.cell } : undefined,
   };
 }
@@ -522,16 +522,23 @@ export function listNestTargets(root: Nest, excludeId: string): { id: string; la
 export function parseToleranceText(text: string): Tolerance {
   const t = text.trim().replace(",", ".");
   if (!t) return { type: "none" };
-  const pm = t.match(/^[±+\-]?\s*(\d+(?:\.\d+)?)$/);
+
+  // "nominal ± delta"  →  { type: "pm", nominal, delta }
+  const pmFull = t.match(/^(-?\d+(?:\.\d+)?)\s*[±+\-]\s*(\d+(?:\.\d+)?)$/);
+  if (pmFull) return { type: "pm", nominal: parseFloat(pmFull[1]), delta: parseFloat(pmFull[2]) };
+
+  // "min - max" or "min a max"
   const range = t.match(/^(-?\d+(?:\.\d+)?)\s*[-–a]\s*(-?\d+(?:\.\d+)?)$/i);
-  const le = t.match(/^[≤<]=?\s*(\d+(?:\.\d+)?)$/);
   if (range) return { type: "range", min: parseFloat(range[1]), max: parseFloat(range[2]) };
+
+  // "< 5" or "≤ 5"
+  const le = t.match(/^[≤<]=?\s*(\d+(?:\.\d+)?)$/);
   if (le) return { type: "abs", delta: parseFloat(le[1]) };
-  if (t.startsWith("±")) {
-    const n = parseFloat(t.slice(1));
-    if (isFinite(n)) return { type: "abs", delta: n };
-  }
-  if (pm) return { type: "abs", delta: parseFloat(pm[1]) };
+
+  // "±5" or plain "5"
+  const pmSimple = t.match(/^[±+\-]?\s*(\d+(?:\.\d+)?)$/);
+  if (pmSimple) return { type: "abs", delta: parseFloat(pmSimple[1]) };
+
   return { type: "none" };
 }
 

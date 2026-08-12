@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -101,9 +101,11 @@ function TemplateEditor() {
   const [parsed, setParsed] = useState<ParsedWorkbook | null>(null);
   const [editingTestId, setEditingTestId] = useState<string | null>(null);
   const [target, setTarget] = useState<TargetSlot | null>(null);
+  const seededRef = useRef(false);
 
   useEffect(() => {
-    if (template || !templates.data) return;
+    if (seededRef.current || !templates.data) return;
+    seededRef.current = true;
     if (templates.data.length > 0) {
       setTemplate(templates.data[0]);
     } else {
@@ -111,7 +113,7 @@ function TemplateEditor() {
       seed.id = `tpl-${machineId}-${Date.now()}`;
       setTemplate(seed);
     }
-  }, [templates.data, machineId, template]);
+  }, [templates.data, machineId]);
 
   const editingTest = template?.tests.find((t) => t.id === editingTestId) ?? null;
 

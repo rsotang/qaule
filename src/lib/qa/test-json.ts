@@ -35,7 +35,7 @@ export function testJsonFileName(test: TestDef): string {
 const FREQUENCIES: Frequency[] = ["monthly", "quarterly", "semiannual", "annual"];
 
 function rid(prefix: string) {
-  return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
+  return `${prefix}-${crypto.randomUUID().slice(0, 7)}`;
 }
 
 function asTextOrRef(v: unknown, fallback: string): TextOrRef {

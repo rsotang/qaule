@@ -1,7 +1,8 @@
 import * as XLSX from "xlsx";
 import type { Category, MachineId, Template, TestDef, Nest, DataPoint } from "./types";
-import { emptyNest, textValue } from "./types";
+import { emptyNest, textValue, cloneNodeDeep } from "./types";
 import type { ParsedSheet, ParsedWorkbook } from "./excel";
+import { autoDetectDateCell } from "./excel";
 
 
 const TEST_CODE_RE = /\b([A-ZÁÉÍÓÚÑ]{2,6})\s+(\d+(?:\.\d+){1,3})\b/;
@@ -70,7 +71,7 @@ export function autoBuildTemplate(parsed: ParsedWorkbook, machineId: MachineId):
         const cleanName = v.replace(/\s+/g, " ").trim().slice(0, 120);
         const root: Nest = emptyNest("raíz");
         root.children = valueCells.map((cc, i): DataPoint => ({
-          id: `dp-${counter}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+          id: `dp-${counter}-${i}-${crypto.randomUUID().slice(0, 6)}`,
           kind: "data",
           name: textValue(cc.label),
           cell: { sheet: sheet.name, address: cc.address },
@@ -91,22 +92,11 @@ export function autoBuildTemplate(parsed: ParsedWorkbook, machineId: MachineId):
 
   let defaultDateCell: Template["defaultDateCell"];
   for (const sheet of parsed.sheets) {
-    for (let r = 0; r < sheet.rows; r++) {
-      for (let c = 0; c < sheet.cols; c++) {
-        const v = sheet.cells[r][c];
-        if (typeof v === "string" && /fecha/i.test(v)) {
-          for (let cc = c + 1; cc < Math.min(sheet.cols, c + 5); cc++) {
-            if (sheet.cells[r][cc] != null) {
-              defaultDateCell = { sheet: sheet.name, address: XLSX.utils.encode_cell({ r, c: cc }) };
-              break;
-            }
-          }
-        }
-        if (defaultDateCell) break;
-      }
-      if (defaultDateCell) break;
+    const detected = autoDetectDateCell(sheet);
+    if (detected) {
+      defaultDateCell = detected;
+      break;
     }
-    if (defaultDateCell) break;
   }
 
   return {
@@ -131,23 +121,6 @@ export function buildSeedTemplate(machineId: MachineId): Template {
   };
 }
 
-function cloneNest(n: Nest): Nest {
-  return {
-    id: `nest-${Math.random().toString(36).slice(2, 9)}`,
-    kind: "nest",
-    name: n.name,
-    children: n.children.map((c) =>
-      c.kind === "nest"
-        ? cloneNest(c)
-        : {
-            ...c,
-            id: `dp-${Math.random().toString(36).slice(2, 9)}`,
-            cell: c.cell ? { ...c.cell } : undefined,
-          },
-    ),
-  };
-}
-
 export function cloneTemplateForMachine(src: Template, machineId: MachineId): Template {
   return {
     id: `tpl-${machineId}-${Date.now()}`,
@@ -165,7 +138,7 @@ export function cloneTemplateForMachine(src: Template, machineId: MachineId): Te
         date: t.admin?.date ? { ...t.admin.date } : undefined,
         performers: t.admin?.performers?.map((p) => ({ ...p })),
       },
-      root: cloneNest(t.root),
+      root: cloneNodeDeep(t.root) as Nest,
     })),
   };
 }

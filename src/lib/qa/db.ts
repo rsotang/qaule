@@ -564,52 +564,23 @@ export async function setCalendarTask(
 ): Promise<void> {
   const { data: auth } = await supabase.auth.getUser();
   const user = auth.user;
+  if (!user) throw new Error("No hay sesión activa");
   const id = calendarTaskId(ym, testName, machineId);
 
-  // Fetch existing row to merge booleans and metadata
-  const { data: existing } = await supabase.from("calendar_tasks").select("*").eq("id", id).maybeSingle();
-  const prev = existing as CalendarTaskRow | null;
+  const userId = user.id;
+  const userName = (user.user_metadata?.display_name as string | undefined) ?? user.email ?? null;
+  const now = new Date().toISOString();
 
-  const measured = fields.measured ?? prev?.measured ?? false;
-  const analyzed = fields.analyzed ?? prev?.analyzed ?? false;
-  const done = measured && analyzed;
-
-  const measuredBy = measured ? (user?.id ?? prev?.measured_by ?? null) : null;
-  const measuredByName = measured
-    ? ((user?.user_metadata?.display_name as string | undefined) ?? user?.email ?? prev?.measured_by_name ?? null)
-    : null;
-  const measuredAt = measured ? (prev?.measured_at ?? new Date().toISOString()) : null;
-
-  const analyzedBy = analyzed ? (user?.id ?? prev?.analyzed_by ?? null) : null;
-  const analyzedByName = analyzed
-    ? ((user?.user_metadata?.display_name as string | undefined) ?? user?.email ?? prev?.analyzed_by_name ?? null)
-    : null;
-  const analyzedAt = analyzed ? (prev?.analyzed_at ?? new Date().toISOString()) : null;
-
-  const completedBy = done ? (user?.id ?? prev?.completed_by ?? null) : null;
-  const completedByName = done
-    ? ((user?.user_metadata?.display_name as string | undefined) ?? user?.email ?? prev?.completed_by_name ?? null)
-    : null;
-  const completedAt = done ? (prev?.completed_at ?? new Date().toISOString()) : null;
-
-  const { error } = await supabase.from("calendar_tasks").upsert({
-    id,
-    ym,
-    test_name: testName,
-    done,
-    measured,
-    measured_by: measuredBy,
-    measured_by_name: measuredByName,
-    measured_at: measuredAt,
-    analyzed,
-    analyzed_by: analyzedBy,
-    analyzed_by_name: analyzedByName,
-    analyzed_at: analyzedAt,
-    completed_by: completedBy,
-    completed_by_name: completedByName,
-    completed_at: completedAt,
-    note: fields.note ?? prev?.note ?? null,
-    updated_at: new Date().toISOString(),
+  const { error } = await supabase.rpc("upsert_calendar_task", {
+    p_id: id,
+    p_ym: ym,
+    p_test_name: testName,
+    p_measured: fields.measured ?? null,
+    p_analyzed: fields.analyzed ?? null,
+    p_note: fields.note ?? null,
+    p_user_id: userId,
+    p_user_name: userName,
+    p_now: now,
   });
   if (error) throw new Error(error.message);
 }
