@@ -294,7 +294,12 @@ function DatabaseEditor({
 
   async function saveRow(m: Measurement) {
     const d = draftFor(m);
-    const v = parseFloat(d.value.replace(",", "."));
+    const cleaned = d.value.trim();
+    let v = parseFloat(cleaned);
+    if (!isFinite(v)) {
+      // try European format: "1.234,56" → remove thousand dots → replace decimal comma
+      v = parseFloat(cleaned.replace(/\./g, "").replace(",", "."));
+    }
     if (!isFinite(v)) {
       toast.error("Valor no numérico");
       return;

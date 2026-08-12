@@ -119,23 +119,3 @@ function NavLink({ to, icon, label }: { to: string; icon?: React.ReactNode; labe
   );
 }
 
-function RadiationIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="2" />
-      <path d="M12 7a8.4 8.4 0 0 1 4.2 1.1l3.4-5.9A13.7 13.7 0 0 0 12 1v6Z" />
-      <path d="M7.8 8.1A8.4 8.4 0 0 1 12 7V1a13.7 13.7 0 0 0-7.6 3.2l3.4 5.9Z" />
-      <path d="M4.4 14a8.4 8.4 0 0 1 0-3.9l-5.9-3.4A13.7 13.7 0 0 0 1 12a13.7 13.7 0 0 0 2.5 5.4l5.9-3.4Z" />
-    </svg>
-  );
-}
-

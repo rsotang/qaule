@@ -99,7 +99,7 @@ export function TestChart({
           }),
         )
       : data;
-    for (const row of data) {
+    for (const row of filteredData) {
       for (const s of series) {
         const v = row[s.key];
         if (typeof v === "number" && !evaluateTolerance(s.tol, v).inTolerance) hasOOT = true;
@@ -207,7 +207,8 @@ export function TestChart({
               dataKey={s.key}
               stroke={SERIES_COLORS[i % SERIES_COLORS.length]}
               strokeWidth={2}
-              dot={(props) => {
+              dot={false}
+              activeDot={(props) => {
                 const { cx, cy, payload, key } = props as { cx?: number; cy?: number; payload: Record<string, unknown>; key?: string };
                 const v = payload[s.key];
                 if (cx == null || cy == null || typeof v !== "number") return <g key={key} />;
@@ -235,10 +236,4 @@ export function TestChart({
       )}
     </div>
   );
-}
-
-function formatNum(v: number) {
-  if (Math.abs(v) >= 100) return v.toFixed(1);
-  if (Math.abs(v) >= 1) return v.toFixed(2);
-  return v.toFixed(3);
 }
