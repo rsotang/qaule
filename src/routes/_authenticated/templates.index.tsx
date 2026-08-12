@@ -15,7 +15,7 @@ import { useIsAdmin } from "@/hooks/use-is-admin";
 export const Route = createFileRoute("/_authenticated/templates/")({ component: TemplatesIndex });
 
 function TemplatesIndex() {
-  const isAdmin = useIsAdmin();
+  const { isAdmin } = useIsAdmin();
   const qc = useQueryClient();
 
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
@@ -51,12 +51,15 @@ function TemplatesIndex() {
     if (!t) return;
     const blob = new Blob([JSON.stringify(t, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${t.machineId}-${t.name.replace(/\s+/g, "_")}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Plantilla exportada");
+    try {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${t.machineId}-${t.name.replace(/\s+/g, "_")}.json`;
+      a.click();
+      toast.success("Plantilla exportada");
+    } finally {
+      URL.revokeObjectURL(url);
+    }
   }
 
   async function handleImport(machineId: MachineId, file: File) {

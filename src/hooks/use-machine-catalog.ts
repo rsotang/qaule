@@ -46,6 +46,8 @@ export function useMachineCatalog() {
     kinds,
     categories,
     isLoading: kindsQuery.isLoading || catsQuery.isLoading,
+    isError: kindsQuery.isError || catsQuery.isError,
+    error: (kindsQuery.error ?? catsQuery.error) as Error | null,
     kindById: (id: MachineKind | undefined) => kinds.find((k) => k.id === id),
     categoriesFor: (kind: MachineKind | undefined): Category[] =>
       categoriesForKind(kind, kinds, categories),

@@ -63,11 +63,14 @@ const MAPPING_KEY = "qaule.calendarMapping";
 
 function downloadText(text: string, filename: string) {
   const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  try {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 
@@ -198,11 +201,14 @@ function ImportsPage() {
     const data = await exportAll();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `qa-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `qa-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+    } finally {
+      URL.revokeObjectURL(url);
+    }
   }
 
   async function handleRestore(file: File) {

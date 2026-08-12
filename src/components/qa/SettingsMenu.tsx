@@ -54,12 +54,15 @@ export function SettingsMenu() {
     const data = await exportAll();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `qa-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Backup descargado");
+    try {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `qa-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      toast.success("Backup descargado");
+    } finally {
+      URL.revokeObjectURL(url);
+    }
   }
 
   async function handleRestore(file: File) {

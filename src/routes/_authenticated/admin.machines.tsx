@@ -53,7 +53,7 @@ import { useIsAdmin } from "@/hooks/use-is-admin";
 export const Route = createFileRoute("/_authenticated/admin/machines")({ component: MachinesAdminPage });
 
 function MachinesAdminPage() {
-  const isAdmin = useIsAdmin();
+  const { isAdmin } = useIsAdmin();
   if (!isAdmin) {
     return (
       <Card>

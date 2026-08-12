@@ -3,7 +3,7 @@ export type MachineId = string;
 
 export type MachineKind = "linac" | "imaging" | "ct" | "other" | (string & {});
 
-export const MACHINE_KIND_LABELS: Record<MachineKind, string> = {
+export const MACHINE_KIND_LABELS: Partial<Record<MachineKind, string>> = {
   linac: "Acelerador lineal",
   imaging: "Sistema de imagen",
   ct: "TC / Simulador",
@@ -47,6 +47,59 @@ export const BUILTIN_CATEGORIES: CategoryDef[] = [
   { id: "image_quality_cbct", name: "Calidad Imagen CBCT", builtin: true },
   { id: "image_sgrt", name: "QC SGRT", builtin: true },
 ];
+
+export const CATEGORY_LABELS: Partial<Record<Category, string>> = {
+  mechanical_unit: "Mecánico Unidad",
+  mechanical_table: "Mecánico Mesa",
+  geometric: "Geométrico Haz",
+  mlc: "MLC",
+  dosimetric_photon: "Dosimétrico Fotones",
+  dosimetric_electron: "Dosimétrico Electrones",
+  monitor_system: "Sistema Monitor",
+  image_geometry: "Geometría",
+  image_registration: "Sistema de Registro",
+  image_quality_mv: "Calidad Imagen MV",
+  image_quality_cbct: "Calidad Imagen CBCT",
+  image_sgrt: "QC SGRT",
+};
+
+/** Categorías disponibles según el tipo de máquina (los sistemas de imagen no comparten las de los aceleradores). */
+export const CATEGORIES_BY_KIND: Partial<Record<MachineKind, Category[]>> = {
+  linac: [
+    "mechanical_unit",
+    "mechanical_table",
+    "geometric",
+    "mlc",
+    "dosimetric_photon",
+    "dosimetric_electron",
+    "monitor_system",
+  ],
+  imaging: [
+    "image_geometry",
+    "image_registration",
+    "image_quality_mv",
+    "image_quality_cbct",
+    "image_sgrt",
+  ],
+  ct: [
+    "mechanical_unit",
+    "mechanical_table",
+    "geometric",
+    "mlc",
+    "dosimetric_photon",
+    "dosimetric_electron",
+    "monitor_system",
+  ],
+  other: [
+    "mechanical_unit",
+    "mechanical_table",
+    "geometric",
+    "mlc",
+    "dosimetric_photon",
+    "dosimetric_electron",
+    "monitor_system",
+  ],
+};
 
 /** Nombre de un tipo de máquina; si no existe, devuelve el id. */
 export function machineKindLabel(kind: MachineKind | undefined, kinds?: MachineKindDef[]): string {
@@ -98,59 +151,6 @@ export type Category =
   | "image_quality_cbct"
   | "image_sgrt"
   | (string & {});
-
-export const CATEGORY_LABELS: Record<Category, string> = {
-  mechanical_unit: "Mecánico Unidad",
-  mechanical_table: "Mecánico Mesa",
-  geometric: "Geométrico Haz",
-  mlc: "MLC",
-  dosimetric_photon: "Dosimétrico Fotones",
-  dosimetric_electron: "Dosimétrico Electrones",
-  monitor_system: "Sistema Monitor",
-  image_geometry: "Geometría",
-  image_registration: "Sistema de Registro",
-  image_quality_mv: "Calidad Imagen MV",
-  image_quality_cbct: "Calidad Imagen CBCT",
-  image_sgrt: "QC SGRT",
-};
-
-/** Categorías disponibles según el tipo de máquina (los sistemas de imagen no comparten las de los aceleradores). */
-export const CATEGORIES_BY_KIND: Record<MachineKind, Category[]> = {
-  linac: [
-    "mechanical_unit",
-    "mechanical_table",
-    "geometric",
-    "mlc",
-    "dosimetric_photon",
-    "dosimetric_electron",
-    "monitor_system",
-  ],
-  imaging: [
-    "image_geometry",
-    "image_registration",
-    "image_quality_mv",
-    "image_quality_cbct",
-    "image_sgrt",
-  ],
-  ct: [
-    "mechanical_unit",
-    "mechanical_table",
-    "geometric",
-    "mlc",
-    "dosimetric_photon",
-    "dosimetric_electron",
-    "monitor_system",
-  ],
-  other: [
-    "mechanical_unit",
-    "mechanical_table",
-    "geometric",
-    "mlc",
-    "dosimetric_photon",
-    "dosimetric_electron",
-    "monitor_system",
-  ],
-};
 
 export type Tolerance =
   | { type: "pm"; nominal: number; delta: number }

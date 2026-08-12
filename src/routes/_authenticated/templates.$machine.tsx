@@ -82,7 +82,7 @@ function TemplateEditor() {
   const machineId = machine as MachineId;
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const isAdmin = useIsAdmin();
+  const { isAdmin } = useIsAdmin();
   const catalog = useMachineCatalog();
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
   const machineKind =
