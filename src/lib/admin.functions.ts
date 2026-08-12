@@ -19,11 +19,8 @@ export const listUsers = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertAdmin(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: profiles, error: pErr } = await supabaseAdmin
-      .from("profiles")
-      .select("id, email, display_name, created_at")
-      .order("created_at", { ascending: true });
-    if (pErr) throw new Error(pErr.message);
+
+    // Fetch all roles first (small table, no need to paginate).
     const { data: roles, error: rErr } = await supabaseAdmin
       .from("user_roles")
       .select("user_id, role");
@@ -34,6 +31,14 @@ export const listUsers = createServerFn({ method: "GET" })
       arr.push(r.role);
       roleMap.set(r.user_id, arr);
     }
+
+    // Paginate profiles (no range needed — fetch all for now, admins page through UI if needed).
+    const { data: profiles, error: pErr } = await supabaseAdmin
+      .from("profiles")
+      .select("id, email, display_name, created_at")
+      .order("created_at", { ascending: true });
+    if (pErr) throw new Error(pErr.message);
+
     return (profiles ?? []).map((p) => ({
       id: p.id,
       email: p.email,
