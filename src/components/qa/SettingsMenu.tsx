@@ -1,7 +1,7 @@
 import { useMachineList } from "@/hooks/use-machine-list";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Settings, Download, Upload, Database, Trash2, Save, X } from "lucide-react";
+import { Settings, Download, Upload, Database, Trash2, Save, X, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,10 +36,12 @@ import {
   exportAll,
   importAll,
   listImports,
+  listTemplates,
   queryMeasurements,
   updateMeasurement,
 } from "@/lib/qa/db";
 import type { MachineId, Measurement } from "@/lib/qa/types";
+import { MPC_TEST_ID, MPC_TEST_NAME } from "@/lib/qa/mpc";
 
 export function SettingsMenu() {
   const [open, setOpen] = useState(false);
@@ -223,6 +225,7 @@ function DatabaseEditor({
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [drafts, setDrafts] = useState<Record<string, { value: string; date: string }>>({});
+  const [editTarget, setEditTarget] = useState<Measurement | null>(null);
 
   // Debounce the free-text search so each keystroke doesn't hit the database.
   useEffect(() => {
@@ -505,6 +508,15 @@ function DatabaseEditor({
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setEditTarget(m)}
+                            aria-label="Editar serie"
+                            title="Editar serie (mover en el árbol)"
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
                           {dirty && (
                             <Button
                               size="icon"
@@ -547,6 +559,187 @@ function DatabaseEditor({
             </TableBody>
           </Table>
         </div>
+      </DialogContent>
+
+      <EditSeriesDialog
+        measurement={editTarget}
+        onClose={() => setEditTarget(null)}
+        onSaved={() => {
+          setEditTarget(null);
+          invalidate();
+        }}
+      />
+    </Dialog>
+  );
+}
+
+// ---------------- Edit series dialog ----------------
+
+function EditSeriesDialog({
+  measurement,
+  onClose,
+  onSaved,
+}: {
+  measurement: Measurement | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [segments, setSegments] = useState<string[]>([]);
+  const [testId, setTestId] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const machineTemplates = useQuery({
+    queryKey: ["templates-for", measurement?.machineId ?? ""],
+    queryFn: () => (measurement ? listTemplates(measurement.machineId) : Promise.resolve([])),
+    enabled: !!measurement,
+  });
+
+  // Reset the form each time a different measurement is opened.
+  useEffect(() => {
+    if (!measurement) return;
+    setSegments(
+      measurement.cellLabel
+        .split(" / ")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+    setTestId(measurement.testId);
+  }, [measurement]);
+
+  const testOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const t of machineTemplates.data ?? []) {
+      for (const test of t.tests) if (!seen.has(test.id)) seen.set(test.id, test.name);
+    }
+    if (!seen.has(MPC_TEST_ID)) seen.set(MPC_TEST_ID, MPC_TEST_NAME);
+    return [...seen.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [machineTemplates.data]);
+
+  const label = segments.map((s) => s.trim()).filter(Boolean).join(" / ");
+
+  function setSegment(i: number, v: string) {
+    setSegments((prev) => prev.map((s, j) => (j === i ? v : s)));
+  }
+  function addSegment() {
+    setSegments((prev) => [...prev, ""]);
+  }
+  function removeSegment(i: number) {
+    setSegments((prev) => prev.filter((_, j) => j !== i));
+  }
+
+  async function handleSave() {
+    if (!measurement) return;
+    const clean = segments.map((s) => s.trim()).filter(Boolean);
+    if (clean.length === 0) {
+      toast.error("La serie no puede quedar vacía");
+      return;
+    }
+    const newLabel = clean.join(" / ");
+    if (newLabel === measurement.cellLabel && testId === measurement.testId) {
+      toast.info("Sin cambios");
+      onClose();
+      return;
+    }
+
+    // Conflict check: another measurement with the same machine+test+label+date
+    // would create a duplicate point (same series, same day) in the tree.
+    const { data: dups } = await supabase
+      .from("measurements")
+      .select("id")
+      .eq("machine_id", measurement.machineId)
+      .eq("test_id", testId)
+      .eq("cell_label", newLabel)
+      .eq("date", measurement.date)
+      .neq("id", measurement.id);
+    if (dups && dups.length > 0) {
+      const ok = window.confirm(
+        `Ya existe ${dups.length} medida(s) con la misma serie y fecha (${newLabel} · ${measurement.date}).
+         Si guardas, se promediarán en la visualización. ¿Continuar?`,
+      );
+      if (!ok) return;
+    }
+
+    setSaving(true);
+    try {
+      await updateMeasurement({ ...measurement, testId, cellLabel: newLabel });
+      toast.success("Medida trasladada en el árbol");
+      onSaved();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={!!measurement} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Pencil className="size-4" /> Editar serie
+          </DialogTitle>
+        </DialogHeader>
+        {measurement && (
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Test</label>
+              <Select value={testId} onValueChange={setTestId}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {testOptions.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground">
+                Parámetros (ramas del árbol, separadas por " / ")
+              </label>
+              {segments.map((seg, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <Input
+                    value={seg}
+                    onChange={(e) => setSegment(i, e.target.value)}
+                    placeholder={`Rama ${i + 1}`}
+                    className="h-8 text-xs"
+                  />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-7 shrink-0"
+                    onClick={() => removeSegment(i)}
+                    aria-label="Quitar rama"
+                  >
+                    <X className="size-3.5" />
+                  </Button>
+                </div>
+              ))}
+              <Button size="sm" variant="outline" onClick={addSegment}>
+                <Plus className="size-3.5" /> Añadir rama
+              </Button>
+            </div>
+
+            {label && (
+              <div className="rounded border bg-muted/30 p-2 text-xs text-muted-foreground">
+                <span className="text-[10px] uppercase">Nueva serie:</span>{" "}
+                <span className="font-medium text-foreground">{label}</span>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button size="sm" onClick={handleSave} disabled={saving}>
+                {saving ? "Guardando…" : "Guardar"}
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
