@@ -300,6 +300,27 @@ export async function listImports(machineId?: string): Promise<ImportRecord[]> {
   return must(data, error).map(importFromRow);
 }
 
+/** Server-side paginated imports (most recent first). */
+export async function queryImports(
+  page: number,
+  pageSize: number,
+  machineId?: string,
+): Promise<{ rows: ImportRecord[]; total: number }> {
+  let q = supabase
+    .from("imports")
+    .select("*", { count: "exact" })
+    .order("source_date", { ascending: false })
+    .order("imported_at", { ascending: false })
+    .range(page * pageSize, page * pageSize + pageSize - 1);
+  if (machineId) q = q.eq("machine_id", machineId);
+  const { data, error, count } = await q;
+  if (error) throw new Error(error.message);
+  return {
+    rows: ((data ?? []) as ImportRow[]).map(importFromRow),
+    total: count ?? 0,
+  };
+}
+
 export async function saveImport(rec: ImportRecord, measurements: Measurement[]) {
   // Delete old measurements for this import first (from a previous import of
   // the same file). Measurement IDs now include crypto.randomUUID() so they

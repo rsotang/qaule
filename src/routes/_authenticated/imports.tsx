@@ -37,9 +37,9 @@ import {
   deleteImport,
   exportAll,
   importAll,
-  listImports,
   listMachines,
   listTemplates,
+  queryImports,
   saveImport,
   saveTemplate,
   getCalendar,
@@ -131,7 +131,16 @@ function ImportsPage() {
 
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
   const machineList = useMachineList();
-  const imports = useQuery({ queryKey: ["imports-all"], queryFn: () => listImports() });
+  const [importsPage, setImportsPage] = useState(0);
+  const IMPORTS_PAGE_SIZE = 15;
+  const imports = useQuery({
+    queryKey: ["imports-page", importsPage],
+    queryFn: () => queryImports(importsPage, IMPORTS_PAGE_SIZE),
+    placeholderData: (prev) => prev,
+  });
+  const importsRows = imports.data?.rows ?? [];
+  const importsTotal = imports.data?.total ?? 0;
+  const importsPageCount = Math.max(1, Math.ceil(importsTotal / IMPORTS_PAGE_SIZE));
   const calendar = useQuery({ queryKey: ["calendar"], queryFn: getCalendar });
 
   async function handleFiles(files: File[]) {
@@ -211,6 +220,10 @@ function ImportsPage() {
   async function handleDelete(id: string) {
     await deleteImport(id);
     toast.success("Importación eliminada");
+    // If we just deleted the last row of the current page, step back one page.
+    if (importsRows.length === 1 && importsPage > 0) {
+      setImportsPage((p) => p - 1);
+    }
     qc.invalidateQueries();
   }
 
@@ -971,58 +984,85 @@ function ImportsPage() {
           <CardTitle className="text-base">Historial de importaciones</CardTitle>
         </CardHeader>
         <CardContent>
-          {imports.data?.length === 0 ? (
+          {importsTotal === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
               No hay importaciones todavía. <Link to="/templates" className="text-primary underline">Configura una plantilla</Link> y sube tu primer archivo.
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Máquina</TableHead>
-                  <TableHead>Fecha datos</TableHead>
-                  <TableHead>Archivo</TableHead>
-                  <TableHead>Importado</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {imports.data?.map((i) => (
-                  <TableRow key={i.id}>
-                    <TableCell className="font-medium">{i.machineId}</TableCell>
-                    <TableCell>{i.sourceDate}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{i.fileName}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {new Date(i.importedAt).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <Trash2 className="size-4 text-destructive" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>¿Eliminar esta importación?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Se borrarán todas las medidas de «{i.fileName}» ({i.machineId} ·{" "}
-                              {i.sourceDate}). Esta acción no se puede deshacer.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDelete(i.id)}>
-                              Eliminar
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </TableCell>
+            <>
+              <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+                <span>
+                  {importsTotal} importaciones{importsTotal > IMPORTS_PAGE_SIZE && ` · página ${importsPage + 1} de ${importsPageCount}`}
+                </span>
+                {importsPageCount > 1 && (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={importsPage === 0 || imports.isFetching}
+                      onClick={() => setImportsPage((p) => Math.max(0, p - 1))}
+                    >
+                      Anterior
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={importsPage + 1 >= importsPageCount || imports.isFetching}
+                      onClick={() => setImportsPage((p) => p + 1)}
+                    >
+                      Siguiente
+                    </Button>
+                  </div>
+                )}
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Máquina</TableHead>
+                    <TableHead>Fecha datos</TableHead>
+                    <TableHead>Archivo</TableHead>
+                    <TableHead>Importado</TableHead>
+                    <TableHead />
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {importsRows.map((i) => (
+                    <TableRow key={i.id}>
+                      <TableCell className="font-medium">{i.machineId}</TableCell>
+                      <TableCell>{i.sourceDate}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{i.fileName}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {new Date(i.importedAt).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <Trash2 className="size-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Eliminar esta importación?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Se borrarán todas las medidas de «{i.fileName}» ({i.machineId} ·{" "}
+                                {i.sourceDate}). Esta acción no se puede deshacer.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(i.id)}>
+                                Eliminar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </>
           )}
         </CardContent>
       </Card>
