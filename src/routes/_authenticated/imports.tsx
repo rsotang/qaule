@@ -672,10 +672,6 @@ function ImportsPage() {
                   }}
                 />
               </div>
-              <p className="text-[10px] text-muted-foreground">
-                En el diálogo puedes elegir varias carpetas a la vez (Ctrl/Cmd + clic), o una
-                carpeta completa que contenga las subcarpetas del mes.
-              </p>
             </div>
           </div>
 
