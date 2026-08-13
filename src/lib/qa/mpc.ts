@@ -165,6 +165,62 @@ export function mpcCellLabel(energy: string | null, name: string): string {
     .join(" / ");
 }
 
+// ---------- agregación de hojas del MLC (geometry check) ----------
+
+/** Fila individual de hoja: ".../MLCLeavesA/MLCLeaf2 [mm]" o ".../MLCBacklashLeavesB/MLCBacklashLeaf7 [mm]" */
+const LEAF_GROUP_RE =
+  /^(.+)\/(MLCLeaves[AB]|MLCBacklashLeaves[AB])\/(MLCLeaf\d+|MLCBacklashLeaf\d+)(\s*\[[^\]]*\])?$/;
+
+const LEAF_AGG_NAMES = ["Máximo", "Mínimo", "Media"] as const;
+
+/**
+ * En los geometry check las medidas hoja a hoja del MLC no aportan nada a la
+ * vista temporal: se sustituyen por parámetros artificiales (máximo, mínimo y
+ * media) por banco de hojas, conservando el umbral de las hojas originales.
+ */
+export function aggregateMlcLeafGroups(rows: MpcRow[]): MpcRow[] {
+  const groups = new Map<string, { values: number[]; threshold: number | null; unit: string }>();
+  const rest: MpcRow[] = [];
+  for (const r of rows) {
+    const m = r.name.match(LEAF_GROUP_RE);
+    if (!m) {
+      rest.push(r);
+      continue;
+    }
+    const key = `${m[1]}/${m[2]}`;
+    let g = groups.get(key);
+    if (!g) {
+      g = { values: [], threshold: r.threshold, unit: r.unit };
+      groups.set(key, g);
+    }
+    g.values.push(r.value);
+  }
+  for (const [key, g] of groups.entries()) {
+    if (g.values.length === 0) continue;
+    const unitSuffix = g.unit ? ` [${g.unit}]` : "";
+    const stats = [
+      Math.max(...g.values),
+      Math.min(...g.values),
+      g.values.reduce((a, b) => a + b, 0) / g.values.length,
+    ];
+    const ok =
+      g.threshold == null ||
+      (Math.abs(stats[0]) <= g.threshold &&
+        Math.abs(stats[1]) <= g.threshold &&
+        Math.abs(stats[2]) <= g.threshold);
+    LEAF_AGG_NAMES.forEach((name, i) => {
+      rest.push({
+        name: `${key}/${name}${unitSuffix}`,
+        unit: g.unit,
+        value: stats[i],
+        threshold: g.threshold,
+        result: ok ? "Pass" : "Fail",
+      });
+    });
+  }
+  return rest;
+}
+
 // ---------- agrupación de archivos de carpeta ----------
 
 export interface MpcFolderFiles {
@@ -200,10 +256,6 @@ export async function parseMpcFolder(
   const csvBuf = await resultsCsv.arrayBuffer();
   const hash = await sha256(csvBuf);
   const csvText = await readText(resultsCsv);
-  const rows = parseResultsCsv(csvText);
-  if (rows.length === 0) {
-    throw new Error("Results.csv sin datos válidos");
-  }
 
   const fromName = folderNameInfo(folderName);
   let info: CheckInfo = {
@@ -223,6 +275,16 @@ export async function parseMpcFolder(
     }
   }
   if (!info.energy && info.templateId) info.energy = energyFromTemplateName(info.templateId);
+
+  // En los geometry check las hojas individuales del MLC se agregan en
+  // parámetros Máximo / Mínimo / Media por banco.
+  let rows = parseResultsCsv(csvText);
+  if (rows.length === 0) {
+    throw new Error("Results.csv sin datos válidos");
+  }
+  if (info.templateId?.startsWith("GeometryCheckTemplate")) {
+    rows = aggregateMlcLeafGroups(rows);
+  }
 
   // El hash incluye el nombre de carpeta para no pisar otra carpeta idéntica.
   const fullHash = await sha256(
