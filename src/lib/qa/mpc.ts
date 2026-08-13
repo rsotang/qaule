@@ -229,19 +229,88 @@ export interface MpcFolderFiles {
   checkXml?: File;
 }
 
-/** Agrupa los archivos seleccionados por carpeta (soporta webkitdirectory). */
-export function groupMpcFiles(files: File[]): Map<string, MpcFolderFiles> {
+/** Un archivo con su ruta relativa (para entradas de arrastrar y soltar o selector). */
+export interface MpcFileEntry {
+  file: File;
+  /** Ruta relativa, p. ej. "CarpetaMPC/Results.csv" */
+  relPath: string;
+}
+
+/** Entradas desde el selector de carpetas (webkitdirectory). */
+export function pickerEntries(files: File[]): MpcFileEntry[] {
+  return files.map((f) => ({
+    file: f,
+    relPath: (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name,
+  }));
+}
+
+function fileFromEntry(entry: FileSystemFileEntry): Promise<File | null> {
+  return new Promise((resolve) => {
+    entry.file(resolve, () => resolve(null));
+  });
+}
+
+function readDirEntries(entry: FileSystemDirectoryEntry): Promise<FileSystemEntry[]> {
+  return new Promise((resolve, reject) => {
+    const reader = entry.createReader();
+    const all: FileSystemEntry[] = [];
+    const readBatch = () => {
+      reader.readEntries(
+        (batch) => {
+          if (batch.length === 0) return resolve(all);
+          all.push(...batch);
+          readBatch();
+        },
+        () => reject(new Error("No se pudo leer la carpeta")),
+      );
+    };
+    readBatch();
+  });
+}
+
+/**
+ * Recorre las carpetas (y archivos) arrastrados, permitiendo soltar varias
+ * carpetas a la vez. Devuelve todos los archivos con su ruta relativa.
+ */
+export async function dropEntries(items: DataTransferItemList): Promise<MpcFileEntry[]> {
+  const out: MpcFileEntry[] = [];
+  const queue: { entry: FileSystemEntry; path: string }[] = [];
+  for (const item of Array.from(items)) {
+    const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+    if (entry) {
+      queue.push({ entry, path: entry.name });
+    } else {
+      const f = item.getAsFile();
+      if (f) out.push({ file: f, relPath: f.name });
+    }
+  }
+  while (queue.length > 0) {
+    const { entry, path } = queue.shift()!;
+    if (entry.isFile) {
+      const f = await fileFromEntry(entry as FileSystemFileEntry);
+      if (f) out.push({ file: f, relPath: path });
+    } else if (entry.isDirectory) {
+      const children = await readDirEntries(entry as FileSystemDirectoryEntry);
+      for (const c of children) queue.push({ entry: c, path: `${path}/${c.name}` });
+    }
+  }
+  return out;
+}
+
+/** Agrupa los archivos por carpeta (selector o arrastrar y soltar). */
+export function groupMpcFiles(entries: MpcFileEntry[]): Map<string, MpcFolderFiles> {
   const map = new Map<string, MpcFolderFiles>();
-  for (const f of files) {
-    const rel = (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name;
-    const dir = rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : "(archivos sueltos)";
+  for (const { file, relPath } of entries) {
+    const dir = relPath.includes("/")
+      ? relPath.slice(0, relPath.lastIndexOf("/"))
+      : "(archivos sueltos)";
     let g = map.get(dir);
     if (!g) {
       g = { folderName: dir.split("/").pop() || dir };
       map.set(dir, g);
     }
-    if (f.name === "Check.xml") g.checkXml = f;
-    else if (f.name === "Results.csv") g.resultsCsv = f;
+    if (file.name === "Check.xml") g.checkXml = file;
+    else if (file.name === "Results.csv") g.resultsCsv = file;
   }
   return map;
 }

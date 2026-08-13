@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMachineList } from "@/hooks/use-machine-list";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useRef, useState, type DragEvent } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,11 +61,14 @@ import type { MachineId, Measurement, CalendarEntry } from "@/lib/qa/types";
 import { evaluateTolerance } from "@/lib/qa/types";
 import {
   buildMpcTemplate,
+  dropEntries,
   groupMpcFiles,
   parseMpcFolder,
+  pickerEntries,
   MPC_TEST_ID,
   mpcCellLabel,
   type MpcFolderPreview,
+  type MpcFileEntry,
 } from "@/lib/qa/mpc";
 
 const MAPPING_KEY = "qaule.calendarMapping";
@@ -121,6 +124,7 @@ function ImportsPage() {
   } | null>(null);
   const [mpcMachineId, setMpcMachineId] = useState<MachineId>("TB1");
   const [mpcPreviews, setMpcPreviews] = useState<MpcFolderPreview[]>([]);
+  const [mpcDragOver, setMpcDragOver] = useState(false);
   const mpcFolderRef = useRef<HTMLInputElement>(null);
 
 
@@ -210,8 +214,8 @@ function ImportsPage() {
     qc.invalidateQueries();
   }
 
-  async function handleMpcFiles(files: File[]) {
-    const groups = groupMpcFiles(files);
+  async function handleMpcFiles(entries: MpcFileEntry[]) {
+    const groups = groupMpcFiles(entries);
     const withResults = [...groups.values()].filter((g) => g.resultsCsv);
     if (withResults.length === 0) {
       toast.error("No se encontraron carpetas MPC con Results.csv. Selecciona la carpeta del mes (o varias).");
@@ -238,6 +242,21 @@ function ImportsPage() {
       return [...prev, ...added.filter((p) => !seen.has(p.importId))];
     });
     if (mpcFolderRef.current) mpcFolderRef.current.value = "";
+  }
+
+  async function handleMpcDrop(e: DragEvent) {
+    e.preventDefault();
+    setMpcDragOver(false);
+    try {
+      const entries = await dropEntries(e.dataTransfer.items);
+      if (entries.length === 0) {
+        toast.error("No se pudieron leer las carpetas arrastradas.");
+        return;
+      }
+      await handleMpcFiles(entries);
+    } catch (err) {
+      toast.error(`Error al leer carpetas: ${(err as Error).message}`);
+    }
   }
 
   async function commitMpc() {
@@ -576,9 +595,9 @@ function ImportsPage() {
             <FolderUp className="size-4" /> Importación MPC (Varian)
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Selecciona la carpeta del mes con los resultados del MPC (carpetas con Check.xml y
-            Results.csv). Se importan todas las medidas y quedan disponibles en Visualización como
-            test «MPC (Varian)» → energía → grupo → parámetro.
+            Importa una o varias carpetas a la vez (mes completo con sus Check.xml y Results.csv).
+            Se importan todas las medidas y quedan disponibles en Visualización como test
+            «MPC (Varian)» → energía → grupo → parámetro.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -598,20 +617,49 @@ function ImportsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="w-full space-y-1 sm:w-auto">
-              <label className="text-xs text-muted-foreground">Carpeta(s) MPC (una o varias)</label>
-              <Input
-                ref={mpcFolderRef}
-                type="file"
-                multiple
-                // @ts-expect-error webkitdirectory no está tipado en React
-                webkitdirectory=""
-                onChange={(e) => {
-                  const fs = Array.from(e.target.files ?? []);
-                  if (fs.length) handleMpcFiles(fs);
+            <div className="min-w-[280px] flex-1 space-y-1">
+              <label className="text-xs text-muted-foreground">
+                Carpetas MPC (varias de golpe: arrastra o selecciona)
+              </label>
+              <div
+                className={`flex flex-col items-center justify-center gap-2 rounded-md border border-dashed px-4 py-5 text-center transition-colors ${
+                  mpcDragOver
+                    ? "border-primary bg-primary/5"
+                    : "border-border bg-muted/20"
+                }`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setMpcDragOver(true);
                 }}
-                className="w-full sm:w-[320px]"
-              />
+                onDragLeave={() => setMpcDragOver(false)}
+                onDrop={handleMpcDrop}
+              >
+                <FolderUp className="size-5 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">
+                  Arrastra aquí las carpetas del mes (o varias a la vez) con Check.xml y
+                  Results.csv
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  onClick={() => mpcFolderRef.current?.click()}
+                >
+                  Seleccionar carpetas
+                </Button>
+                <Input
+                  ref={mpcFolderRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  // @ts-expect-error webkitdirectory no está tipado en React
+                  webkitdirectory=""
+                  onChange={(e) => {
+                    const fs = Array.from(e.target.files ?? []);
+                    if (fs.length) handleMpcFiles(pickerEntries(fs));
+                  }}
+                />
+              </div>
             </div>
           </div>
 
