@@ -46,6 +46,7 @@ export const BUILTIN_CATEGORIES: CategoryDef[] = [
   { id: "image_quality_mv", name: "Calidad Imagen MV", builtin: true },
   { id: "image_quality_cbct", name: "Calidad Imagen CBCT", builtin: true },
   { id: "image_sgrt", name: "QC SGRT", builtin: true },
+  { id: "mpc", name: "MPC (Varian)", builtin: true },
 ];
 
 export const CATEGORY_LABELS: Partial<Record<Category, string>> = {
@@ -61,6 +62,7 @@ export const CATEGORY_LABELS: Partial<Record<Category, string>> = {
   image_quality_mv: "Calidad Imagen MV",
   image_quality_cbct: "Calidad Imagen CBCT",
   image_sgrt: "QC SGRT",
+  mpc: "MPC (Varian)",
 };
 
 /** Categorías disponibles según el tipo de máquina (los sistemas de imagen no comparten las de los aceleradores). */
@@ -73,6 +75,7 @@ export const CATEGORIES_BY_KIND: Partial<Record<MachineKind, Category[]>> = {
     "dosimetric_photon",
     "dosimetric_electron",
     "monitor_system",
+    "mpc",
   ],
   imaging: [
     "image_geometry",

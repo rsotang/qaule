@@ -14,7 +14,8 @@ import {
   Legend,
 } from "recharts";
 import { listMeasurements, listTemplates } from "@/lib/qa/db";
-import { MPC_TEST_NAME } from "@/lib/qa/mpc";
+import { MPC_TEST_NAME, MPC_CATEGORY } from "@/lib/qa/mpc";
+import { useMachineCatalog } from "@/hooks/use-machine-catalog";
 import {
   displayTextOrRef,
   toleranceBand,
@@ -59,6 +60,7 @@ export const Route = createFileRoute("/_authenticated/visualization")({ componen
 interface SeriesSel {
   id: string;
   machineId: MachineId | "";
+  categoryId: string;
   testId: string;
   /** ordered label segments picked from the DB parameter tree */
   path: string[];
@@ -67,7 +69,7 @@ interface SeriesSel {
 const COLORS = ["#2563eb", "#dc2626", "#16a34a", "#ca8a04", "#9333ea", "#0891b2", "#db2777", "#0d9488"];
 
 function newSeries(): SeriesSel {
-  return { id: `s-${Math.random().toString(36).slice(2, 9)}`, machineId: "", testId: "", path: [] };
+  return { id: `s-${Math.random().toString(36).slice(2, 9)}`, machineId: "", categoryId: "", testId: "", path: [] };
 }
 
 /** Node of the parameter tree derived from measurement labels in the DB. */
@@ -165,6 +167,7 @@ function VisualizationPage() {
   const [showReference, setShowReference] = useState(true);
 
   const machineList = useMachineList();
+  const catalog = useMachineCatalog();
   const allTemplates = useQuery({ queryKey: ["templates-all"], queryFn: () => listTemplates() });
   const allMeasurements = useQuery({
     queryKey: ["measurements-all"],
@@ -196,15 +199,37 @@ function VisualizationPage() {
   );
 
   /** Test options for a machine come from the DB (tests with imported data). */
-  const testsFor = (mid: MachineId | "") => {
+  const testsFor = (mid: MachineId | "", categoryId: string) => {
     const byTest = mid ? labelIndex.get(mid) : undefined;
     return [...(byTest?.keys() ?? [])]
-      .map((testId) => ({
-        id: testId,
-        name:
-          testForMachine(mid, testId)?.name ??
-          (testId === "mpc" ? MPC_TEST_NAME : testId),
-      }))
+      .map((testId) => {
+        const test = testForMachine(mid, testId);
+        return {
+          id: testId,
+          name: test?.name ?? (testId === "mpc" ? MPC_TEST_NAME : testId),
+          category: test?.category ?? (testId === "mpc" ? MPC_CATEGORY : undefined),
+        };
+      })
+      .filter((t) => !categoryId || t.category === categoryId)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  };
+
+  /** Categorías disponibles para la máquina: las del catálogo del tipo, más las que usen sus tests. */
+  const categoryOptionsFor = (s: SeriesSel) => {
+    const machine = machineList.find((m) => m.id === s.machineId);
+    const fromCatalog = catalog.categoriesFor(machine?.kind);
+    const used = new Set<string>();
+    if (s.machineId) {
+      const byTest = labelIndex.get(s.machineId);
+      for (const testId of byTest?.keys() ?? []) {
+        const cat = testForMachine(s.machineId, testId)?.category ?? (testId === "mpc" ? MPC_CATEGORY : undefined);
+        if (cat) used.add(cat);
+      }
+    }
+    const seen = new Set<string>(fromCatalog);
+    for (const id of used) if (!seen.has(id)) seen.add(id);
+    return [...seen]
+      .map((id) => ({ id, name: catalog.categoryName(id) }))
       .sort((a, b) => a.name.localeCompare(b.name));
   };
 
@@ -384,7 +409,7 @@ function VisualizationPage() {
         {/* Parameter selectors — each row stacks vertically; dropdowns inside flow horizontally */}
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           {series.map((s, idx) => {
-            const tests = testsFor(s.machineId);
+            const tests = testsFor(s.machineId, s.categoryId);
             const root = s.machineId ? labelIndex.get(s.machineId)?.get(s.testId) : undefined;
             const chain = resolveLabelChain(root, s.path);
             const last = chain[chain.length - 1];
@@ -424,7 +449,7 @@ function VisualizationPage() {
                       <Select
                         value={s.machineId || undefined}
                         onValueChange={(v) =>
-                          updateSeries(s.id, { machineId: v as MachineId, testId: "", path: [] })
+                          updateSeries(s.id, { machineId: v as MachineId, categoryId: "", testId: "", path: [] })
                         }
                       >
                         <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecciona máquina" /></SelectTrigger>
@@ -435,6 +460,25 @@ function VisualizationPage() {
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {s.machineId && (
+                      <div className="w-full space-y-1 sm:w-[180px]">
+                        <Label className="text-[10px] uppercase text-muted-foreground">Categoría</Label>
+                        <Select
+                          value={s.categoryId || undefined}
+                          onValueChange={(v) =>
+                            updateSeries(s.id, { categoryId: v, testId: "", path: [] })
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                          <SelectContent>
+                            {categoryOptionsFor(s).map((c) => (
+                              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
 
                     {s.machineId && (
                       <div className="w-full space-y-1 sm:w-[200px]">
@@ -761,7 +805,9 @@ function TestSnapshot({
   templates: Template[];
 }) {
   const machineList = useMachineList();
+  const catalog = useMachineCatalog();
   const [machineId, setMachineId] = useState<MachineId | "">("");
+  const [categoryId, setCategoryId] = useState("");
   const [testId, setTestId] = useState("");
   const [month, setMonth] = useState("");
 
@@ -774,9 +820,28 @@ function TestSnapshot({
       .map((id) => ({
         id,
         name: tplTests.find((t) => t.id === id)?.name ?? (id === "mpc" ? MPC_TEST_NAME : id),
+        category: tplTests.find((t) => t.id === id)?.category ?? (id === "mpc" ? MPC_CATEGORY : undefined),
       }))
+      .filter((t) => !categoryId || t.category === categoryId)
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [measurements, templates, machineId]);
+  }, [measurements, templates, machineId, categoryId]);
+
+  const categoryOptions = useMemo(() => {
+    const machine = machineList.find((m) => m.id === machineId);
+    const fromCatalog = catalog.categoriesFor(machine?.kind);
+    const used = new Set<string>();
+    const ids = new Set(measurements.filter((m) => m.machineId === machineId).map((m) => m.testId));
+    for (const id of ids) {
+      const tplTests = templates.filter((t) => t.machineId === machineId).flatMap((t) => t.tests);
+      const cat = tplTests.find((t) => t.id === id)?.category ?? (id === "mpc" ? MPC_CATEGORY : undefined);
+      if (cat) used.add(cat);
+    }
+    const seen = new Set<string>(fromCatalog);
+    for (const id of used) if (!seen.has(id)) seen.add(id);
+    return [...seen]
+      .map((id) => ({ id, name: catalog.categoryName(id) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [measurements, templates, machineId, machineList, catalog]);
 
   const months = useMemo(() => {
     const set = new Set(
@@ -830,6 +895,7 @@ function TestSnapshot({
               value={machineId || undefined}
               onValueChange={(v) => {
                 setMachineId(v as MachineId);
+                setCategoryId("");
                 setTestId("");
                 setMonth("");
               }}
@@ -842,6 +908,22 @@ function TestSnapshot({
               </SelectContent>
             </Select>
           </div>
+          {machineId && (
+            <div className="w-full space-y-1 sm:w-[180px]">
+              <Label className="text-[10px] uppercase text-muted-foreground">Categoría</Label>
+              <Select
+                value={categoryId || undefined}
+                onValueChange={(v) => { setCategoryId(v); setTestId(""); setMonth(""); }}
+              >
+                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                <SelectContent>
+                  {categoryOptions.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           {machineId && (
             <div className="w-full space-y-1 sm:w-[220px]">
               <Label className="text-[10px] uppercase text-muted-foreground">Prueba</Label>
