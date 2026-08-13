@@ -635,7 +635,7 @@ function ImportsPage() {
                 Carpetas MPC (varias de golpe: arrastra o selecciona)
               </label>
               <div
-                className={`flex flex-col items-center justify-center gap-2 rounded-md border border-dashed px-4 py-5 text-center transition-colors ${
+                className={`flex flex-row flex-wrap items-center justify-between gap-2 rounded-md border border-dashed px-3 py-2 transition-colors ${
                   mpcDragOver
                     ? "border-primary bg-primary/5"
                     : "border-border bg-muted/20"
@@ -647,11 +647,10 @@ function ImportsPage() {
                 onDragLeave={() => setMpcDragOver(false)}
                 onDrop={handleMpcDrop}
               >
-                <FolderUp className="size-5 text-muted-foreground" />
-                <p className="text-xs text-muted-foreground">
-                  Arrastra aquí las carpetas del mes (o varias a la vez) con Check.xml y
-                  Results.csv
-                </p>
+                <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                  <FolderUp className="size-4 shrink-0" />
+                  <span className="truncate">Arrastra aquí las carpetas MPC</span>
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
@@ -673,6 +672,10 @@ function ImportsPage() {
                   }}
                 />
               </div>
+              <p className="text-[10px] text-muted-foreground">
+                En el diálogo puedes elegir varias carpetas a la vez (Ctrl/Cmd + clic), o una
+                carpeta completa que contenga las subcarpetas del mes.
+              </p>
             </div>
           </div>
 
