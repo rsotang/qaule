@@ -31,7 +31,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Trash2, Upload, Download, CalendarDays } from "lucide-react";
+import { Trash2, Upload, Download, CalendarDays, FolderUp } from "lucide-react";
 import { toast } from "sonner";
 import {
   deleteImport,
@@ -41,6 +41,7 @@ import {
   listMachines,
   listTemplates,
   saveImport,
+  saveTemplate,
   getCalendar,
   saveCalendar,
   deleteCalendar,
@@ -58,8 +59,17 @@ import {
 import { CalendarMapper } from "@/components/qa/CalendarMapper";
 import type { MachineId, Measurement, CalendarEntry } from "@/lib/qa/types";
 import { evaluateTolerance } from "@/lib/qa/types";
+import {
+  buildMpcTemplate,
+  groupMpcFiles,
+  parseMpcFolder,
+  MPC_TEST_ID,
+  mpcCellLabel,
+  type MpcFolderPreview,
+} from "@/lib/qa/mpc";
 
 const MAPPING_KEY = "qaule.calendarMapping";
+const MPC_MAX_FOLDERS = 120;
 
 function downloadText(text: string, filename: string) {
   const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
@@ -109,6 +119,9 @@ function ImportsPage() {
     sheetNames: string[];
     sheets: Record<string, Grid>;
   } | null>(null);
+  const [mpcMachineId, setMpcMachineId] = useState<MachineId>("TB1");
+  const [mpcPreviews, setMpcPreviews] = useState<MpcFolderPreview[]>([]);
+  const mpcFolderRef = useRef<HTMLInputElement>(null);
 
 
 
@@ -195,6 +208,88 @@ function ImportsPage() {
     await deleteImport(id);
     toast.success("Importación eliminada");
     qc.invalidateQueries();
+  }
+
+  async function handleMpcFiles(files: File[]) {
+    const groups = groupMpcFiles(files);
+    const withResults = [...groups.values()].filter((g) => g.resultsCsv);
+    if (withResults.length === 0) {
+      toast.error("No se encontraron carpetas MPC con Results.csv. Selecciona la carpeta del mes (o varias).");
+      return;
+    }
+    if (withResults.length > MPC_MAX_FOLDERS) {
+      toast.error(
+        `Se detectaron ${withResults.length} carpetas. Selecciona solo la carpeta del mes a importar (máx. ${MPC_MAX_FOLDERS}).`,
+      );
+      return;
+    }
+    const added: MpcFolderPreview[] = [];
+    for (const g of withResults) {
+      try {
+        const p = await parseMpcFolder(g.folderName, g.resultsCsv!, g.checkXml, mpcMachineId);
+        added.push(p);
+      } catch (e) {
+        toast.error(`${g.folderName}: ${(e as Error).message}`);
+      }
+    }
+    if (added.length === 0) return;
+    setMpcPreviews((prev) => {
+      const seen = new Set(prev.map((p) => p.importId));
+      return [...prev, ...added.filter((p) => !seen.has(p.importId))];
+    });
+    if (mpcFolderRef.current) mpcFolderRef.current.value = "";
+  }
+
+  async function commitMpc() {
+    if (mpcPreviews.length === 0) return;
+    const machineId = mpcMachineId;
+    try {
+      const templates = await listTemplates(machineId);
+      const existing = templates.find((t) => t.id === `mpc-${machineId}`);
+      const tpl = buildMpcTemplate(
+        machineId,
+        mpcPreviews.flatMap((p) =>
+          p.rows.map((r) => ({
+            energy: p.energy,
+            name: r.name,
+            unit: r.unit,
+            threshold: r.threshold,
+          })),
+        ),
+        existing,
+      );
+      await saveTemplate(tpl);
+
+      let total = 0;
+      for (const p of mpcPreviews) {
+        const measurements: Measurement[] = p.rows.map((r, idx) => ({
+          id: `${p.importId}:${idx}:${crypto.randomUUID().slice(0, 8)}`,
+          importId: p.importId,
+          machineId,
+          testId: MPC_TEST_ID,
+          cellLabel: mpcCellLabel(p.energy, r.name),
+          date: p.date ?? "",
+          value: r.value,
+        }));
+        await saveImport(
+          {
+            id: p.importId,
+            machineId,
+            fileName: p.folderName,
+            importedAt: new Date().toISOString(),
+            sourceDate: p.date ?? "",
+            fileHash: p.hash,
+          },
+          measurements,
+        );
+        total += measurements.length;
+      }
+      toast.success(`${total} medidas MPC importadas de ${mpcPreviews.length} carpeta(s)`);
+      setMpcPreviews([]);
+      qc.invalidateQueries();
+    } catch (e) {
+      toast.error(`Error al importar MPC: ${(e as Error).message}`);
+    }
   }
 
   async function handleBackup() {
@@ -470,6 +565,166 @@ function ImportsPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <FolderUp className="size-4" /> Importación MPC (Varian)
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Selecciona la carpeta del mes con los resultados del MPC (carpetas con Check.xml y
+            Results.csv). Se importan todas las medidas y quedan disponibles en Visualización como
+            test «MPC (Varian)» → energía → grupo → parámetro.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="w-full space-y-1 sm:w-auto">
+              <label className="text-xs text-muted-foreground">Máquina</label>
+              <Select value={mpcMachineId} onValueChange={(v) => setMpcMachineId(v as MachineId)}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {machineList.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.id} — {m.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-full space-y-1 sm:w-auto">
+              <label className="text-xs text-muted-foreground">Carpeta(s) MPC (una o varias)</label>
+              <Input
+                ref={mpcFolderRef}
+                type="file"
+                multiple
+                // @ts-expect-error webkitdirectory no está tipado en React
+                webkitdirectory=""
+                onChange={(e) => {
+                  const fs = Array.from(e.target.files ?? []);
+                  if (fs.length) handleMpcFiles(fs);
+                }}
+                className="w-full sm:w-[320px]"
+              />
+            </div>
+          </div>
+
+          {mpcPreviews.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">
+                  {mpcPreviews.length} carpeta(s) ·{" "}
+                  {mpcPreviews.reduce((n, p) => n + p.rows.length, 0)} medidas válidas
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setMpcPreviews([])}>
+                    Cancelar
+                  </Button>
+                  <Button size="sm" onClick={commitMpc}>
+                    Confirmar importación ({mpcPreviews.length})
+                  </Button>
+                </div>
+              </div>
+
+              {mpcPreviews.map((preview) => {
+                const fails = preview.rows.filter(
+                  (r) => r.threshold != null && Math.abs(r.value) > r.threshold,
+                ).length;
+                return (
+                  <div
+                    key={preview.importId}
+                    className="space-y-3 rounded-md border bg-muted/30 p-4"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-medium">{preview.folderName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {[
+                            preview.serial ? `SN${preview.serial}` : null,
+                            preview.date ? `fecha: ${preview.date}` : null,
+                            preview.energy ? `energía: ${preview.energy}` : null,
+                            preview.templateId,
+                          ]
+                            .filter(Boolean)
+                            .join(" • ")}{" "}
+                          · {preview.rows.length} valores
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {preview.evaluation && (
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                              preview.evaluation === "Pass"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {preview.evaluation}
+                            {preview.isBaseline ? " · Baseline" : ""}
+                          </span>
+                        )}
+                        {fails > 0 && (
+                          <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700">
+                            {fails} fuera de tolerancia
+                          </span>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setMpcPreviews((prev) => prev.filter((p) => p.importId !== preview.importId))
+                          }
+                        >
+                          <Trash2 className="size-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="max-h-[300px] overflow-auto rounded border bg-background">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Parámetro</TableHead>
+                            <TableHead className="text-right">Valor</TableHead>
+                            <TableHead className="text-right">Umbral</TableHead>
+                            <TableHead className="text-center">Estado</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {preview.rows.map((r, i) => {
+                            const ok = r.threshold == null || Math.abs(r.value) <= r.threshold;
+                            return (
+                              <TableRow key={i}>
+                                <TableCell className="text-xs">{r.name}</TableCell>
+                                <TableCell className="text-right font-mono text-xs tabular-nums">
+                                  {r.value.toFixed(4)}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                                  {r.threshold == null ? "—" : r.threshold.toFixed(4)}
+                                </TableCell>
+                                <TableCell className="text-center text-xs">
+                                  {r.threshold == null ? (
+                                    <span className="text-muted-foreground">—</span>
+                                  ) : ok ? (
+                                    <span className="text-emerald-600">✓</span>
+                                  ) : (
+                                    <span className="font-medium text-destructive">✗</span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>

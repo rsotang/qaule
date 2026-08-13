@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMachineList } from "@/hooks/use-machine-list";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo, useCallback, useState } from "react";
 import {
   CartesianGrid,
   Line,
@@ -13,7 +13,8 @@ import {
   YAxis,
   Legend,
 } from "recharts";
-import { listMachines, listMeasurements, listTemplates } from "@/lib/qa/db";
+import { listMeasurements, listTemplates } from "@/lib/qa/db";
+import { MPC_TEST_NAME } from "@/lib/qa/mpc";
 import {
   displayTextOrRef,
   toleranceBand,
@@ -163,7 +164,6 @@ function VisualizationPage() {
   const [showTolerance, setShowTolerance] = useState(true);
   const [showReference, setShowReference] = useState(true);
 
-  const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
   const machineList = useMachineList();
   const allTemplates = useQuery({ queryKey: ["templates-all"], queryFn: () => listTemplates() });
   const allMeasurements = useQuery({
@@ -176,21 +176,34 @@ function VisualizationPage() {
     [allMeasurements.data],
   );
 
-  const templateFor = (mid: MachineId | ""): Template | null => {
-    if (!mid || !machines.data || !allTemplates.data) return null;
-    const m = machines.data.find((x) => x.id === mid);
-    const tpls = allTemplates.data.filter((t) => t.machineId === mid);
-    return tpls.find((t) => t.id === m?.activeTemplateId) ?? tpls[0] ?? null;
-  };
+  const templatesByMachine = useMemo(() => {
+    const map = new Map<string, Template[]>();
+    for (const t of allTemplates.data ?? []) {
+      const list = map.get(t.machineId) ?? [];
+      list.push(t);
+      map.set(t.machineId, list);
+    }
+    return map;
+  }, [allTemplates.data]);
+
+  /** Test en cualquiera de las plantillas de la máquina (el de MPC está en la suya). */
+  const testForMachine = useCallback(
+    (mid: MachineId | "", testId: string) => {
+      const tests = (mid ? templatesByMachine.get(mid) ?? [] : []).flatMap((t) => t.tests);
+      return tests.find((t) => t.id === testId) ?? null;
+    },
+    [templatesByMachine],
+  );
 
   /** Test options for a machine come from the DB (tests with imported data). */
   const testsFor = (mid: MachineId | "") => {
     const byTest = mid ? labelIndex.get(mid) : undefined;
-    const tpl = templateFor(mid);
     return [...(byTest?.keys() ?? [])]
       .map((testId) => ({
         id: testId,
-        name: tpl?.tests.find((t) => t.id === testId)?.name ?? testId,
+        name:
+          testForMachine(mid, testId)?.name ??
+          (testId === "mpc" ? MPC_TEST_NAME : testId),
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   };
@@ -205,8 +218,7 @@ function VisualizationPage() {
   // Resolve each series → { color, key, leaf, measurements }
   const resolved = useMemo(() => {
     return series.map((s, i) => {
-      const tpl = templateFor(s.machineId);
-      const test = tpl?.tests.find((t) => t.id === s.testId) ?? null;
+      const test = testForMachine(s.machineId, s.testId);
       const root = s.machineId ? labelIndex.get(s.machineId)?.get(s.testId) : undefined;
       const chain = resolveLabelChain(root, s.path);
       const last = chain[chain.length - 1];
@@ -224,7 +236,7 @@ function VisualizationPage() {
       );
       return { sel: s, test, chain, leaf, isLeaf, key, color, measurements };
     });
-  }, [series, machines.data, allTemplates.data, allMeasurements.data, labelIndex, dateFrom, dateTo]);
+  }, [series, allMeasurements.data, labelIndex, dateFrom, dateTo, testForMachine]);
 
   // Build chart data: one row per date, with each series key as column
   const chartData = useMemo(() => {
@@ -759,7 +771,10 @@ function TestSnapshot({
     );
     const tplTests = templates.filter((t) => t.machineId === machineId).flatMap((t) => t.tests);
     return [...ids]
-      .map((id) => ({ id, name: tplTests.find((t) => t.id === id)?.name ?? id }))
+      .map((id) => ({
+        id,
+        name: tplTests.find((t) => t.id === id)?.name ?? (id === "mpc" ? MPC_TEST_NAME : id),
+      }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [measurements, templates, machineId]);
 
@@ -773,8 +788,12 @@ function TestSnapshot({
   }, [measurements, machineId, testId]);
 
   const selectedTest = useMemo(() => {
-    const tpl = templates.find((t) => t.machineId === machineId);
-    return tpl?.tests.find((t) => t.id === testId);
+    for (const t of templates) {
+      if (t.machineId !== machineId) continue;
+      const test = t.tests.find((x) => x.id === testId);
+      if (test) return test;
+    }
+    return undefined;
   }, [templates, machineId, testId]);
 
   const metaMap = useMemo(() => buildMetaMap(selectedTest), [selectedTest]);
