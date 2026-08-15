@@ -164,17 +164,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "machine_kind_categories_kind_id_fkey"
-            columns: ["kind_id"]
-            isOneToOne: false
-            referencedRelation: "machine_kinds"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "machine_kind_categories_category_id_fkey"
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_kind_categories_kind_id_fkey"
+            columns: ["kind_id"]
+            isOneToOne: false
+            referencedRelation: "machine_kinds"
             referencedColumns: ["id"]
           },
         ]
@@ -356,20 +356,6 @@ export type Database = {
         Returns: boolean
       }
       public_has_any_user: { Args: never; Returns: boolean }
-      upsert_calendar_task: {
-        Args: {
-          p_id: string
-          p_ym: string
-          p_test_name: string
-          p_measured: boolean | null
-          p_analyzed: boolean | null
-          p_note: string | null
-          p_user_id: string
-          p_user_name: string | null
-          p_now: string
-        }
-        Returns: undefined
-      }
     }
     Enums: {
       app_role: "admin" | "user"
