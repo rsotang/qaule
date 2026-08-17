@@ -590,16 +590,37 @@ export async function setCalendarTask(
   const userName = (user.user_metadata?.display_name as string | undefined) ?? user.email ?? null;
   const now = new Date().toISOString();
 
-  const { error } = await supabase.rpc("upsert_calendar_task", {
-    p_id: id,
-    p_ym: ym,
-    p_test_name: testName,
-    p_measured: fields.measured ?? null,
-    p_analyzed: fields.analyzed ?? null,
-    p_note: fields.note ?? null,
-    p_user_id: userId,
-    p_user_name: userName,
-    p_now: now,
-  });
+  const { data: existing, error: readErr } = await supabase
+    .from("calendar_tasks")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (readErr) throw new Error(readErr.message);
+
+  const measured = fields.measured ?? existing?.measured ?? false;
+  const analyzed = fields.analyzed ?? existing?.analyzed ?? false;
+  const done = measured && analyzed;
+
+  const row = {
+    id,
+    ym,
+    test_name: testName,
+    measured,
+    measured_by: measured ? (existing?.measured ? existing.measured_by : userId) : null,
+    measured_by_name: measured ? (existing?.measured ? existing.measured_by_name : userName) : null,
+    measured_at: measured ? (existing?.measured ? existing.measured_at : now) : null,
+    analyzed,
+    analyzed_by: analyzed ? (existing?.analyzed ? existing.analyzed_by : userId) : null,
+    analyzed_by_name: analyzed ? (existing?.analyzed ? existing.analyzed_by_name : userName) : null,
+    analyzed_at: analyzed ? (existing?.analyzed ? existing.analyzed_at : now) : null,
+    done,
+    completed_by: done ? userId : null,
+    completed_by_name: done ? userName : null,
+    completed_at: done ? (existing?.done ? existing.completed_at : now) : null,
+    note: fields.note ?? existing?.note ?? null,
+    updated_at: now,
+  };
+
+  const { error } = await supabase.from("calendar_tasks").upsert(row);
   if (error) throw new Error(error.message);
 }
