@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Upload, Settings2, LineChart, LogOut, Users, Menu } from "lucide-react";
 import { SettingsMenu } from "./SettingsMenu";
 import { ChangePasswordDialog } from "./ChangePasswordDialog";
+import { ThemeToggle } from "./ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
@@ -91,6 +92,7 @@ export function AppShell() {
               </span>
             )}
             <ChangePasswordDialog />
+            <ThemeToggle />
             {me.data?.isAdmin && <SettingsMenu />}
             <Button variant="ghost" size="icon" onClick={signOut} aria-label="Cerrar sesión">
               <LogOut className="size-5" />
