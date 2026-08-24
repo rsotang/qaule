@@ -286,6 +286,30 @@ export type Database = {
         }
         Relationships: []
       }
+      python_scripts: {
+        Row: {
+          code: string
+          id: string
+          name: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          code?: string
+          id?: string
+          name: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          code?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       templates: {
         Row: {
           created_at: string
