@@ -17,7 +17,6 @@ import type {
 } from "./types";
 import { calendarTaskId } from "./types";
 
-
 // ---------- mapping helpers ----------
 
 type MachineRow = {
@@ -185,7 +184,10 @@ export async function updateMachineState(
 }
 
 /** Actualiza nombre y/o tipo de una máquina existente. */
-export async function updateMachine(id: string, patch: { name?: string; kind?: string }): Promise<void> {
+export async function updateMachine(
+  id: string,
+  patch: { name?: string; kind?: string },
+): Promise<void> {
   const { error } = await supabase.from("machines").update(patch).eq("id", id);
   if (error) throw new Error(error.message);
 }
@@ -206,13 +208,17 @@ export async function listMachineKinds(): Promise<MachineKindDef[]> {
   }));
 }
 
-export async function createMachineKind(rec: { id: string; name: string; categories: string[] }): Promise<void> {
+export async function createMachineKind(rec: {
+  id: string;
+  name: string;
+  categories: string[];
+}): Promise<void> {
   const { error } = await supabase.from("machine_kinds").insert({ id: rec.id, name: rec.name });
   if (error) throw new Error(error.message);
   if (rec.categories.length > 0) {
-    const { error: linkErr } = await supabase.from("machine_kind_categories").insert(
-      rec.categories.map((categoryId) => ({ kind_id: rec.id, category_id: categoryId })),
-    );
+    const { error: linkErr } = await supabase
+      .from("machine_kind_categories")
+      .insert(rec.categories.map((categoryId) => ({ kind_id: rec.id, category_id: categoryId })));
     if (linkErr) throw new Error(linkErr.message);
   }
 }
@@ -222,16 +228,22 @@ export async function updateMachineKind(
   patch: { name?: string; categories?: string[] },
 ): Promise<void> {
   if (patch.name !== undefined) {
-    const { error } = await supabase.from("machine_kinds").update({ name: patch.name }).eq("id", id);
+    const { error } = await supabase
+      .from("machine_kinds")
+      .update({ name: patch.name })
+      .eq("id", id);
     if (error) throw new Error(error.message);
   }
   if (patch.categories !== undefined) {
-    const { error: delErr } = await supabase.from("machine_kind_categories").delete().eq("kind_id", id);
+    const { error: delErr } = await supabase
+      .from("machine_kind_categories")
+      .delete()
+      .eq("kind_id", id);
     if (delErr) throw new Error(delErr.message);
     if (patch.categories.length > 0) {
-      const { error: linkErr } = await supabase.from("machine_kind_categories").insert(
-        patch.categories.map((categoryId) => ({ kind_id: id, category_id: categoryId })),
-      );
+      const { error: linkErr } = await supabase
+        .from("machine_kind_categories")
+        .insert(patch.categories.map((categoryId) => ({ kind_id: id, category_id: categoryId })));
       if (linkErr) throw new Error(linkErr.message);
     }
   }
@@ -373,9 +385,11 @@ export async function listMeasurements(machineId?: string): Promise<Measurement[
   const all: Measurement[] = [];
   const pageSize = 1000;
   let from = 0;
-  // eslint-disable-next-line no-constant-condition
   while (true) {
-    let q = supabase.from("measurements").select("*").range(from, from + pageSize - 1);
+    let q = supabase
+      .from("measurements")
+      .select("*")
+      .range(from, from + pageSize - 1);
     if (machineId) q = q.eq("machine_id", machineId);
     const { data, error } = await q;
     if (error) throw new Error(error.message);
@@ -474,8 +488,15 @@ export async function importAll(data: Awaited<ReturnType<typeof exportAll>>) {
   if (!data || typeof data !== "object") {
     throw new Error("Datos de importación no válidos: se esperaba un objeto");
   }
-  if (!Array.isArray(data.machines) || !Array.isArray(data.templates) || !Array.isArray(data.imports) || !Array.isArray(data.measurements)) {
-    throw new Error("Datos de importación no válidos: faltan arrays requeridos (machines, templates, imports, measurements)");
+  if (
+    !Array.isArray(data.machines) ||
+    !Array.isArray(data.templates) ||
+    !Array.isArray(data.imports) ||
+    !Array.isArray(data.measurements)
+  ) {
+    throw new Error(
+      "Datos de importación no válidos: faltan arrays requeridos (machines, templates, imports, measurements)",
+    );
   }
 
   await clearAllData();

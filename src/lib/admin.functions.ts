@@ -95,9 +95,7 @@ export const deleteUser = createServerFn({ method: "POST" })
 export const setUserRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
-    z
-      .object({ userId: z.string().uuid(), admin: z.boolean() })
-      .parse(input),
+    z.object({ userId: z.string().uuid(), admin: z.boolean() }).parse(input),
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);

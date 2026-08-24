@@ -86,7 +86,6 @@ function downloadText(text: string, filename: string) {
   }
 }
 
-
 export const Route = createFileRoute("/_authenticated/imports")({ component: ImportsPage });
 
 interface Preview {
@@ -94,7 +93,13 @@ interface Preview {
   fileName: string;
   fileHash: string;
   sourceDate: string;
-  rows: { testId: string; name: string; cellLabel: string; value: number | null; inTol: boolean | null }[];
+  rows: {
+    testId: string;
+    name: string;
+    cellLabel: string;
+    value: number | null;
+    inTol: boolean | null;
+  }[];
 }
 
 function ImportsPage() {
@@ -126,8 +131,6 @@ function ImportsPage() {
   const [mpcPreviews, setMpcPreviews] = useState<MpcFolderPreview[]>([]);
   const [mpcDragOver, setMpcDragOver] = useState(false);
   const mpcFolderRef = useRef<HTMLInputElement>(null);
-
-
 
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
   const machineList = useMachineList();
@@ -231,7 +234,9 @@ function ImportsPage() {
     const groups = groupMpcFiles(entries);
     const withResults = [...groups.values()].filter((g) => g.resultsCsv);
     if (withResults.length === 0) {
-      toast.error("No se encontraron carpetas MPC con Results.csv. Selecciona la carpeta del mes (o varias).");
+      toast.error(
+        "No se encontraron carpetas MPC con Results.csv. Selecciona la carpeta del mes (o varias).",
+      );
       return;
     }
     if (withResults.length > MPC_MAX_FOLDERS) {
@@ -451,17 +456,12 @@ function ImportsPage() {
     qc.invalidateQueries({ queryKey: ["calendar"] });
   }
 
-
-
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold sm:text-2xl">Importaciones</h1>
-          <p className="text-sm text-muted-foreground">
-            Sube un archivo .xlsm mensual por máquina
-          </p>
+          <p className="text-sm text-muted-foreground">Sube un archivo .xlsm mensual por máquina</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleBackup}>
@@ -505,7 +505,9 @@ function ImportsPage() {
               </Select>
             </div>
             <div className="w-full space-y-1 sm:w-auto">
-              <label className="text-xs text-muted-foreground">Archivos .xlsm / .xlsx (varios)</label>
+              <label className="text-xs text-muted-foreground">
+                Archivos .xlsm / .xlsx (varios)
+              </label>
               <Input
                 ref={fileRef}
                 type="file"
@@ -524,8 +526,8 @@ function ImportsPage() {
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
-                  {previews.length} archivo(s) ·{" "}
-                  {previews.reduce((n, p) => n + p.rows.length, 0)} valores válidos
+                  {previews.length} archivo(s) · {previews.reduce((n, p) => n + p.rows.length, 0)}{" "}
+                  valores válidos
                 </p>
                 <div className="flex gap-2">
                   <Button variant="ghost" size="sm" onClick={() => setPreviews([])}>
@@ -546,7 +548,8 @@ function ImportsPage() {
                     <div>
                       <p className="text-sm font-medium">{preview.fileName}</p>
                       <p className="text-xs text-muted-foreground">
-                        {preview.machineId} • fecha: {preview.sourceDate} • {preview.rows.length} valores extraídos
+                        {preview.machineId} • fecha: {preview.sourceDate} • {preview.rows.length}{" "}
+                        valores extraídos
                       </p>
                     </div>
                     <Button
@@ -573,7 +576,9 @@ function ImportsPage() {
                         {preview.rows.map((r, i) => (
                           <TableRow key={i}>
                             <TableCell className="text-xs">{r.name}</TableCell>
-                            <TableCell className="text-xs text-muted-foreground">{r.cellLabel}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {r.cellLabel}
+                            </TableCell>
                             <TableCell className="text-right text-xs font-mono">
                               {r.value == null ? (
                                 <span className="text-muted-foreground">—</span>
@@ -609,8 +614,8 @@ function ImportsPage() {
           </CardTitle>
           <p className="text-xs text-muted-foreground">
             Importa una o varias carpetas a la vez (mes completo con sus Check.xml y Results.csv).
-            Se importan todas las medidas y quedan disponibles en Visualización como test
-            «MPC (Varian)» → energía → grupo → parámetro.
+            Se importan todas las medidas y quedan disponibles en Visualización como test «MPC
+            (Varian)» → energía → grupo → parámetro.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -636,9 +641,7 @@ function ImportsPage() {
               </label>
               <div
                 className={`flex flex-row flex-wrap items-center justify-between gap-2 rounded-md border border-dashed px-3 py-2 transition-colors ${
-                  mpcDragOver
-                    ? "border-primary bg-primary/5"
-                    : "border-border bg-muted/20"
+                  mpcDragOver ? "border-primary bg-primary/5" : "border-border bg-muted/20"
                 }`}
                 onDragOver={(e) => {
                   e.preventDefault();
@@ -738,7 +741,9 @@ function ImportsPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() =>
-                            setMpcPreviews((prev) => prev.filter((p) => p.importId !== preview.importId))
+                            setMpcPreviews((prev) =>
+                              prev.filter((p) => p.importId !== preview.importId),
+                            )
                           }
                         >
                           <Trash2 className="size-4 text-destructive" />
@@ -888,7 +893,9 @@ function ImportsPage() {
               <Input
                 type="number"
                 value={calYear}
-                onChange={(e) => setCalYear(parseInt(e.target.value || "0", 10) || new Date().getFullYear())}
+                onChange={(e) =>
+                  setCalYear(parseInt(e.target.value || "0", 10) || new Date().getFullYear())
+                }
                 className="w-[120px]"
               />
             </div>
@@ -914,15 +921,14 @@ function ImportsPage() {
             </div>
           </div>
 
-
           {calPreview && (
             <div className="space-y-3 rounded-md border bg-muted/30 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="text-sm font-medium">{calFileName}</p>
                   <p className="text-xs text-muted-foreground">
-                    Hoja: {calPreview.sheetName} · {calPreview.detectedColumns.length} columnas detectadas ·{" "}
-                    {calPreview.entries.length} tests
+                    Hoja: {calPreview.sheetName} · {calPreview.detectedColumns.length} columnas
+                    detectadas · {calPreview.entries.length} tests
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -951,17 +957,18 @@ function ImportsPage() {
                         <TableCell className="text-xs">
                           {e.testName}
                           {e.category && (
-                            <span className="block text-[10px] text-muted-foreground">{e.category}</span>
+                            <span className="block text-[10px] text-muted-foreground">
+                              {e.category}
+                            </span>
                           )}
                           {e.detail && (
-                            <span className="block text-[10px] text-muted-foreground">nota: {e.detail}</span>
+                            <span className="block text-[10px] text-muted-foreground">
+                              nota: {e.detail}
+                            </span>
                           )}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
-                          {[
-                            ...e.months.map((m) => `mes ${m}`),
-                            ...e.dates,
-                          ].join(" · ") || "—"}
+                          {[...e.months.map((m) => `mes ${m}`), ...e.dates].join(" · ") || "—"}
                         </TableCell>
                         <TableCell className="text-xs">
                           {[e.patientId, e.course, e.plan].filter(Boolean).join(" · ") || "—"}
@@ -976,8 +983,6 @@ function ImportsPage() {
         </CardContent>
       </Card>
 
-
-
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Historial de importaciones</CardTitle>
@@ -985,13 +990,19 @@ function ImportsPage() {
         <CardContent>
           {importsTotal === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
-              No hay importaciones todavía. <Link to="/templates" className="text-primary underline">Configura una plantilla</Link> y sube tu primer archivo.
+              No hay importaciones todavía.{" "}
+              <Link to="/templates" className="text-primary underline">
+                Configura una plantilla
+              </Link>{" "}
+              y sube tu primer archivo.
             </p>
           ) : (
             <>
               <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
                 <span>
-                  {importsTotal} importaciones{importsTotal > IMPORTS_PAGE_SIZE && ` · página ${importsPage + 1} de ${importsPageCount}`}
+                  {importsTotal} importaciones
+                  {importsTotal > IMPORTS_PAGE_SIZE &&
+                    ` · página ${importsPage + 1} de ${importsPageCount}`}
                 </span>
                 {importsPageCount > 1 && (
                   <div className="flex items-center gap-1">

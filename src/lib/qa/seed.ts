@@ -4,7 +4,6 @@ import { emptyNest, textValue, cloneNodeDeep } from "./types";
 import type { ParsedSheet, ParsedWorkbook } from "./excel";
 import { autoDetectDateCell } from "./excel";
 
-
 const TEST_CODE_RE = /\b([A-ZÁÉÍÓÚÑ]{2,6})\s+(\d+(?:\.\d+){1,3})\b/;
 
 function inferCategory(sheetName: string): Category {
@@ -70,12 +69,14 @@ export function autoBuildTemplate(parsed: ParsedWorkbook, machineId: MachineId):
         const valueCells = findValueCells(sheet, r, c);
         const cleanName = v.replace(/\s+/g, " ").trim().slice(0, 120);
         const root: Nest = emptyNest("raíz");
-        root.children = valueCells.map((cc, i): DataPoint => ({
-          id: `dp-${counter}-${i}-${crypto.randomUUID().slice(0, 6)}`,
-          kind: "data",
-          name: textValue(cc.label),
-          cell: { sheet: sheet.name, address: cc.address },
-        }));
+        root.children = valueCells.map(
+          (cc, i): DataPoint => ({
+            id: `dp-${counter}-${i}-${crypto.randomUUID().slice(0, 6)}`,
+            kind: "data",
+            name: textValue(cc.label),
+            cell: { sheet: sheet.name, address: cc.address },
+          }),
+        );
         counter++;
 
         tests.push({

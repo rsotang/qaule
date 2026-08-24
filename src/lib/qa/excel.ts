@@ -1,5 +1,12 @@
 import * as XLSX from "xlsx";
-import type { CellRef, Template, ToleranceValue, Tolerance, TextOrRef, WalkedDataPoint } from "./types";
+import type {
+  CellRef,
+  Template,
+  ToleranceValue,
+  Tolerance,
+  TextOrRef,
+  WalkedDataPoint,
+} from "./types";
 import { walkDataPoints, dpSeriesLabel, parseToleranceText, displayTextOrRef } from "./types";
 
 export interface ParsedWorkbook {
@@ -13,7 +20,9 @@ export interface ParsedSheet {
   cells: (string | number | null)[][];
 }
 
-export async function readFile(file: File): Promise<{ wb: XLSX.WorkBook; parsed: ParsedWorkbook; hash: string }> {
+export async function readFile(
+  file: File,
+): Promise<{ wb: XLSX.WorkBook; parsed: ParsedWorkbook; hash: string }> {
   const buf = await file.arrayBuffer();
   const hash = await sha256(buf);
   const wb = XLSX.read(buf, { type: "array", cellDates: true });
@@ -24,7 +33,9 @@ export async function readFile(file: File): Promise<{ wb: XLSX.WorkBook; parsed:
 }
 
 function parseSheet(name: string, ws: XLSX.WorkSheet): ParsedSheet {
-  const range = ws["!ref"] ? XLSX.utils.decode_range(ws["!ref"]) : { s: { r: 0, c: 0 }, e: { r: 0, c: 0 } };
+  const range = ws["!ref"]
+    ? XLSX.utils.decode_range(ws["!ref"])
+    : { s: { r: 0, c: 0 }, e: { r: 0, c: 0 } };
   const rows = range.e.r + 1;
   const cols = range.e.c + 1;
   const cells: (string | number | null)[][] = [];
@@ -34,10 +45,17 @@ function parseSheet(name: string, ws: XLSX.WorkSheet): ParsedSheet {
       const addr = XLSX.utils.encode_cell({ r, c });
       const cell = ws[addr];
       if (!cell) row.push(null);
-      else if (cell.t === "e") row.push(null); // Excel error (#DIV/0!, #REF!, #N/A, etc.)
+      else if (cell.t === "e")
+        row.push(null); // Excel error (#DIV/0!, #REF!, #N/A, etc.)
       else if (cell.v == null) row.push(null);
       else if (typeof cell.v === "string" && cell.v.trim() === "") row.push(null);
-      else if (typeof cell.v === "string" && /^#?(DIV\/0!|REF!|N\s*\/\s*A|NA|NAME\?|VALUE!|NULL!|NUM!|GETTING_DATA)$/i.test(cell.v.trim())) row.push(null);
+      else if (
+        typeof cell.v === "string" &&
+        /^#?(DIV\/0!|REF!|N\s*\/\s*A|NA|NAME\?|VALUE!|NULL!|NUM!|GETTING_DATA)$/i.test(
+          cell.v.trim(),
+        )
+      )
+        row.push(null);
       else if (cell.v instanceof Date) row.push(cell.v.toISOString());
       else row.push(cell.v as string | number);
     }
@@ -70,9 +88,10 @@ export function readDate(parsed: ParsedWorkbook, ref: CellRef): string | null {
   if (typeof v === "string") {
     const iso = new Date(v);
     if (!isNaN(iso.getTime())) return iso.toISOString().slice(0, 10);
-    const m = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+    const m = v.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
     if (m) {
-      let [, d, mo, y] = m;
+      const [, d, mo] = m;
+      let y = m[3];
       if (y.length === 2) y = "20" + y;
       return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`;
     }
@@ -139,7 +158,11 @@ function resolveTolerance(
 }
 
 /** Resolve a TextOrRef to its real value: text as-is, cellRef -> the cell's content. */
-export function resolveTextOrRef(v: TextOrRef | undefined, parsed: ParsedWorkbook, placeholder = ""): string {
+export function resolveTextOrRef(
+  v: TextOrRef | undefined,
+  parsed: ParsedWorkbook,
+  placeholder = "",
+): string {
   if (!v) return placeholder;
   if (v.kind === "text") return v.text || placeholder;
   const raw = readCell(parsed, { sheet: v.sheet, address: v.address });
@@ -150,7 +173,10 @@ export function resolveTextOrRef(v: TextOrRef | undefined, parsed: ParsedWorkboo
 
 /** Series label with cell references replaced by their workbook values. */
 export function resolvedSeriesLabel(w: WalkedDataPoint, parsed: ParsedWorkbook): string {
-  return [...w.path.map((p) => resolveTextOrRef(p, parsed, "?")), resolveTextOrRef(w.dp.name, parsed, "?")]
+  return [
+    ...w.path.map((p) => resolveTextOrRef(p, parsed, "?")),
+    resolveTextOrRef(w.dp.name, parsed, "?"),
+  ]
     .filter(Boolean)
     .join(" / ");
 }

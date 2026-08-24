@@ -55,7 +55,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-export const Route = createFileRoute("/_authenticated/visualization")({ component: VisualizationPage });
+export const Route = createFileRoute("/_authenticated/visualization")({
+  component: VisualizationPage,
+});
 
 interface SeriesSel {
   id: string;
@@ -66,10 +68,25 @@ interface SeriesSel {
   path: string[];
 }
 
-const COLORS = ["#2563eb", "#dc2626", "#16a34a", "#ca8a04", "#9333ea", "#0891b2", "#db2777", "#0d9488"];
+const COLORS = [
+  "#2563eb",
+  "#dc2626",
+  "#16a34a",
+  "#ca8a04",
+  "#9333ea",
+  "#0891b2",
+  "#db2777",
+  "#0d9488",
+];
 
 function newSeries(): SeriesSel {
-  return { id: `s-${Math.random().toString(36).slice(2, 9)}`, machineId: "", categoryId: "", testId: "", path: [] };
+  return {
+    id: `s-${Math.random().toString(36).slice(2, 9)}`,
+    machineId: "",
+    categoryId: "",
+    testId: "",
+    path: [],
+  };
 }
 
 /** Node of the parameter tree derived from measurement labels in the DB. */
@@ -97,7 +114,10 @@ function buildLabelIndex(measurements: Measurement[]) {
       root = emptyNode("");
       byTest.set(m.testId, root);
     }
-    const segs = m.cellLabel.split(" / ").map((s) => s.trim()).filter(Boolean);
+    const segs = m.cellLabel
+      .split(" / ")
+      .map((s) => s.trim())
+      .filter(Boolean);
     if (segs.length === 0) continue;
     let cur = root;
     segs.forEach((seg, i) => {
@@ -192,7 +212,7 @@ function VisualizationPage() {
   /** Test en cualquiera de las plantillas de la máquina (el de MPC está en la suya). */
   const testForMachine = useCallback(
     (mid: MachineId | "", testId: string) => {
-      const tests = (mid ? templatesByMachine.get(mid) ?? [] : []).flatMap((t) => t.tests);
+      const tests = (mid ? (templatesByMachine.get(mid) ?? []) : []).flatMap((t) => t.tests);
       return tests.find((t) => t.id === testId) ?? null;
     },
     [templatesByMachine],
@@ -222,7 +242,9 @@ function VisualizationPage() {
     if (s.machineId) {
       const byTest = labelIndex.get(s.machineId);
       for (const testId of byTest?.keys() ?? []) {
-        const cat = testForMachine(s.machineId, testId)?.category ?? (testId === "mpc" ? MPC_CATEGORY : undefined);
+        const cat =
+          testForMachine(s.machineId, testId)?.category ??
+          (testId === "mpc" ? MPC_CATEGORY : undefined);
         if (cat) used.add(cat);
       }
     }
@@ -265,7 +287,10 @@ function VisualizationPage() {
 
   // Build chart data: one row per date, with each series key as column
   const chartData = useMemo(() => {
-    const byDate = new Map<string, { date: string; sums: Map<string, { sum: number; n: number }> }>();
+    const byDate = new Map<
+      string,
+      { date: string; sums: Map<string, { sum: number; n: number }> }
+    >();
     for (const r of resolved) {
       if (!r.isLeaf) continue;
       const seriesId = r.sel.id;
@@ -304,7 +329,9 @@ function VisualizationPage() {
     const pct = (p: number) =>
       sorted.length === 0
         ? 0
-        : sorted[Math.min(sorted.length - 1, Math.max(0, Math.round((p / 100) * (sorted.length - 1))))];
+        : sorted[
+            Math.min(sorted.length - 1, Math.max(0, Math.round((p / 100) * (sorted.length - 1))))
+          ];
     let min = sorted.length <= 4 ? (sorted[0] ?? 0) : pct(5);
     let max = sorted.length <= 4 ? (sorted[sorted.length - 1] ?? 1) : pct(95);
     if (min === max && sorted.length > 0) {
@@ -337,7 +364,12 @@ function VisualizationPage() {
       }
     }
 
-    if (sorted.length === 0) return { yDomain: undefined as [number, number] | undefined, fmtAxis: (v: number) => String(v), unitLabel: "" };
+    if (sorted.length === 0)
+      return {
+        yDomain: undefined as [number, number] | undefined,
+        fmtAxis: (v: number) => String(v),
+        unitLabel: "",
+      };
     if (min === max) {
       const base = Math.abs(min) || 1;
       min -= base * 0.1;
@@ -347,7 +379,17 @@ function VisualizationPage() {
     const yDomain: [number, number] = [min - span * 0.15, max + span * 0.15];
     const visibleSpan = yDomain[1] - yDomain[0];
     const decimals =
-      visibleSpan >= 100 ? 0 : visibleSpan >= 10 ? 1 : visibleSpan >= 1 ? 2 : visibleSpan >= 0.1 ? 3 : visibleSpan >= 0.01 ? 4 : 5;
+      visibleSpan >= 100
+        ? 0
+        : visibleSpan >= 10
+          ? 1
+          : visibleSpan >= 1
+            ? 2
+            : visibleSpan >= 0.1
+              ? 3
+              : visibleSpan >= 0.01
+                ? 4
+                : 5;
     const fmtAxis = (v: number) => {
       if (!isFinite(v)) return "";
       const abs = Math.abs(v);
@@ -362,7 +404,8 @@ function VisualizationPage() {
       const u = displayTextOrRef(r.leaf.unit, "").trim();
       if (u) units.add(u);
     }
-    const unitLabel = units.size === 1 ? [...units][0] : units.size > 1 ? [...units].join(" / ") : "";
+    const unitLabel =
+      units.size === 1 ? [...units][0] : units.size > 1 ? [...units].join(" / ") : "";
 
     return { yDomain, fmtAxis, unitLabel };
   }, [chartData, resolved, showTolerance, showReference]);
@@ -386,20 +429,34 @@ function VisualizationPage() {
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label className="text-[10px] uppercase text-muted-foreground">Desde</Label>
-                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 text-xs" />
+                <Input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="h-8 text-xs"
+                />
               </div>
               <div className="space-y-1">
                 <Label className="text-[10px] uppercase text-muted-foreground">Hasta</Label>
-                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 text-xs" />
+                <Input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="h-8 text-xs"
+                />
               </div>
             </div>
             <div className="space-y-2 border-t pt-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="tog-tol" className="text-xs">Mostrar tolerancias</Label>
+                <Label htmlFor="tog-tol" className="text-xs">
+                  Mostrar tolerancias
+                </Label>
                 <Switch id="tog-tol" checked={showTolerance} onCheckedChange={setShowTolerance} />
               </div>
               <div className="flex items-center justify-between">
-                <Label htmlFor="tog-ref" className="text-xs">Mostrar referencias</Label>
+                <Label htmlFor="tog-ref" className="text-xs">
+                  Mostrar referencias
+                </Label>
                 <Switch id="tog-ref" checked={showReference} onCheckedChange={setShowReference} />
               </div>
             </div>
@@ -417,7 +474,8 @@ function VisualizationPage() {
             const r = resolved.find((x) => x.sel.id === s.id);
             const leaf = r?.leaf ?? null;
 
-            const levels: { current: LabelNode; selectedId: string | undefined; depth: number }[] = [];
+            const levels: { current: LabelNode; selectedId: string | undefined; depth: number }[] =
+              [];
             if (root) {
               let node: LabelNode | undefined = root;
               let depth = 0;
@@ -437,7 +495,12 @@ function VisualizationPage() {
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm">Parámetro {idx + 1}</CardTitle>
                   {series.length > 1 && (
-                    <Button variant="ghost" size="icon" className="size-6" onClick={() => removeSeries(s.id)}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-6"
+                      onClick={() => removeSeries(s.id)}
+                    >
                       <Trash2 className="size-3.5" />
                     </Button>
                   )}
@@ -449,13 +512,22 @@ function VisualizationPage() {
                       <Select
                         value={s.machineId || undefined}
                         onValueChange={(v) =>
-                          updateSeries(s.id, { machineId: v as MachineId, categoryId: "", testId: "", path: [] })
+                          updateSeries(s.id, {
+                            machineId: v as MachineId,
+                            categoryId: "",
+                            testId: "",
+                            path: [],
+                          })
                         }
                       >
-                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecciona máquina" /></SelectTrigger>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Selecciona máquina" />
+                        </SelectTrigger>
                         <SelectContent>
                           {machineList.map((m) => (
-                            <SelectItem key={m.id} value={m.id}>{m.id} — {m.name}</SelectItem>
+                            <SelectItem key={m.id} value={m.id}>
+                              {m.id} — {m.name}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -463,17 +535,23 @@ function VisualizationPage() {
 
                     {s.machineId && (
                       <div className="w-full space-y-1 sm:w-[180px]">
-                        <Label className="text-[10px] uppercase text-muted-foreground">Categoría</Label>
+                        <Label className="text-[10px] uppercase text-muted-foreground">
+                          Categoría
+                        </Label>
                         <Select
                           value={s.categoryId || undefined}
                           onValueChange={(v) =>
                             updateSeries(s.id, { categoryId: v, testId: "", path: [] })
                           }
                         >
-                          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Todas" />
+                          </SelectTrigger>
                           <SelectContent>
                             {categoryOptionsFor(s).map((c) => (
-                              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                              <SelectItem key={c.id} value={c.id}>
+                                {c.name}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -487,13 +565,19 @@ function VisualizationPage() {
                           value={s.testId || undefined}
                           onValueChange={(v) => updateSeries(s.id, { testId: v, path: [] })}
                         >
-                          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecciona test" /></SelectTrigger>
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Selecciona test" />
+                          </SelectTrigger>
                           <SelectContent>
                             {tests.length === 0 ? (
-                              <div className="px-2 py-1.5 text-xs text-muted-foreground">Sin datos importados</div>
+                              <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                                Sin datos importados
+                              </div>
                             ) : (
                               tests.map((t) => (
-                                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                                <SelectItem key={t.id} value={t.id}>
+                                  {t.name}
+                                </SelectItem>
                               ))
                             )}
                           </SelectContent>
@@ -534,12 +618,16 @@ function VisualizationPage() {
 
                   {isLeaf && (
                     <div className="mt-2 rounded border border-dashed bg-muted/30 p-2 text-[10px] text-muted-foreground">
-                      <div className="font-medium text-foreground">{chain.map((n) => n.name).join(" / ")}</div>
+                      <div className="font-medium text-foreground">
+                        {chain.map((n) => n.name).join(" / ")}
+                      </div>
                       {leaf?.unit && <div>Unidad: {displayTextOrRef(leaf.unit, "—")}</div>}
                       {leaf?.parsedTolerance && leaf.parsedTolerance.type !== "none" && (
                         <div>Tolerancia: {displayTextOrRef(leaf.tolerance, "—")}</div>
                       )}
-                      {leaf?.reference && <div>Referencia: {displayTextOrRef(leaf.reference, "—")}</div>}
+                      {leaf?.reference && (
+                        <div>Referencia: {displayTextOrRef(leaf.reference, "—")}</div>
+                      )}
                     </div>
                   )}
                   {!isLeaf && s.testId && (
@@ -570,125 +658,150 @@ function VisualizationPage() {
 
       {/* Chart below */}
       <div>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Evolución</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {chartData.length === 0 ? (
-                <div className="flex h-[360px] flex-col items-center justify-center gap-1 text-sm text-muted-foreground">
-                  {resolved.every((r) => !r.isLeaf) ? (
-                    <span>Selecciona al menos un parámetro completo (hasta un punto ●) para visualizar datos.</span>
-                  ) : (
-                    <>
-                      <span>No hay mediciones para la selección actual.</span>
-                      <span className="text-xs">Revisa el rango de fechas o importa datos para este parámetro.</span>
-                    </>
-                  )}
-                </div>
-              ) : (
-                <div className="h-[420px] w-full">
-                  <ResponsiveContainer>
-                    <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
-                      <XAxis dataKey="date" fontSize={11} tick={{ fill: "currentColor" }} />
-                      <YAxis
-                        domain={yDomain ?? ["auto", "auto"]}
-                        fontSize={11}
-                        tick={{ fill: "currentColor" }}
-                        width={64}
-                        tickFormatter={fmtAxis}
-                        allowDecimals
-                        label={
-                          unitLabel
-                            ? { value: unitLabel, angle: -90, position: "insideLeft", style: { fill: "currentColor", fontSize: 11 } }
-                            : undefined
-                        }
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          background: "var(--popover)",
-                          color: "var(--popover-foreground)",
-                          border: "1px solid var(--border)",
-                          borderRadius: 6,
-                          fontSize: 12,
-                        }}
-                        formatter={(v: number | string) => {
-                          if (typeof v !== "number") return v;
-                          return unitLabel ? `${fmtAxis(v)} ${unitLabel}` : fmtAxis(v);
-                        }}
-                      />
-                      <Legend wrapperStyle={{ fontSize: 11 }} />
-                      {resolved.flatMap((r) => {
-                        if (!r.isLeaf || !r.leaf) return [];
-                        const band = showTolerance ? toleranceBand(r.leaf.parsedTolerance) : null;
-                        const refVal = showReference ? parseRefNumber(r.leaf.reference) : null;
-                        const lines = [];
-                        if (band) {
-                          lines.push(
-                            <ReferenceLine
-                              key={`${r.sel.id}-tmin`}
-                              y={band.min}
-                              stroke={r.color}
-                              strokeWidth={1.5}
-                              ifOverflow="extendDomain"
-                              label={{ value: "Tol min", fill: r.color, fontSize: 9, position: "insideBottomRight" }}
-                            />,
-                            <ReferenceLine
-                              key={`${r.sel.id}-tmax`}
-                              y={band.max}
-                              stroke={r.color}
-                              strokeWidth={1.5}
-                              ifOverflow="extendDomain"
-                              label={{ value: "Tol max", fill: r.color, fontSize: 9, position: "insideTopRight" }}
-                            />,
-                          );
-                        }
-                        if (refVal != null) {
-                          lines.push(
-                            <ReferenceLine
-                              key={`${r.sel.id}-ref`}
-                              y={refVal}
-                              stroke={r.color}
-                              strokeDasharray="6 4"
-                              strokeWidth={1.5}
-                              ifOverflow="extendDomain"
-                              label={{ value: "Ref", fill: r.color, fontSize: 9, position: "insideTopLeft" }}
-                            />,
-                          );
-                        }
-                        return lines;
-                      })}
-                      {resolved.map((r) => {
-                        if (!r.isLeaf) return null;
-                        const name = `${r.sel.machineId} · ${r.test?.name ?? r.sel.testId} · ${r.key}`;
-                        return (
-                          <Line
-                            key={r.sel.id}
-                            type="monotone"
-                            dataKey={r.sel.id}
-                            name={name}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Evolución</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {chartData.length === 0 ? (
+              <div className="flex h-[360px] flex-col items-center justify-center gap-1 text-sm text-muted-foreground">
+                {resolved.every((r) => !r.isLeaf) ? (
+                  <span>
+                    Selecciona al menos un parámetro completo (hasta un punto ●) para visualizar
+                    datos.
+                  </span>
+                ) : (
+                  <>
+                    <span>No hay mediciones para la selección actual.</span>
+                    <span className="text-xs">
+                      Revisa el rango de fechas o importa datos para este parámetro.
+                    </span>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="h-[420px] w-full">
+                <ResponsiveContainer>
+                  <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="hsl(var(--border))"
+                      opacity={0.4}
+                    />
+                    <XAxis dataKey="date" fontSize={11} tick={{ fill: "currentColor" }} />
+                    <YAxis
+                      domain={yDomain ?? ["auto", "auto"]}
+                      fontSize={11}
+                      tick={{ fill: "currentColor" }}
+                      width={64}
+                      tickFormatter={fmtAxis}
+                      allowDecimals
+                      label={
+                        unitLabel
+                          ? {
+                              value: unitLabel,
+                              angle: -90,
+                              position: "insideLeft",
+                              style: { fill: "currentColor", fontSize: 11 },
+                            }
+                          : undefined
+                      }
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        background: "var(--popover)",
+                        color: "var(--popover-foreground)",
+                        border: "1px solid var(--border)",
+                        borderRadius: 6,
+                        fontSize: 12,
+                      }}
+                      formatter={(v: number | string) => {
+                        if (typeof v !== "number") return v;
+                        return unitLabel ? `${fmtAxis(v)} ${unitLabel}` : fmtAxis(v);
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    {resolved.flatMap((r) => {
+                      if (!r.isLeaf || !r.leaf) return [];
+                      const band = showTolerance ? toleranceBand(r.leaf.parsedTolerance) : null;
+                      const refVal = showReference ? parseRefNumber(r.leaf.reference) : null;
+                      const lines = [];
+                      if (band) {
+                        lines.push(
+                          <ReferenceLine
+                            key={`${r.sel.id}-tmin`}
+                            y={band.min}
                             stroke={r.color}
-                            strokeWidth={2}
-                            dot={{ r: 3.5, fill: r.color, stroke: "white", strokeWidth: 1 }}
-                            connectNulls
-                            isAnimationActive={false}
-                          />
+                            strokeWidth={1.5}
+                            ifOverflow="extendDomain"
+                            label={{
+                              value: "Tol min",
+                              fill: r.color,
+                              fontSize: 9,
+                              position: "insideBottomRight",
+                            }}
+                          />,
+                          <ReferenceLine
+                            key={`${r.sel.id}-tmax`}
+                            y={band.max}
+                            stroke={r.color}
+                            strokeWidth={1.5}
+                            ifOverflow="extendDomain"
+                            label={{
+                              value: "Tol max",
+                              fill: r.color,
+                              fontSize: 9,
+                              position: "insideTopRight",
+                            }}
+                          />,
                         );
-                      })}
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                      }
+                      if (refVal != null) {
+                        lines.push(
+                          <ReferenceLine
+                            key={`${r.sel.id}-ref`}
+                            y={refVal}
+                            stroke={r.color}
+                            strokeDasharray="6 4"
+                            strokeWidth={1.5}
+                            ifOverflow="extendDomain"
+                            label={{
+                              value: "Ref",
+                              fill: r.color,
+                              fontSize: 9,
+                              position: "insideTopLeft",
+                            }}
+                          />,
+                        );
+                      }
+                      return lines;
+                    })}
+                    {resolved.map((r) => {
+                      if (!r.isLeaf) return null;
+                      const name = `${r.sel.machineId} · ${r.test?.name ?? r.sel.testId} · ${r.key}`;
+                      return (
+                        <Line
+                          key={r.sel.id}
+                          type="monotone"
+                          dataKey={r.sel.id}
+                          name={name}
+                          stroke={r.color}
+                          strokeWidth={2}
+                          dot={{ r: 3.5, fill: r.color, stroke: "white", strokeWidth: 1 }}
+                          connectNulls
+                          isAnimationActive={false}
+                        />
+                      );
+                    })}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      <TestSnapshot
-        measurements={allMeasurements.data ?? []}
-        templates={allTemplates.data ?? []}
-      />
+      <TestSnapshot measurements={allMeasurements.data ?? []} templates={allTemplates.data ?? []} />
     </div>
   );
 }
@@ -734,7 +847,10 @@ function buildMetaMap(test: TestDef | undefined): Map<string, MetaEntry> {
 function buildSnapTree(rows: Measurement[], metaMap: Map<string, MetaEntry>): SnapNode {
   const root: SnapNode = { name: "", children: new Map() };
   for (const m of rows) {
-    const segs = m.cellLabel.split(" / ").map((s) => s.trim()).filter(Boolean);
+    const segs = m.cellLabel
+      .split(" / ")
+      .map((s) => s.trim())
+      .filter(Boolean);
     let cur = root;
     const meta = metaMap.get(m.cellLabel);
     segs.forEach((seg, i) => {
@@ -747,7 +863,9 @@ function buildSnapTree(rows: Measurement[], metaMap: Map<string, MetaEntry>): Sn
         next.value = m.value;
         next.date = m.date;
         if (meta) {
-          const ok = meta.parsedTolerance ? evaluateTolerance(meta.parsedTolerance, m.value).inTolerance : true;
+          const ok = meta.parsedTolerance
+            ? evaluateTolerance(meta.parsedTolerance, m.value).inTolerance
+            : true;
           next.meta = {
             unit: meta.unit,
             tolerance: meta.tolerance,
@@ -775,9 +893,13 @@ function SnapBranch({ node, depth }: { node: SnapNode; depth: number }) {
         <li key={c.name}>
           <div className="flex flex-col gap-0.5 py-0.5">
             <div className="flex items-baseline justify-between gap-3">
-              <span className={c.children.size === 0 ? "text-xs" : "text-xs font-medium"}>{c.name}</span>
+              <span className={c.children.size === 0 ? "text-xs" : "text-xs font-medium"}>
+                {c.name}
+              </span>
               {c.value != null && (
-                <span className={`font-mono text-xs tabular-nums ${c.meta && !c.meta.inTolerance ? "text-destructive" : "text-primary"}`}>
+                <span
+                  className={`font-mono text-xs tabular-nums ${c.meta && !c.meta.inTolerance ? "text-destructive" : "text-primary"}`}
+                >
                   {fmtVal(c.value)}
                   {c.meta?.unit ? ` ${c.meta.unit}` : ""}
                 </span>
@@ -812,15 +934,14 @@ function TestSnapshot({
   const [month, setMonth] = useState("");
 
   const tests = useMemo(() => {
-    const ids = new Set(
-      measurements.filter((m) => m.machineId === machineId).map((m) => m.testId),
-    );
+    const ids = new Set(measurements.filter((m) => m.machineId === machineId).map((m) => m.testId));
     const tplTests = templates.filter((t) => t.machineId === machineId).flatMap((t) => t.tests);
     return [...ids]
       .map((id) => ({
         id,
         name: tplTests.find((t) => t.id === id)?.name ?? (id === "mpc" ? MPC_TEST_NAME : id),
-        category: tplTests.find((t) => t.id === id)?.category ?? (id === "mpc" ? MPC_CATEGORY : undefined),
+        category:
+          tplTests.find((t) => t.id === id)?.category ?? (id === "mpc" ? MPC_CATEGORY : undefined),
       }))
       .filter((t) => !categoryId || t.category === categoryId)
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -833,7 +954,8 @@ function TestSnapshot({
     const ids = new Set(measurements.filter((m) => m.machineId === machineId).map((m) => m.testId));
     for (const id of ids) {
       const tplTests = templates.filter((t) => t.machineId === machineId).flatMap((t) => t.tests);
-      const cat = tplTests.find((t) => t.id === id)?.category ?? (id === "mpc" ? MPC_CATEGORY : undefined);
+      const cat =
+        tplTests.find((t) => t.id === id)?.category ?? (id === "mpc" ? MPC_CATEGORY : undefined);
       if (cat) used.add(cat);
     }
     const seen = new Set<string>(fromCatalog);
@@ -900,10 +1022,14 @@ function TestSnapshot({
                 setMonth("");
               }}
             >
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecciona máquina" /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Selecciona máquina" />
+              </SelectTrigger>
               <SelectContent>
                 {machineList.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>{m.id} — {m.name}</SelectItem>
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.id} — {m.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -913,12 +1039,20 @@ function TestSnapshot({
               <Label className="text-[10px] uppercase text-muted-foreground">Categoría</Label>
               <Select
                 value={categoryId || undefined}
-                onValueChange={(v) => { setCategoryId(v); setTestId(""); setMonth(""); }}
+                onValueChange={(v) => {
+                  setCategoryId(v);
+                  setTestId("");
+                  setMonth("");
+                }}
               >
-                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Todas" />
+                </SelectTrigger>
                 <SelectContent>
                   {categoryOptions.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -927,13 +1061,27 @@ function TestSnapshot({
           {machineId && (
             <div className="w-full space-y-1 sm:w-[220px]">
               <Label className="text-[10px] uppercase text-muted-foreground">Prueba</Label>
-              <Select value={testId || undefined} onValueChange={(v) => { setTestId(v); setMonth(""); }}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecciona prueba" /></SelectTrigger>
+              <Select
+                value={testId || undefined}
+                onValueChange={(v) => {
+                  setTestId(v);
+                  setMonth("");
+                }}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Selecciona prueba" />
+                </SelectTrigger>
                 <SelectContent>
                   {tests.length === 0 ? (
-                    <div className="px-2 py-1.5 text-xs text-muted-foreground">Sin datos importados</div>
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                      Sin datos importados
+                    </div>
                   ) : (
-                    tests.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)
+                    tests.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))
                   )}
                 </SelectContent>
               </Select>
@@ -943,9 +1091,15 @@ function TestSnapshot({
             <div className="w-full space-y-1 sm:w-[160px]">
               <Label className="text-[10px] uppercase text-muted-foreground">Mes</Label>
               <Select value={month || undefined} onValueChange={setMonth}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecciona mes" /></SelectTrigger>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Selecciona mes" />
+                </SelectTrigger>
                 <SelectContent>
-                  {months.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  {months.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -964,12 +1118,16 @@ function TestSnapshot({
           <Tabs defaultValue="table">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">{testName}</span> · {machineId} · {month} ·{" "}
-                {rows.length} valores
+                <span className="font-medium text-foreground">{testName}</span> · {machineId} ·{" "}
+                {month} · {rows.length} valores
               </div>
               <TabsList className="h-8">
-                <TabsTrigger value="table" className="text-xs">Tabla</TabsTrigger>
-                <TabsTrigger value="tree" className="text-xs">Árbol</TabsTrigger>
+                <TabsTrigger value="table" className="text-xs">
+                  Tabla
+                </TabsTrigger>
+                <TabsTrigger value="tree" className="text-xs">
+                  Árbol
+                </TabsTrigger>
               </TabsList>
             </div>
             <TabsContent value="table" className="mt-2">
@@ -989,20 +1147,34 @@ function TestSnapshot({
                   <TableBody>
                     {rows.map((m) => {
                       const meta = metaMap.get(m.cellLabel);
-                      const ok = meta?.parsedTolerance ? evaluateTolerance(meta.parsedTolerance, m.value).inTolerance : true;
+                      const ok = meta?.parsedTolerance
+                        ? evaluateTolerance(meta.parsedTolerance, m.value).inTolerance
+                        : true;
                       return (
                         <TableRow key={m.id}>
                           <TableCell className="text-xs">{m.cellLabel}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">{m.date}</TableCell>
-                          <TableCell className={`text-right font-mono text-xs tabular-nums ${ok ? "" : "text-destructive font-medium"}`}>
+                          <TableCell
+                            className={`text-right font-mono text-xs tabular-nums ${ok ? "" : "text-destructive font-medium"}`}
+                          >
                             {fmtVal(m.value)}
                           </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{meta?.unit ?? "—"}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{meta?.tolerance ?? "—"}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{meta?.reference ?? "—"}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {meta?.unit ?? "—"}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {meta?.tolerance ?? "—"}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {meta?.reference ?? "—"}
+                          </TableCell>
                           <TableCell className="text-center text-xs">
                             {meta?.parsedTolerance && meta.parsedTolerance.type !== "none" ? (
-                              ok ? <span className="text-emerald-600">✓</span> : <span className="text-destructive">✗</span>
+                              ok ? (
+                                <span className="text-emerald-600">✓</span>
+                              ) : (
+                                <span className="text-destructive">✗</span>
+                              )
                             ) : (
                               <span className="text-muted-foreground">—</span>
                             )}
@@ -1025,4 +1197,3 @@ function TestSnapshot({
     </Card>
   );
 }
-

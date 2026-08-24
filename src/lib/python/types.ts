@@ -12,6 +12,7 @@ export type RunnerToParent =
 export type RunnerFile = { name: string; bytes: ArrayBuffer };
 
 export type ParentToRunner =
-  { type: "ping" } | { type: "run"; code: string; context: unknown; files: RunnerFile[] };
+  | { type: "ping" }
+  | { type: "run"; code: string; context: unknown; files: RunnerFile[] };
 
 export const RUNNER_PATH = "/python-runner";

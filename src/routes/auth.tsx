@@ -97,32 +97,62 @@ function AuthPage() {
             <form className="space-y-4" onSubmit={handleBootstrap}>
               <div className="space-y-1.5">
                 <Label htmlFor="dn">Nombre</Label>
-                <Input id="dn" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+                <Input
+                  id="dn"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="em">Email</Label>
-                <Input id="em" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                <Input
+                  id="em"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="pw">Contraseña</Label>
-                <Input id="pw" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
+                <Input
+                  id="pw"
+                  type="password"
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
               </div>
               <Button type="submit" className="w-full" disabled={busy}>
                 {busy ? "Creando…" : "Crear administrador y entrar"}
               </Button>
               <p className="text-center text-xs text-muted-foreground">
-                Esta opción solo aparece la primera vez. Las cuentas posteriores las crea el administrador.
+                Esta opción solo aparece la primera vez. Las cuentas posteriores las crea el
+                administrador.
               </p>
             </form>
           ) : (
             <form className="space-y-4" onSubmit={handleSignIn}>
               <div className="space-y-1.5">
                 <Label htmlFor="em-login">Email</Label>
-                <Input id="em-login" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                <Input
+                  id="em-login"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="pw-login">Contraseña</Label>
-                <Input id="pw-login" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+                <Input
+                  id="pw-login"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
               </div>
               <Button type="submit" className="w-full" disabled={busy}>
                 {busy ? "Entrando…" : "Entrar"}

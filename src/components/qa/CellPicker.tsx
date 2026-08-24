@@ -1,7 +1,13 @@
 import { useMemo, useState } from "react";
 import type { ParsedSheet, ParsedWorkbook } from "@/lib/qa/excel";
 import { colLabel, encodeAddress } from "@/lib/qa/excel";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -13,7 +19,6 @@ interface Props {
 }
 
 export function CellPicker({ parsed, initialSheet, selected = [], onPick, maxRows }: Props) {
-
   const sheetNames = parsed.sheets.map((s) => s.name);
   const [active, setActive] = useState(initialSheet ?? sheetNames[0] ?? "");
 
@@ -29,7 +34,6 @@ export function CellPicker({ parsed, initialSheet, selected = [], onPick, maxRow
 
   const rows = maxRows ? Math.min(sheet.rows, maxRows) : sheet.rows;
   const cols = sheet.cols;
-
 
   return (
     <div className="space-y-2">
@@ -57,7 +61,10 @@ export function CellPicker({ parsed, initialSheet, selected = [], onPick, maxRow
             <tr>
               <th className="sticky left-0 z-20 w-10 border-b border-r bg-muted px-1" />
               {Array.from({ length: cols }, (_, c) => (
-                <th key={c} className="min-w-[90px] border-b border-r px-1 py-1 text-center font-medium text-muted-foreground">
+                <th
+                  key={c}
+                  className="min-w-[90px] border-b border-r px-1 py-1 text-center font-medium text-muted-foreground"
+                >
                   {colLabel(c)}
                 </th>
               ))}
@@ -73,7 +80,8 @@ export function CellPicker({ parsed, initialSheet, selected = [], onPick, maxRow
                   const addr = encodeAddress(r, c);
                   const v = sheet.cells[r]?.[c];
                   const isSelected = selectedSet.has(addr);
-                  const display = v == null ? "" : typeof v === "number" ? formatCellNum(v) : String(v);
+                  const display =
+                    v == null ? "" : typeof v === "number" ? formatCellNum(v) : String(v);
                   return (
                     <td
                       key={c}

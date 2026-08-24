@@ -75,13 +75,33 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "QAULE — Control de calidad" },
-      { name: "description", content: "QAULE: panel de control de calidad para aceleradores lineales y sistemas de imagen" },
+      {
+        name: "description",
+        content:
+          "QAULE: panel de control de calidad para aceleradores lineales y sistemas de imagen",
+      },
       { property: "og:title", content: "QAULE — Control de calidad" },
       { name: "twitter:title", content: "QAULE — Control de calidad" },
-      { property: "og:description", content: "QAULE: panel de control de calidad para aceleradores lineales y sistemas de imagen" },
-      { name: "twitter:description", content: "QAULE: panel de control de calidad para aceleradores lineales y sistemas de imagen" },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4c6a2882-dd87-4d94-af7f-7d35bd172c43/id-preview-42993226--970963e8-e440-4634-a2eb-fbb06fefacea.lovable.app-1785147801788.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4c6a2882-dd87-4d94-af7f-7d35bd172c43/id-preview-42993226--970963e8-e440-4634-a2eb-fbb06fefacea.lovable.app-1785147801788.png" },
+      {
+        property: "og:description",
+        content:
+          "QAULE: panel de control de calidad para aceleradores lineales y sistemas de imagen",
+      },
+      {
+        name: "twitter:description",
+        content:
+          "QAULE: panel de control de calidad para aceleradores lineales y sistemas de imagen",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4c6a2882-dd87-4d94-af7f-7d35bd172c43/id-preview-42993226--970963e8-e440-4634-a2eb-fbb06fefacea.lovable.app-1785147801788.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4c6a2882-dd87-4d94-af7f-7d35bd172c43/id-preview-42993226--970963e8-e440-4634-a2eb-fbb06fefacea.lovable.app-1785147801788.png",
+      },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
     ],

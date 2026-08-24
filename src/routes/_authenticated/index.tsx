@@ -19,7 +19,6 @@ import {
   mergeMachineList,
   walkDataPoints,
   calendarTaskId,
-
   dpSeriesLabel,
   evaluateTolerance,
   type MachineId,
@@ -45,24 +44,50 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertTriangle, CheckCircle2, ShieldAlert, ChevronLeft, ChevronRight, CalendarDays, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ShieldAlert,
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays,
+  ChevronDown,
+  ChevronUp,
+  Trash2,
+} from "lucide-react";
 import { MachineGlyph } from "@/components/qa/MachineGlyph";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/")({ component: Dashboard });
 
-const STATE_META: Record<MachineState, { label: string; cls: string; Icon: typeof CheckCircle2 }> = {
-  ok: { label: "OK", cls: "bg-emerald-500/15 text-emerald-700 border-emerald-500/30", Icon: CheckCircle2 },
-  warning: { label: "Aviso", cls: "bg-amber-500/15 text-amber-700 border-amber-500/30", Icon: AlertTriangle },
-  critical: { label: "Crítico", cls: "bg-destructive/15 text-destructive border-destructive/30", Icon: ShieldAlert },
-};
+const STATE_META: Record<MachineState, { label: string; cls: string; Icon: typeof CheckCircle2 }> =
+  {
+    ok: {
+      label: "OK",
+      cls: "bg-emerald-500/15 text-emerald-700 border-emerald-500/30",
+      Icon: CheckCircle2,
+    },
+    warning: {
+      label: "Aviso",
+      cls: "bg-amber-500/15 text-amber-700 border-amber-500/30",
+      Icon: AlertTriangle,
+    },
+    critical: {
+      label: "Crítico",
+      cls: "bg-destructive/15 text-destructive border-destructive/30",
+      Icon: ShieldAlert,
+    },
+  };
 
 function Dashboard() {
   const qc = useQueryClient();
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
   const templates = useQuery({ queryKey: ["templates-all"], queryFn: () => listTemplates() });
   const imports = useQuery({ queryKey: ["imports-all"], queryFn: () => listImports() });
-  const measurements = useQuery({ queryKey: ["measurements-all"], queryFn: () => listMeasurements() });
+  const measurements = useQuery({
+    queryKey: ["measurements-all"],
+    queryFn: () => listMeasurements(),
+  });
   const calendar = useQuery({ queryKey: ["calendar"], queryFn: getCalendar });
 
   async function setState(id: MachineId, state: MachineState) {
@@ -76,13 +101,12 @@ function Dashboard() {
     const out = rows.map((r) => ({
       id: r.id,
       name: r.name,
-      kind: r.kind ?? (MACHINES.find((m) => m.id === r.id)?.kind ?? "other"),
+      kind: r.kind ?? MACHINES.find((m) => m.id === r.id)?.kind ?? "other",
     }));
     for (const m of MACHINES) if (!out.some((o) => o.id === m.id)) out.push({ ...m });
     const kindOrder: Record<string, number> = { linac: 0, imaging: 1, ct: 2, other: 3 };
     return out.sort(
-      (a, b) =>
-        (kindOrder[a.kind] ?? 9) - (kindOrder[b.kind] ?? 9) || a.id.localeCompare(b.id),
+      (a, b) => (kindOrder[a.kind] ?? 9) - (kindOrder[b.kind] ?? 9) || a.id.localeCompare(b.id),
     );
   }, [machines.data]);
 
@@ -113,7 +137,6 @@ function Dashboard() {
           />
         ))}
       </div>
-
 
       <MonthlySummary
         calendar={calendar.data}
@@ -216,7 +239,12 @@ function MachineCard({
                 className="size-6"
                 title="Eliminar máquina"
                 onClick={async () => {
-                  if (!confirm(`¿Eliminar la máquina ${machineId}? Las plantillas y datos asociados dejarán de mostrarse.`)) return;
+                  if (
+                    !confirm(
+                      `¿Eliminar la máquina ${machineId}? Las plantillas y datos asociados dejarán de mostrarse.`,
+                    )
+                  )
+                    return;
                   try {
                     await deleteMachine(machineId);
                     toast.success("Máquina eliminada");
@@ -231,7 +259,6 @@ function MachineCard({
             )}
           </div>
         </div>
-
       </CardHeader>
       <CardContent className="space-y-1.5 pt-1">
         <div>
@@ -239,7 +266,8 @@ function MachineCard({
           <p className="truncate text-xs font-medium">{tpl?.name ?? "—"}</p>
           {tpl ? (
             <p className="text-[10px] text-muted-foreground">
-              {freq.total} tests · M:{freq.monthly} · T:{freq.quarterly} · S:{freq.semiannual} · A:{freq.annual}
+              {freq.total} tests · M:{freq.monthly} · T:{freq.quarterly} · S:{freq.semiannual} · A:
+              {freq.annual}
             </p>
           ) : (
             <Link to="/templates" className="text-[10px] text-primary underline">
@@ -254,7 +282,9 @@ function MachineCard({
             <>
               <p className="text-xs font-medium">{lastImport.sourceDate}</p>
               <p className="truncate text-[10px] text-muted-foreground">{lastImport.fileName}</p>
-              <p className={`text-[10px] font-medium ${ootCount > 0 ? "text-destructive" : "text-emerald-600"}`}>
+              <p
+                className={`text-[10px] font-medium ${ootCount > 0 ? "text-destructive" : "text-emerald-600"}`}
+              >
                 {ootCount > 0 ? `${ootCount} fuera de tolerancia` : "Todo en tolerancia"}
               </p>
             </>
@@ -270,9 +300,15 @@ function MachineCard({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ok" className="text-xs">OK</SelectItem>
-              <SelectItem value="warning" className="text-xs">Aviso</SelectItem>
-              <SelectItem value="critical" className="text-xs">Crítico</SelectItem>
+              <SelectItem value="ok" className="text-xs">
+                OK
+              </SelectItem>
+              <SelectItem value="warning" className="text-xs">
+                Aviso
+              </SelectItem>
+              <SelectItem value="critical" className="text-xs">
+                Crítico
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -293,7 +329,13 @@ function OOTPanel({
   measurements: Measurement[];
 }) {
   const alerts = useMemo(() => {
-    const rows: { machineId: MachineId; testName: string; cellLabel: string; value: number; date: string }[] = [];
+    const rows: {
+      machineId: MachineId;
+      testName: string;
+      cellLabel: string;
+      value: number;
+      date: string;
+    }[] = [];
     for (const m of mergeMachineList(machines)) {
       const machine = machines.find((x) => x.id === m.id);
       const tpls = templates.filter((t) => t.machineId === m.id);
@@ -325,7 +367,9 @@ function OOTPanel({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Alertas de tolerancia (última importación por máquina)</CardTitle>
+        <CardTitle className="text-base">
+          Alertas de tolerancia (última importación por máquina)
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {alerts.length === 0 ? (
@@ -338,7 +382,9 @@ function OOTPanel({
               <li key={i} className="flex items-center justify-between gap-3 py-2 text-sm">
                 <div className="min-w-0">
                   <p className="truncate font-medium">
-                    <Badge variant="outline" className="mr-2 text-[10px]">{a.machineId}</Badge>
+                    <Badge variant="outline" className="mr-2 text-[10px]">
+                      {a.machineId}
+                    </Badge>
                     {a.testName}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
@@ -349,10 +395,7 @@ function OOTPanel({
                   <span className="font-mono text-sm font-semibold text-destructive">
                     {a.value.toFixed(3)}
                   </span>
-                  <Link
-                    to="/visualization"
-                    className="text-xs text-primary underline"
-                  >
+                  <Link to="/visualization" className="text-xs text-primary underline">
                     ver
                   </Link>
                 </div>
@@ -366,8 +409,18 @@ function OOTPanel({
 }
 
 const MONTH_NAMES_ES = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
 ];
 
 function MonthlySummary({
@@ -390,13 +443,18 @@ function MonthlySummary({
     queryKey: ["calendar-tasks", ym],
     queryFn: () => listCalendarTasks(ym),
   });
+  const tasksData = tasks.data;
   const taskById = useMemo(() => {
-    const m = new Map<string, NonNullable<typeof tasks.data>[number]>();
-    for (const t of tasks.data ?? []) m.set(t.id, t);
+    const m = new Map<string, NonNullable<typeof tasksData>[number]>();
+    for (const t of tasksData ?? []) m.set(t.id, t);
     return m;
-  }, [tasks.data]);
+  }, [tasksData]);
 
-  async function setTaskState(testName: string, machineId: string | undefined, patch: { measured?: boolean; analyzed?: boolean }) {
+  async function setTaskState(
+    testName: string,
+    machineId: string | undefined,
+    patch: { measured?: boolean; analyzed?: boolean },
+  ) {
     await setCalendarTask(ym, testName, patch, machineId);
     qc.invalidateQueries({ queryKey: ["calendar-tasks", ym] });
   }
@@ -511,10 +569,7 @@ function MonthlySummary({
   }, [rows, taskById]);
 
   // Menús colapsados por defecto; el usuario expande los grupos que quiera ver
-  const groupsKey = useMemo(
-    () => groups.map((g) => g.key).join(","),
-    [groups],
-  );
+  const groupsKey = useMemo(() => groups.map((g) => g.key).join(","), [groups]);
   useEffect(() => {
     setExpanded(new Set());
   }, [groupsKey]);
@@ -538,7 +593,8 @@ function MonthlySummary({
             </CardTitle>
             {calendar ? (
               <p className="text-xs text-muted-foreground">
-                {rows.length} tests programados · {doneCount} completados ({measuredCount} medidos · {analyzedCount} analizados) · {oot} fuera de tolerancia
+                {rows.length} tests programados · {doneCount} completados ({measuredCount} medidos ·{" "}
+                {analyzedCount} analizados) · {oot} fuera de tolerancia
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
@@ -589,7 +645,8 @@ function MonthlySummary({
                       )}
                       <h4 className="text-sm font-semibold">{g.label}</h4>
                       <span className="text-xs text-muted-foreground">
-                        {g.done}/{g.items.length} completados · {g.measured} medidos · {g.analyzed} analizados
+                        {g.done}/{g.items.length} completados · {g.measured} medidos · {g.analyzed}{" "}
+                        analizados
                       </span>
                     </div>
                     {isOpen ? (
@@ -617,22 +674,36 @@ function MonthlySummary({
                                     id={`m-${r.taskId}`}
                                     checked={measured}
                                     onCheckedChange={(v: boolean | "indeterminate") =>
-                                      setTaskState(r.entry.testName, r.entry.machineId, { measured: v === true })
+                                      setTaskState(r.entry.testName, r.entry.machineId, {
+                                        measured: v === true,
+                                      })
                                     }
                                     aria-label={`Marcar ${r.entry.testName} como medido`}
                                   />
-                                  <label htmlFor={`m-${r.taskId}`} className="text-xs text-muted-foreground">Medido</label>
+                                  <label
+                                    htmlFor={`m-${r.taskId}`}
+                                    className="text-xs text-muted-foreground"
+                                  >
+                                    Medido
+                                  </label>
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                   <Checkbox
                                     id={`a-${r.taskId}`}
                                     checked={analyzed}
                                     onCheckedChange={(v: boolean | "indeterminate") =>
-                                      setTaskState(r.entry.testName, r.entry.machineId, { analyzed: v === true })
+                                      setTaskState(r.entry.testName, r.entry.machineId, {
+                                        analyzed: v === true,
+                                      })
                                     }
                                     aria-label={`Marcar ${r.entry.testName} como analizado`}
                                   />
-                                  <label htmlFor={`a-${r.taskId}`} className="text-xs text-muted-foreground">Analizado</label>
+                                  <label
+                                    htmlFor={`a-${r.taskId}`}
+                                    className="text-xs text-muted-foreground"
+                                  >
+                                    Analizado
+                                  </label>
                                 </div>
                               </div>
                               <div className="min-w-0">
@@ -719,9 +790,7 @@ function MonthlySummary({
             })}
           </div>
         )}
-
       </CardContent>
     </Card>
   );
 }
-

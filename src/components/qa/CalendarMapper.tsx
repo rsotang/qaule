@@ -49,11 +49,9 @@ export function CalendarMapper({
     initial?.defaultYear ?? new Date().getFullYear(),
   );
 
-  const grid = sheets[sheetName] ?? [];
-  const colCount = useMemo(
-    () => grid.reduce((max, r) => Math.max(max, r?.length ?? 0), 0),
-    [grid],
-  );
+  const sheetGrid = sheets[sheetName];
+  const grid = useMemo(() => sheetGrid ?? [], [sheetGrid]);
+  const colCount = useMemo(() => grid.reduce((max, r) => Math.max(max, r?.length ?? 0), 0), [grid]);
 
   return (
     <div className="flex min-h-0 flex-col gap-3">
@@ -153,9 +151,7 @@ export function CalendarMapper({
         </Button>
         <Button
           size="sm"
-          onClick={() =>
-            onSave({ version: 1, name, sheetName, headerRow, nameCol, defaultYear })
-          }
+          onClick={() => onSave({ version: 1, name, sheetName, headerRow, nameCol, defaultYear })}
         >
           Guardar plantilla
         </Button>

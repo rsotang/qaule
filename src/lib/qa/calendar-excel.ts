@@ -2,16 +2,39 @@ import * as XLSX from "xlsx";
 import type { CalendarEntry } from "./types";
 
 const ES_MONTHS: Record<string, number> = {
-  enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
-  julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12,
-  ene: 1, feb: 2, mar: 3, abr: 4, may: 5, jun: 6, jul: 7, ago: 8,
-  sep: 9, set: 9, oct: 10, nov: 11, dic: 12,
-  jan: 1, apr: 4, aug: 8, dec: 12,
+  enero: 1,
+  febrero: 2,
+  marzo: 3,
+  abril: 4,
+  mayo: 5,
+  junio: 6,
+  julio: 7,
+  agosto: 8,
+  septiembre: 9,
+  setiembre: 9,
+  octubre: 10,
+  noviembre: 11,
+  diciembre: 12,
+  ene: 1,
+  feb: 2,
+  mar: 3,
+  abr: 4,
+  may: 5,
+  jun: 6,
+  jul: 7,
+  ago: 8,
+  sep: 9,
+  set: 9,
+  oct: 10,
+  nov: 11,
+  dic: 12,
+  jan: 1,
+  apr: 4,
+  aug: 8,
+  dec: 12,
 };
 
-type Col =
-  | { kind: "date"; iso: string }
-  | { kind: "month"; ym: string };
+type Col = { kind: "date"; iso: string } | { kind: "month"; ym: string };
 
 function excelSerialToISO(n: number): string | null {
   if (!isFinite(n) || n < 1) return null;
@@ -35,23 +58,31 @@ function parseHeader(raw: string | number | null, defaultYear: number): Col | nu
   if (!s) return null;
   // ISO date
   const isoM = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (isoM) return { kind: "date", iso: `${isoM[1]}-${isoM[2].padStart(2, "0")}-${isoM[3].padStart(2, "0")}` };
+  if (isoM)
+    return {
+      kind: "date",
+      iso: `${isoM[1]}-${isoM[2].padStart(2, "0")}-${isoM[3].padStart(2, "0")}`,
+    };
   // D/M/Y
-  const dmy = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+  const dmy = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$/);
   if (dmy) {
-    let [, d, m, y] = dmy;
+    const [, d, m] = dmy;
+    let y = dmy[3];
     if (y.length === 2) y = "20" + y;
     return { kind: "date", iso: `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}` };
   }
   // Year-month
-  const ym = s.match(/^(\d{4})[-\/](\d{1,2})$/);
+  const ym = s.match(/^(\d{4})[-/](\d{1,2})$/);
   if (ym) return { kind: "month", ym: `${ym[1]}-${ym[2].padStart(2, "0")}` };
-  const my = s.match(/^(\d{1,2})[-\/](\d{4})$/);
+  const my = s.match(/^(\d{1,2})[-/](\d{4})$/);
   if (my) return { kind: "month", ym: `${my[2]}-${my[1].padStart(2, "0")}` };
   // Month name (optionally with year)
   const nameYear = s.match(/^([a-záéíóú]+)\.?\s*(\d{4})?$/);
   if (nameYear) {
-    const key = nameYear[1].replace(/[áéíóú]/g, (c) => ({ á: "a", é: "e", í: "i", ó: "o", ú: "u" }[c]!));
+    const key = nameYear[1].replace(
+      /[áéíóú]/g,
+      (c) => ({ á: "a", é: "e", í: "i", ó: "o", ú: "u" })[c]!,
+    );
     const monthNum = ES_MONTHS[key];
     if (monthNum) {
       const year = nameYear[2] ? parseInt(nameYear[2], 10) : defaultYear;
@@ -171,9 +202,10 @@ export function parseCalendarGrid(
           continue;
         }
       } else {
-        const dm = s.match(/^(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?$/);
+        const dm = s.match(/^(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?$/);
         if (dm) {
-          let [, d, m, y] = dm;
+          const [, d, m] = dm;
+          let y = dm[3];
           if (!y) y = col.kind === "date" ? col.iso.slice(0, 4) : col.ym.slice(0, 4);
           if (y.length === 2) y = "20" + y;
           dates.add(`${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`);
@@ -229,11 +261,7 @@ export function calendarToJson(rec: {
   updatedAt: string;
   entries: CalendarEntry[];
 }): string {
-  return JSON.stringify(
-    { kind: "qaule-calendar", version: 1, ...rec },
-    null,
-    2,
-  );
+  return JSON.stringify({ kind: "qaule-calendar", version: 1, ...rec }, null, 2);
 }
 
 // ----- Anual per-machine schedule format (calendario_qc_YYYY.json) -----
@@ -279,7 +307,9 @@ export function parseAnualCalendar(doc: AnualDoc): { fileName?: string; entries:
 
   for (const [rawId, machine] of Object.entries(machines)) {
     const id = rawId.trim().toUpperCase().replace(/\s+/g, "");
-    const machineId = KNOWN_MACHINES.has(id) ? (id as NonNullable<CalendarEntry["machineId"]>) : undefined;
+    const machineId = KNOWN_MACHINES.has(id)
+      ? (id as NonNullable<CalendarEntry["machineId"]>)
+      : undefined;
     for (const mes of machine?.meses ?? []) {
       const num = typeof mes.numero === "number" ? mes.numero : null;
       if (!num || num < 1 || num > 12) continue;
@@ -294,11 +324,12 @@ export function parseAnualCalendar(doc: AnualDoc): { fileName?: string; entries:
       for (const p of mes.pruebas ?? []) {
         const category = (p.tipo_prueba ?? "").trim();
         const name = (p.nombre_prueba ?? "").trim();
-        const testName = name && name.toLowerCase() !== "todas"
-          ? name
-          : category
-            ? `${category}${name ? ` — ${name}` : ""}`
-            : name;
+        const testName =
+          name && name.toLowerCase() !== "todas"
+            ? name
+            : category
+              ? `${category}${name ? ` — ${name}` : ""}`
+              : name;
         if (!testName) continue;
         const key = `${machineId ?? rawId}|${category}|${testName.toLowerCase()}`;
         let entry = byKey.get(key);
@@ -386,8 +417,6 @@ export function parseCalendarJson(text: string): { fileName?: string; entries: C
   });
   return { fileName: typeof obj.fileName === "string" ? obj.fileName : undefined, entries };
 }
-
-
 
 /** True if the entry is scheduled within the given month (YYYY-MM). */
 export function entryIsInMonth(entry: CalendarEntry, ym: string): boolean {

@@ -14,9 +14,28 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import {
-  Trash2, Plus, Save, Upload, Wand2, Copy, FolderPlus, FilePlus,
-  ChevronRight, ChevronDown, X, Target, Type, Hash, CopyPlus, FileJson, Download,
-  ArrowUp, ArrowDown, IndentIncrease, IndentDecrease, MoveRight,
+  Trash2,
+  Plus,
+  Save,
+  Upload,
+  Wand2,
+  Copy,
+  FolderPlus,
+  FilePlus,
+  ChevronRight,
+  ChevronDown,
+  X,
+  Target,
+  Type,
+  Hash,
+  CopyPlus,
+  FileJson,
+  Download,
+  ArrowUp,
+  ArrowDown,
+  IndentIncrease,
+  IndentDecrease,
+  MoveRight,
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -25,7 +44,6 @@ import { parseTestJson, testToJson, testJsonFileName } from "@/lib/qa/test-json"
 import { listTemplates, saveTemplate, setActiveTemplate, listMachines } from "@/lib/qa/db";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { useMachineCatalog } from "@/hooks/use-machine-catalog";
-
 
 import { readFile, type ParsedWorkbook } from "@/lib/qa/excel";
 import { autoBuildTemplate, buildSeedTemplate, cloneTemplateForMachine } from "@/lib/qa/seed";
@@ -48,7 +66,6 @@ import {
   moveNodeInto,
   listNestTargets,
   walkDataPoints,
-
   allBoundCells,
   textValue,
   refValue,
@@ -65,7 +82,9 @@ import {
   type TreeNode,
 } from "@/lib/qa/types";
 
-export const Route = createFileRoute("/_authenticated/templates/$machine")({ component: TemplateEditor });
+export const Route = createFileRoute("/_authenticated/templates/$machine")({
+  component: TemplateEditor,
+});
 
 /** A field on a tree node that accepts TextOrRef. */
 type NodeField = "name" | "unit" | "tolerance" | "reference";
@@ -73,7 +92,7 @@ type NodeField = "name" | "unit" | "tolerance" | "reference";
 /** What the user is about to fill from a click in the cell picker. */
 type TargetSlot =
   | { kind: "node"; testId: string; nodeId: string; field: NodeField } // sets a TextOrRef field
-  | { kind: "cell"; testId: string; nodeId: string }                    // sets DataPoint.cell
+  | { kind: "cell"; testId: string; nodeId: string } // sets DataPoint.cell
   | { kind: "admin"; testId: string; field: "date" }
   | { kind: "admin-performer"; testId: string; index: number };
 
@@ -90,7 +109,6 @@ function TemplateEditor() {
     MACHINES.find((m) => m.id === machineId)?.kind ??
     "other";
   const availableCategories: Category[] = catalog.categoriesFor(machineKind);
-
 
   const templates = useQuery({
     queryKey: ["templates", machineId],
@@ -254,7 +272,9 @@ function TemplateEditor() {
               </SelectTrigger>
               <SelectContent>
                 {templates.data.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -267,7 +287,9 @@ function TemplateEditor() {
               onChange={(e) => e.target.files?.[0] && handleSampleFile(e.target.files[0])}
             />
             <Button variant="outline" asChild>
-              <span><Upload className="size-4" /> Archivo referencia</span>
+              <span>
+                <Upload className="size-4" /> Archivo referencia
+              </span>
             </Button>
           </label>
           {isAdmin ? (
@@ -283,10 +305,11 @@ function TemplateEditor() {
               </Button>
             </>
           ) : (
-            <Badge variant="secondary" className="self-center">Solo lectura</Badge>
+            <Badge variant="secondary" className="self-center">
+              Solo lectura
+            </Badge>
           )}
         </div>
-
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
@@ -311,7 +334,6 @@ function TemplateEditor() {
                 className="h-8 text-sm"
               />
             </div>
-
           </CardHeader>
           <CardContent className="space-y-2">
             {template.tests.map((t) => {
@@ -327,12 +349,22 @@ function TemplateEditor() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <span className="font-medium">{t.name}</span>
-                    <span className="shrink-0 text-[10px] text-muted-foreground">{dpCount} dato(s)</span>
+                    <span className="shrink-0 text-[10px] text-muted-foreground">
+                      {dpCount} dato(s)
+                    </span>
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1">
-                    <Badge variant="secondary" className="text-[9px]">{CATEGORY_LABELS[t.category] ?? t.category}</Badge>
+                    <Badge variant="secondary" className="text-[9px]">
+                      {CATEGORY_LABELS[t.category] ?? t.category}
+                    </Badge>
                     <Badge variant="outline" className="text-[9px]">
-                      {t.frequency === "monthly" ? "M" : t.frequency === "quarterly" ? "T" : t.frequency === "semiannual" ? "S" : "A"}
+                      {t.frequency === "monthly"
+                        ? "M"
+                        : t.frequency === "quarterly"
+                          ? "T"
+                          : t.frequency === "semiannual"
+                            ? "S"
+                            : "A"}
                     </Badge>
                   </div>
                 </button>
@@ -395,12 +427,13 @@ function TemplateEditor() {
                   onPick={onPickCell}
                 />
               ) : (
-                <p className="py-8 text-center text-sm text-muted-foreground">Sin archivo de referencia</p>
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  Sin archivo de referencia
+                </p>
               )}
             </CardContent>
           </Card>
         </div>
-
       </div>
     </div>
   );
@@ -414,11 +447,19 @@ function describeTarget(target: TargetSlot, test: TestDef | null): string {
   const walked = walkDataPoints(test);
   const w = walked.find((x) => x.dp.id === target.nodeId);
   const labelFromNode = (() => {
-    if (w) return [...w.path.map((p) => displayTextOrRef(p, "?")), displayTextOrRef(w.dp.name, "?")].join(" / ");
+    if (w)
+      return [
+        ...w.path.map((p) => displayTextOrRef(p, "?")),
+        displayTextOrRef(w.dp.name, "?"),
+      ].join(" / ");
     // search nests
     const findNest = (n: Nest): Nest | null => {
       if (n.id === target.nodeId) return n;
-      for (const c of n.children) if (c.kind === "nest") { const r = findNest(c); if (r) return r; }
+      for (const c of n.children)
+        if (c.kind === "nest") {
+          const r = findNest(c);
+          if (r) return r;
+        }
       return null;
     };
     const nest = findNest(test.root);
@@ -465,7 +506,9 @@ function TestEditor({
   }
 
   function exportJson() {
-    const blob = new Blob([JSON.stringify(testToJson(test), null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(testToJson(test), null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -492,7 +535,9 @@ function TestEditor({
                 }}
               />
               <Button size="sm" variant="outline" asChild>
-                <span><FileJson className="size-4" /> Importar JSON</span>
+                <span>
+                  <FileJson className="size-4" /> Importar JSON
+                </span>
               </Button>
             </label>
             <Button size="sm" variant="outline" onClick={exportJson}>
@@ -504,8 +549,8 @@ function TestEditor({
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          El JSON puede ser un test exportado o un objeto anidado con los parámetros; se cargará en el
-          editor para poder ajustarlo y asignar celdas.
+          El JSON puede ser un test exportado o un objeto anidado con los parámetros; se cargará en
+          el editor para poder ajustarlo y asignar celdas.
         </p>
       </CardHeader>
 
@@ -516,21 +561,33 @@ function TestEditor({
             <Input value={test.name} onChange={(e) => onChange({ name: e.target.value })} />
           </Field>
           <Field label="Categoría">
-            <Select value={test.category} onValueChange={(v) => onChange({ category: v as Category })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Select
+              value={test.category}
+              onValueChange={(v) => onChange({ category: v as Category })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {(availableCategories.includes(test.category)
                   ? availableCategories
                   : [...availableCategories, test.category]
                 ).map((v) => (
-                  <SelectItem key={v} value={v}>{CATEGORY_LABELS[v] ?? v}</SelectItem>
+                  <SelectItem key={v} value={v}>
+                    {CATEGORY_LABELS[v] ?? v}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </Field>
           <Field label="Frecuencia">
-            <Select value={test.frequency} onValueChange={(v) => onChange({ frequency: v as Frequency })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Select
+              value={test.frequency}
+              onValueChange={(v) => onChange({ frequency: v as Frequency })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="monthly">Mensual</SelectItem>
                 <SelectItem value="quarterly">Trimestral</SelectItem>
@@ -543,7 +600,9 @@ function TestEditor({
 
         {/* Admin block */}
         <div className="rounded-md border bg-muted/30 p-3">
-          <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">Datos administrativos</p>
+          <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">
+            Datos administrativos
+          </p>
           <div className="space-y-2 text-xs">
             <div className="flex items-center gap-2">
               <span className="w-24 text-muted-foreground">Fecha:</span>
@@ -561,8 +620,14 @@ function TestEditor({
                   <CellChip
                     key={i}
                     cell={p}
-                    active={target?.kind === "admin-performer" && target.testId === test.id && target.index === i}
-                    onActivate={() => setTarget({ kind: "admin-performer", testId: test.id, index: i })}
+                    active={
+                      target?.kind === "admin-performer" &&
+                      target.testId === test.id &&
+                      target.index === i
+                    }
+                    onActivate={() =>
+                      setTarget({ kind: "admin-performer", testId: test.id, index: i })
+                    }
                     onClear={() => {
                       const performers = (test.admin.performers ?? []).filter((_, j) => j !== i);
                       onChange({ admin: { ...test.admin, performers } });
@@ -574,9 +639,16 @@ function TestEditor({
                   variant="outline"
                   className="h-6 text-[10px]"
                   onClick={() => {
-                    const performers = [...(test.admin.performers ?? []), { sheet: "", address: "" } as CellRef];
+                    const performers = [
+                      ...(test.admin.performers ?? []),
+                      { sheet: "", address: "" } as CellRef,
+                    ];
                     onChange({ admin: { ...test.admin, performers } });
-                    setTarget({ kind: "admin-performer", testId: test.id, index: performers.length - 1 });
+                    setTarget({
+                      kind: "admin-performer",
+                      testId: test.id,
+                      index: performers.length - 1,
+                    });
                   }}
                 >
                   <Plus className="size-3" /> añadir
@@ -589,19 +661,25 @@ function TestEditor({
         {/* Tree */}
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <p className="text-xs font-medium uppercase text-muted-foreground">Estructura de datos</p>
+            <p className="text-xs font-medium uppercase text-muted-foreground">
+              Estructura de datos
+            </p>
             <div className="flex gap-1">
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => onTreeChange(addChild(test.root, test.root.id, newNest("Nuevo grupo")))}
+                onClick={() =>
+                  onTreeChange(addChild(test.root, test.root.id, newNest("Nuevo grupo")))
+                }
               >
                 <FolderPlus className="size-3" /> nest
               </Button>
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => onTreeChange(addChild(test.root, test.root.id, newDataPoint("Nuevo dato")))}
+                onClick={() =>
+                  onTreeChange(addChild(test.root, test.root.id, newDataPoint("Nuevo dato")))
+                }
               >
                 <FilePlus className="size-3" /> dato
               </Button>
@@ -658,7 +736,6 @@ function TestEditor({
                   )
                 }
               />
-
             ))}
           </div>
         </div>
@@ -682,10 +759,22 @@ function MoveControls({ id, root, onMove, onMoveInto }: MoveProps & { id: string
   const targets = listNestTargets(root, id);
   return (
     <div className="flex items-center gap-0.5">
-      <Button size="icon" variant="ghost" className="size-7" title="Subir" onClick={() => onMove(id, "up")}>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-7"
+        title="Subir"
+        onClick={() => onMove(id, "up")}
+      >
         <ArrowUp className="size-3" />
       </Button>
-      <Button size="icon" variant="ghost" className="size-7" title="Bajar" onClick={() => onMove(id, "down")}>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-7"
+        title="Bajar"
+        onClick={() => onMove(id, "down")}
+      >
         <ArrowDown className="size-3" />
       </Button>
       <Button
@@ -713,9 +802,13 @@ function MoveControls({ id, root, onMove, onMoveInto }: MoveProps & { id: string
           <MoveRight className="size-3" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="__root__" className="text-xs">raíz</SelectItem>
+          <SelectItem value="__root__" className="text-xs">
+            raíz
+          </SelectItem>
           {targets.map((t) => (
-            <SelectItem key={t.id} value={t.id} className="text-xs">{t.label}</SelectItem>
+            <SelectItem key={t.id} value={t.id} className="text-xs">
+              {t.label}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
@@ -760,7 +853,6 @@ function TreeNodeView({
 
   const pad = { paddingLeft: `${depth * 16}px` };
 
-
   if (node.kind === "nest") {
     const nameActive =
       target?.kind === "node" && target.nodeId === node.id && target.field === "name";
@@ -780,10 +872,20 @@ function TreeNodeView({
             }
             className="flex-1"
           />
-          <Button size="sm" variant="ghost" className="h-7 px-2 text-[10px]" onClick={() => onAddChild(node.id, "nest")}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-[10px]"
+            onClick={() => onAddChild(node.id, "nest")}
+          >
             <FolderPlus className="size-3" /> nest
           </Button>
-          <Button size="sm" variant="ghost" className="h-7 px-2 text-[10px]" onClick={() => onAddChild(node.id, "data")}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-[10px]"
+            onClick={() => onAddChild(node.id, "data")}
+          >
             <FilePlus className="size-3" /> dato
           </Button>
           <MoveControls id={node.id} root={root} onMove={onMove} onMoveInto={onMoveInto} />
@@ -819,7 +921,6 @@ function TreeNodeView({
                 onMoveInto={onMoveInto}
               />
             ))}
-
           </div>
         )}
       </div>
@@ -887,24 +988,22 @@ function TreeNodeView({
             </div>
           ))}
         {missing.length > 0 && (
-          <Select
-            value=""
-            onValueChange={(v) => setField(v as NodeField, textValue(""))}
-          >
+          <Select value="" onValueChange={(v) => setField(v as NodeField, textValue(""))}>
             <SelectTrigger className="h-7 w-[110px] text-[10px]">
               <Plus className="size-3" />
               <SelectValue placeholder="añadir" />
             </SelectTrigger>
             <SelectContent>
               {missing.map((a) => (
-                <SelectItem key={a.key} value={a.key} className="text-xs">+ {a.label}</SelectItem>
+                <SelectItem key={a.key} value={a.key} className="text-xs">
+                  + {a.label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         )}
         <MoveControls id={dp.id} root={root} onMove={onMove} onMoveInto={onMoveInto} />
         <Button
-
           size="icon"
           variant="ghost"
           className="size-7"
@@ -950,9 +1049,9 @@ function TextOrRefField({
           if (isText) {
             onActivate();
           } else {
-            onChange(textValue(
-              (v as { kind: "cellRef"; sheet: string; address: string }).address || ""
-            ));
+            onChange(
+              textValue((v as { kind: "cellRef"; sheet: string; address: string }).address || ""),
+            );
           }
         }}
         className="rounded border bg-card p-1 text-muted-foreground hover:text-foreground"
@@ -1003,10 +1102,10 @@ function CellChip({
       <button
         onClick={onActivate}
         className={`inline-flex items-center gap-1 ${active ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-        title={hasCell ? `${cell!.sheet}!${cell!.address}` : label ?? "Activar para seleccionar"}
+        title={hasCell ? `${cell!.sheet}!${cell!.address}` : (label ?? "Activar para seleccionar")}
       >
         <Target className={`size-3 ${active ? "text-primary" : ""}`} />
-        {hasCell ? `${truncate(cell!.sheet, 10)}!${cell!.address}` : label ?? "sin asignar"}
+        {hasCell ? `${truncate(cell!.sheet, 10)}!${cell!.address}` : (label ?? "sin asignar")}
       </button>
       {hasCell && (
         <button onClick={onClear} className="text-muted-foreground hover:text-destructive">

@@ -4,13 +4,20 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { listMachines, listTemplates, saveTemplate, setActiveTemplate, deleteTemplate, clearActiveTemplate, getTemplate } from "@/lib/qa/db";
+import {
+  listMachines,
+  listTemplates,
+  saveTemplate,
+  setActiveTemplate,
+  deleteTemplate,
+  clearActiveTemplate,
+  getTemplate,
+} from "@/lib/qa/db";
 import { type MachineId, type Template } from "@/lib/qa/types";
 import { buildSeedTemplate } from "@/lib/qa/seed";
 import { toast } from "sonner";
 import { Plus, Pencil, CheckCircle2, Trash2, Download, Upload, Eye } from "lucide-react";
 import { useIsAdmin } from "@/hooks/use-is-admin";
-
 
 export const Route = createFileRoute("/_authenticated/templates/")({ component: TemplatesIndex });
 
@@ -87,7 +94,8 @@ function TemplatesIndex() {
       <div>
         <h1 className="text-xl font-semibold sm:text-2xl">Plantillas</h1>
         <p className="text-sm text-muted-foreground">
-          Define qué tests extraer y en qué celdas se encuentran. Cada máquina tiene su plantilla activa.
+          Define qué tests extraer y en qué celdas se encuentran. Cada máquina tiene su plantilla
+          activa.
         </p>
       </div>
 
@@ -125,11 +133,7 @@ function TemplatesIndex() {
                         </div>
                         <div className="flex gap-1">
                           {isAdmin && machine?.activeTemplateId !== t.id && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => activate(m.id, t.id)}
-                            >
+                            <Button size="sm" variant="ghost" onClick={() => activate(m.id, t.id)}>
                               Activar
                             </Button>
                           )}
@@ -141,7 +145,12 @@ function TemplatesIndex() {
                           >
                             <Download className="size-4" />
                           </Button>
-                          <Button asChild size="sm" variant="ghost" title={isAdmin ? "Editar" : "Ver"}>
+                          <Button
+                            asChild
+                            size="sm"
+                            variant="ghost"
+                            title={isAdmin ? "Editar" : "Ver"}
+                          >
                             <Link to="/templates/$machine" params={{ machine: m.id }}>
                               {isAdmin ? <Pencil className="size-4" /> : <Eye className="size-4" />}
                             </Link>
@@ -150,7 +159,9 @@ function TemplatesIndex() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => handleDelete(m.id, t.id, machine?.activeTemplateId === t.id)}
+                              onClick={() =>
+                                handleDelete(m.id, t.id, machine?.activeTemplateId === t.id)
+                              }
                             >
                               <Trash2 className="size-4 text-destructive" />
                             </Button>
@@ -163,7 +174,12 @@ function TemplatesIndex() {
                 {isAdmin ? (
                   <>
                     <div className="flex gap-2">
-                      <Button size="sm" variant="outline" className="flex-1" onClick={() => seedOne(m.id)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => seedOne(m.id)}
+                      >
                         <Plus className="size-4" /> Plantilla inicial
                       </Button>
                       <Button asChild size="sm" className="flex-1">
@@ -203,7 +219,6 @@ function TemplatesIndex() {
                     </Link>
                   </Button>
                 )}
-
               </CardContent>
             </Card>
           );
