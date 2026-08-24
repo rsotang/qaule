@@ -22,15 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import {
-  Trash2,
-  Plus,
-  Pencil,
-  Layers,
-  Boxes,
-  Check,
-  X,
-} from "lucide-react";
+import { Trash2, Plus, Pencil, Layers, Boxes, Check, X } from "lucide-react";
 import {
   listMachines,
   createMachine,
@@ -47,7 +39,9 @@ import {
 import { useMachineCatalog } from "@/hooks/use-machine-catalog";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 
-export const Route = createFileRoute("/_authenticated/admin/machines")({ component: MachinesAdminPage });
+export const Route = createFileRoute("/_authenticated/admin/machines")({
+  component: MachinesAdminPage,
+});
 
 function MachinesAdminPage() {
   const { isAdmin } = useIsAdmin();
@@ -59,7 +53,9 @@ function MachinesAdminPage() {
           <CardTitle>Acceso restringido</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">Solo los administradores pueden configurar máquinas.</p>
+          <p className="text-sm text-muted-foreground">
+            Solo los administradores pueden configurar máquinas.
+          </p>
         </CardContent>
       </Card>
     );
@@ -104,7 +100,12 @@ function MachinesSection() {
   const [editKind, setEditKind] = useState<string>("linac");
 
   const create = useMutation({
-    mutationFn: () => createMachine({ id: newId.trim().toUpperCase().replace(/\s+/g, ""), name: newName.trim(), kind: newKind }),
+    mutationFn: () =>
+      createMachine({
+        id: newId.trim().toUpperCase().replace(/\s+/g, ""),
+        name: newName.trim(),
+        kind: newKind,
+      }),
     onSuccess: () => {
       toast.success("Máquina creada");
       setNewId("");
@@ -148,17 +149,30 @@ function MachinesSection() {
           onSubmit={(e) => {
             e.preventDefault();
             const machineId = newId.trim().toUpperCase().replace(/\s+/g, "");
-            if (!machineId) { toast.error("El identificador no puede quedar vacío"); return; }
+            if (!machineId) {
+              toast.error("El identificador no puede quedar vacío");
+              return;
+            }
             if (newId.trim() && newName.trim()) create.mutate();
           }}
         >
           <div className="space-y-1">
             <Label className="text-xs">Identificador</Label>
-            <Input className="h-8 w-24" placeholder="TB4" value={newId} onChange={(e) => setNewId(e.target.value)} />
+            <Input
+              className="h-8 w-24"
+              placeholder="TB4"
+              value={newId}
+              onChange={(e) => setNewId(e.target.value)}
+            />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Nombre</Label>
-            <Input className="h-8 w-48" placeholder="TrueBeam 4" value={newName} onChange={(e) => setNewName(e.target.value)} />
+            <Input
+              className="h-8 w-48"
+              placeholder="TrueBeam 4"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+            />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Tipo</Label>
@@ -168,7 +182,9 @@ function MachinesSection() {
               </SelectTrigger>
               <SelectContent>
                 {catalog.kinds.map((k) => (
-                  <SelectItem key={k.id} value={k.id}>{k.name}</SelectItem>
+                  <SelectItem key={k.id} value={k.id}>
+                    {k.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -194,7 +210,11 @@ function MachinesSection() {
                   <>
                     <TableCell className="text-xs font-mono">{m.id}</TableCell>
                     <TableCell>
-                      <Input className="h-8" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                      <Input
+                        className="h-8"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                      />
                     </TableCell>
                     <TableCell>
                       <Select value={editKind} onValueChange={setEditKind}>
@@ -203,17 +223,30 @@ function MachinesSection() {
                         </SelectTrigger>
                         <SelectContent>
                           {catalog.kinds.map((k) => (
-                            <SelectItem key={k.id} value={k.id}>{k.name}</SelectItem>
+                            <SelectItem key={k.id} value={k.id}>
+                              {k.name}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button size="icon" variant="ghost" className="size-7" onClick={() => saveEdit.mutate()} disabled={!editName.trim()}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="size-7"
+                          onClick={() => saveEdit.mutate()}
+                          disabled={!editName.trim()}
+                        >
                           <Check className="size-3" />
                         </Button>
-                        <Button size="icon" variant="ghost" className="size-7" onClick={() => setEditId(null)}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="size-7"
+                          onClick={() => setEditId(null)}
+                        >
                           <X className="size-3" />
                         </Button>
                       </div>
@@ -243,7 +276,11 @@ function MachinesSection() {
                           variant="ghost"
                           className="size-7"
                           onClick={() => {
-                            if (confirm(`¿Eliminar la máquina ${m.id}? Las plantillas y datos asociados dejarán de mostrarse.`)) {
+                            if (
+                              confirm(
+                                `¿Eliminar la máquina ${m.id}? Las plantillas y datos asociados dejarán de mostrarse.`,
+                              )
+                            ) {
                               remove.mutate(m.id);
                             }
                           }}
@@ -279,7 +316,11 @@ function MachineKindsSection({ catalogUnavailable }: { catalogUnavailable: boole
   const create = useMutation({
     mutationFn: () =>
       createMachineKind({
-        id: newId.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
+        id: newId
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, ""),
         name: newName.trim(),
         categories: [],
       }),
@@ -324,8 +365,9 @@ function MachineKindsSection({ catalogUnavailable }: { catalogUnavailable: boole
           <Boxes className="size-4" /> Tipos de máquina
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Cada tipo define qué categorías de prueba pueden usar sus máquinas. Si editas las categorías de un tipo
-          que ya tiene plantillas, las pruebas existentes conservan su categoría (solo cambia el selector).
+          Cada tipo define qué categorías de prueba pueden usar sus máquinas. Si editas las
+          categorías de un tipo que ya tiene plantillas, las pruebas existentes conservan su
+          categoría (solo cambia el selector).
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -333,18 +375,35 @@ function MachineKindsSection({ catalogUnavailable }: { catalogUnavailable: boole
           className="flex flex-wrap items-end gap-2 rounded-md border bg-muted/30 p-3"
           onSubmit={(e) => {
             e.preventDefault();
-            const kindId = newId.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-            if (!kindId) { toast.error("El identificador no puede quedar vacío"); return; }
+            const kindId = newId
+              .trim()
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-|-$/g, "");
+            if (!kindId) {
+              toast.error("El identificador no puede quedar vacío");
+              return;
+            }
             if (newId.trim() && newName.trim()) create.mutate();
           }}
         >
           <div className="space-y-1">
             <Label className="text-xs">Identificador</Label>
-            <Input className="h-8 w-40" placeholder="brachy" value={newId} onChange={(e) => setNewId(e.target.value)} />
+            <Input
+              className="h-8 w-40"
+              placeholder="brachy"
+              value={newId}
+              onChange={(e) => setNewId(e.target.value)}
+            />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Nombre</Label>
-            <Input className="h-8 w-48" placeholder="Braquiterapia" value={newName} onChange={(e) => setNewName(e.target.value)} />
+            <Input
+              className="h-8 w-48"
+              placeholder="Braquiterapia"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+            />
           </div>
           <Button type="submit" size="sm" disabled={create.isPending || catalogUnavailable}>
             <Plus className="size-4" /> Añadir tipo
@@ -361,9 +420,17 @@ function MachineKindsSection({ catalogUnavailable }: { catalogUnavailable: boole
                     <div className="flex flex-wrap items-end gap-2">
                       <div className="space-y-1">
                         <Label className="text-xs">Nombre</Label>
-                        <Input className="h-8 w-56" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                        <Input
+                          className="h-8 w-56"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                        />
                       </div>
-                      <Button size="sm" onClick={() => saveEdit.mutate()} disabled={!editName.trim()}>
+                      <Button
+                        size="sm"
+                        onClick={() => saveEdit.mutate()}
+                        disabled={!editName.trim()}
+                      >
                         <Check className="size-4" /> Guardar
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => setEditId(null)}>
@@ -398,17 +465,26 @@ function MachineKindsSection({ catalogUnavailable }: { catalogUnavailable: boole
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium">{k.name}</span>
-                        {k.builtin && <Badge variant="outline" className="text-[9px]">Fábrica</Badge>}
+                        {k.builtin && (
+                          <Badge variant="outline" className="text-[9px]">
+                            Fábrica
+                          </Badge>
+                        )}
                         <span className="text-[10px] text-muted-foreground font-mono">{k.id}</span>
                       </div>
                       <div className="mt-1 flex flex-wrap gap-1">
                         {k.categories.map((c) => (
-                          <span key={c} className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                          <span
+                            key={c}
+                            className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"
+                          >
                             {catalog.categoryName(c)}
                           </span>
                         ))}
                         {k.categories.length === 0 && (
-                          <span className="text-[10px] text-muted-foreground italic">Sin categorías</span>
+                          <span className="text-[10px] text-muted-foreground italic">
+                            Sin categorías
+                          </span>
                         )}
                       </div>
                     </div>
@@ -476,7 +552,11 @@ function CategoriesSection({ catalogUnavailable }: { catalogUnavailable: boolean
   const create = useMutation({
     mutationFn: () =>
       createCategory({
-        id: newId.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, ""),
+        id: newId
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "_")
+          .replace(/^_+|_+$/g, ""),
         name: newName.trim(),
       }),
     onSuccess: () => {
@@ -533,8 +613,9 @@ function CategoriesSection({ catalogUnavailable }: { catalogUnavailable: boolean
           <Layers className="size-4" /> Categorías de prueba
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Catálogo global de categorías. Al borrar una categoría se quita de todos los tipos que la usen; las
-          plantillas que la tengan conservan el texto, pero dejará de ofrecerse en el selector.
+          Catálogo global de categorías. Al borrar una categoría se quita de todos los tipos que la
+          usen; las plantillas que la tengan conservan el texto, pero dejará de ofrecerse en el
+          selector.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -542,18 +623,35 @@ function CategoriesSection({ catalogUnavailable }: { catalogUnavailable: boolean
           className="flex flex-wrap items-end gap-2 rounded-md border bg-muted/30 p-3"
           onSubmit={(e) => {
             e.preventDefault();
-            const catId = newId.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
-            if (!catId) { toast.error("El identificador no puede quedar vacío"); return; }
+            const catId = newId
+              .trim()
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "_")
+              .replace(/^_+|_+$/g, "");
+            if (!catId) {
+              toast.error("El identificador no puede quedar vacío");
+              return;
+            }
             if (newId.trim() && newName.trim()) create.mutate();
           }}
         >
           <div className="space-y-1">
             <Label className="text-xs">Identificador</Label>
-            <Input className="h-8 w-48" placeholder="brachy_dosimetric" value={newId} onChange={(e) => setNewId(e.target.value)} />
+            <Input
+              className="h-8 w-48"
+              placeholder="brachy_dosimetric"
+              value={newId}
+              onChange={(e) => setNewId(e.target.value)}
+            />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Nombre</Label>
-            <Input className="h-8 w-48" placeholder="Dosimétrico Braquiterapia" value={newName} onChange={(e) => setNewName(e.target.value)} />
+            <Input
+              className="h-8 w-48"
+              placeholder="Dosimétrico Braquiterapia"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+            />
           </div>
           <Button type="submit" size="sm" disabled={create.isPending || catalogUnavailable}>
             <Plus className="size-4" /> Añadir categoría
@@ -582,17 +680,32 @@ function CategoriesSection({ catalogUnavailable }: { catalogUnavailable: boolean
                     <>
                       <TableCell className="text-xs font-mono">{c.id}</TableCell>
                       <TableCell>
-                        <Input className="h-8" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                        <Input
+                          className="h-8"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                        />
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {usedBy.map((k) => k.name).join(", ") || "—"}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          <Button size="icon" variant="ghost" className="size-7" onClick={() => saveEdit.mutate()} disabled={!editName.trim()}>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="size-7"
+                            onClick={() => saveEdit.mutate()}
+                            disabled={!editName.trim()}
+                          >
                             <Check className="size-3" />
                           </Button>
-                          <Button size="icon" variant="ghost" className="size-7" onClick={() => setEditId(null)}>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="size-7"
+                            onClick={() => setEditId(null)}
+                          >
                             <X className="size-3" />
                           </Button>
                         </div>
@@ -603,7 +716,11 @@ function CategoriesSection({ catalogUnavailable }: { catalogUnavailable: boolean
                       <TableCell className="text-xs font-mono">{c.id}</TableCell>
                       <TableCell className="text-sm">
                         {c.name}
-                        {c.builtin && <Badge variant="outline" className="ml-2 text-[9px]">Fábrica</Badge>}
+                        {c.builtin && (
+                          <Badge variant="outline" className="ml-2 text-[9px]">
+                            Fábrica
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-xs">
                         <span className="block text-muted-foreground">
@@ -611,7 +728,8 @@ function CategoriesSection({ catalogUnavailable }: { catalogUnavailable: boolean
                         </span>
                         {inUse && (
                           <span className="mt-0.5 block text-[10px] text-muted-foreground/80">
-                            {inUse.templates} prueba{inUse.templates > 1 ? "s" : ""} en {machineNames}
+                            {inUse.templates} prueba{inUse.templates > 1 ? "s" : ""} en{" "}
+                            {machineNames}
                           </span>
                         )}
                       </TableCell>
@@ -634,7 +752,8 @@ function CategoriesSection({ catalogUnavailable }: { catalogUnavailable: boolean
                               variant="ghost"
                               className="size-7"
                               onClick={() => {
-                                if (confirm(`¿Eliminar la categoría "${c.name}"?`)) remove.mutate(c.id);
+                                if (confirm(`¿Eliminar la categoría "${c.name}"?`))
+                                  remove.mutate(c.id);
                               }}
                             >
                               <Trash2 className="size-3 text-destructive" />

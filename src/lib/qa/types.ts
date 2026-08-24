@@ -27,10 +27,60 @@ export interface CategoryDef {
 
 /** Catálogo de tipos y categorías de fábrica (fallback si la BD aún no tiene datos). */
 export const BUILTIN_KINDS: MachineKindDef[] = [
-  { id: "linac", name: "Acelerador lineal", builtin: true, categories: ["mechanical_unit", "mechanical_table", "geometric", "mlc", "dosimetric_photon", "dosimetric_electron", "monitor_system"] },
-  { id: "imaging", name: "Sistema de imagen", builtin: true, categories: ["image_geometry", "image_registration", "image_quality_mv", "image_quality_cbct", "image_sgrt"] },
-  { id: "ct", name: "TC / Simulador", builtin: true, categories: ["mechanical_unit", "mechanical_table", "geometric", "mlc", "dosimetric_photon", "dosimetric_electron", "monitor_system"] },
-  { id: "other", name: "Otro", builtin: true, categories: ["mechanical_unit", "mechanical_table", "geometric", "mlc", "dosimetric_photon", "dosimetric_electron", "monitor_system"] },
+  {
+    id: "linac",
+    name: "Acelerador lineal",
+    builtin: true,
+    categories: [
+      "mechanical_unit",
+      "mechanical_table",
+      "geometric",
+      "mlc",
+      "dosimetric_photon",
+      "dosimetric_electron",
+      "monitor_system",
+    ],
+  },
+  {
+    id: "imaging",
+    name: "Sistema de imagen",
+    builtin: true,
+    categories: [
+      "image_geometry",
+      "image_registration",
+      "image_quality_mv",
+      "image_quality_cbct",
+      "image_sgrt",
+    ],
+  },
+  {
+    id: "ct",
+    name: "TC / Simulador",
+    builtin: true,
+    categories: [
+      "mechanical_unit",
+      "mechanical_table",
+      "geometric",
+      "mlc",
+      "dosimetric_photon",
+      "dosimetric_electron",
+      "monitor_system",
+    ],
+  },
+  {
+    id: "other",
+    name: "Otro",
+    builtin: true,
+    categories: [
+      "mechanical_unit",
+      "mechanical_table",
+      "geometric",
+      "mlc",
+      "dosimetric_photon",
+      "dosimetric_electron",
+      "monitor_system",
+    ],
+  },
 ];
 
 export const BUILTIN_CATEGORIES: CategoryDef[] = [
@@ -138,7 +188,6 @@ export const MACHINES: { id: MachineId; name: string; kind: MachineKind }[] = [
   { id: "CTSIM", name: "CT Simulador", kind: "ct" },
 ];
 
-
 export type Frequency = "monthly" | "quarterly" | "semiannual" | "annual";
 export type Category =
   | "mechanical_unit"
@@ -181,7 +230,9 @@ export function textValue(text: string): TextOrRef {
 export function refValue(sheet: string, address: string): TextOrRef {
   return { kind: "cellRef", sheet, address };
 }
-export function isCellRefValue(v: TextOrRef | undefined): v is { kind: "cellRef"; sheet: string; address: string } {
+export function isCellRefValue(
+  v: TextOrRef | undefined,
+): v is { kind: "cellRef"; sheet: string; address: string } {
   return !!v && v.kind === "cellRef";
 }
 /** Human display of a TextOrRef without resolving the workbook. */
@@ -277,7 +328,6 @@ export interface CalendarEntry {
   time?: string;
 }
 
-
 export interface CalendarRecord {
   id: "default";
   updatedAt: string;
@@ -299,11 +349,21 @@ export interface Measurement {
 // ---------- tree helpers ----------
 
 export function emptyNest(name = "raíz"): Nest {
-  return { id: `nest-${crypto.randomUUID().slice(0, 7)}`, kind: "nest", name: textValue(name), children: [] };
+  return {
+    id: `nest-${crypto.randomUUID().slice(0, 7)}`,
+    kind: "nest",
+    name: textValue(name),
+    children: [],
+  };
 }
 
 export function newNest(name = "Nuevo grupo"): Nest {
-  return { id: `nest-${crypto.randomUUID().slice(0, 7)}`, kind: "nest", name: textValue(name), children: [] };
+  return {
+    id: `nest-${crypto.randomUUID().slice(0, 7)}`,
+    kind: "nest",
+    name: textValue(name),
+    children: [],
+  };
 }
 
 export function newDataPoint(name = "Nuevo dato"): DataPoint {
@@ -329,7 +389,10 @@ export function walkDataPoints(test: TestDef): WalkedDataPoint[] {
 }
 
 export function dpSeriesLabel(walked: WalkedDataPoint): string {
-  return [...walked.path.map((p) => displayTextOrRef(p, "?")), displayTextOrRef(walked.dp.name, "?")]
+  return [
+    ...walked.path.map((p) => displayTextOrRef(p, "?")),
+    displayTextOrRef(walked.dp.name, "?"),
+  ]
     .filter(Boolean)
     .join(" / ");
 }
@@ -340,7 +403,8 @@ export function allBoundCells(test: TestDef): CellRef[] {
     if (node.kind === "data") {
       if (node.cell) refs.push(node.cell);
       for (const v of [node.name, node.unit, node.tolerance, node.reference]) {
-        if (isCellRefValue(v) && v.sheet && v.address) refs.push({ sheet: v.sheet, address: v.address });
+        if (isCellRefValue(v) && v.sheet && v.address)
+          refs.push({ sheet: v.sheet, address: v.address });
       }
     } else {
       if (isCellRefValue(node.name) && node.name.sheet && node.name.address)
@@ -494,12 +558,12 @@ export function moveNodeInto(root: Nest, id: string, targetNestId: string): Nest
   if (!found) return root;
   if (found.node.kind === "nest") {
     const containsTarget = (n: TreeNode): boolean =>
-      n.id === targetNestId ||
-      (n.kind === "nest" && n.children.some(containsTarget));
+      n.id === targetNestId || (n.kind === "nest" && n.children.some(containsTarget));
     if (containsTarget(found.node)) return root;
   }
   const detached = detach(root, id);
-  if (targetNestId === root.id) return { ...detached, children: [...detached.children, found.node] };
+  if (targetNestId === root.id)
+    return { ...detached, children: [...detached.children, found.node] };
   return addChild(detached, targetNestId, found.node);
 }
 
@@ -518,7 +582,6 @@ export function listNestTargets(root: Nest, excludeId: string): { id: string; la
   walk(root, []);
   return out;
 }
-
 
 // ---------- tolerance helpers ----------
 
@@ -552,7 +615,10 @@ export function evaluateTolerance(
   if (!tol) return { inTolerance: true, deviation: 0 };
   switch (tol.type) {
     case "pm":
-      return { inTolerance: Math.abs(value - tol.nominal) <= tol.delta, deviation: value - tol.nominal };
+      return {
+        inTolerance: Math.abs(value - tol.nominal) <= tol.delta,
+        deviation: value - tol.nominal,
+      };
     case "abs":
       return { inTolerance: Math.abs(value) <= tol.delta, deviation: value };
     case "range":
@@ -608,7 +674,6 @@ export function calendarTaskDone(task: CalendarTask): boolean {
 export function calendarTaskId(ym: string, testName: string, machineId?: string): string {
   const base = `${ym}::${testName.trim().toLowerCase()}`;
   return machineId ? `${base}::${machineId.toLowerCase()}` : base;
-
 }
 
 /** Seeded machines plus any user-created ones from the database. */

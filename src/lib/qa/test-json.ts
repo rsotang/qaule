@@ -26,7 +26,11 @@ export function testToJson(test: TestDef): TestJson {
 }
 
 export function testJsonFileName(test: TestDef): string {
-  const slug = test.name.trim().toLowerCase().replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "");
+  const slug = test.name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gi, "-")
+    .replace(/^-|-$/g, "");
   return `test-${slug || "sin-nombre"}.json`;
 }
 
@@ -55,7 +59,11 @@ function asCell(v: unknown): CellRef | undefined {
   if (v && typeof v === "object") {
     const o = v as Record<string, unknown>;
     if (typeof o.sheet === "string" && typeof o.address === "string")
-      return { sheet: o.sheet, address: o.address, ...(typeof o.label === "string" ? { label: o.label } : {}) };
+      return {
+        sheet: o.sheet,
+        address: o.address,
+        ...(typeof o.label === "string" ? { label: o.label } : {}),
+      };
   }
   return undefined;
 }
@@ -69,7 +77,12 @@ function isDataLike(o: Record<string, unknown>): boolean {
 
 function nodeFromAny(name: string, value: unknown): TreeNode {
   // "Beam center"  → plain data point
-  if (value === null || value === undefined || typeof value === "string" || typeof value === "number") {
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value === "string" ||
+    typeof value === "number"
+  ) {
     const dp = newDataPoint(name);
     if (typeof value === "string" && value.trim()) dp.unit = textValue(value);
     return dp;
@@ -198,7 +211,8 @@ export function parseTestJson(
     : rootFromAny(
         Object.fromEntries(
           Object.entries(obj).filter(
-            ([k]) => !["name", "category", "frequency", "admin", "id", "kind", "version"].includes(k),
+            ([k]) =>
+              !["name", "category", "frequency", "admin", "id", "kind", "version"].includes(k),
           ),
         ),
       );

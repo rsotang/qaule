@@ -44,8 +44,7 @@ function AdminPage() {
   const [makeAdmin, setMakeAdmin] = useState(false);
 
   const create = useMutation({
-    mutationFn: () =>
-      createFn({ data: { email, password, displayName, admin: makeAdmin } }),
+    mutationFn: () => createFn({ data: { email, password, displayName, admin: makeAdmin } }),
     onSuccess: () => {
       toast.success("Usuario creado");
       setEmail("");
@@ -113,7 +112,13 @@ function AdminPage() {
           >
             <div className="space-y-1.5">
               <Label htmlFor="em">Email</Label>
-              <Input id="em" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Input
+                id="em"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="dn">Nombre</Label>
@@ -121,12 +126,21 @@ function AdminPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="pw">Contraseña temporal</Label>
-              <Input id="pw" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
+              <Input
+                id="pw"
+                type="password"
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <Switch id="ad" checked={makeAdmin} onCheckedChange={setMakeAdmin} />
-                <Label htmlFor="ad" className="text-sm">Administrador</Label>
+                <Label htmlFor="ad" className="text-sm">
+                  Administrador
+                </Label>
               </div>
               <Button type="submit" disabled={create.isPending} className="ml-auto">
                 {create.isPending ? "Creando…" : "Crear"}
@@ -170,7 +184,9 @@ function AdminPage() {
                               if (!v) {
                                 const { data: authData } = await supabase.auth.getUser();
                                 if (authData.user?.id === u.id) {
-                                  toast.error("No puedes quitarte a ti mismo el rol de administrador");
+                                  toast.error(
+                                    "No puedes quitarte a ti mismo el rol de administrador",
+                                  );
                                   return;
                                 }
                               }

@@ -75,9 +75,7 @@ export function ChangePasswordDialog() {
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Cambiar contraseña</DialogTitle>
-          <DialogDescription>
-            Sustituye tu contraseña temporal por una personal.
-          </DialogDescription>
+          <DialogDescription>Sustituye tu contraseña temporal por una personal.</DialogDescription>
         </DialogHeader>
         <form className="space-y-3" onSubmit={handleSubmit}>
           <div className="space-y-1.5">

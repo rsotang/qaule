@@ -25,7 +25,16 @@ interface Props {
   showLegend?: boolean;
 }
 
-const SERIES_COLORS = ["#2563eb", "#dc2626", "#16a34a", "#ca8a04", "#9333ea", "#0891b2", "#db2777", "#0d9488"];
+const SERIES_COLORS = [
+  "#2563eb",
+  "#dc2626",
+  "#16a34a",
+  "#ca8a04",
+  "#9333ea",
+  "#0891b2",
+  "#db2777",
+  "#0d9488",
+];
 
 export function TestChart({
   test,
@@ -46,19 +55,23 @@ export function TestChart({
       const parts = label.split(" / ");
       return parts.length > 1 ? parts.slice(0, -1).join(" / ") : label;
     };
-    const tolFor = new Map<string, typeof walked[number]["dp"]["parsedTolerance"]>();
+    const tolFor = new Map<string, (typeof walked)[number]["dp"]["parsedTolerance"]>();
     for (const w of walked) {
       const fullKey = [...w.path.map((p) => p), w.dp.name]
         .map((v) => (v.kind === "text" ? v.text : `[${v.sheet}!${v.address}]`))
         .join(" / ");
       tolFor.set(keyFor(fullKey), w.dp.parsedTolerance);
     }
-    const allKeys = [...new Set(walked.map((w) => {
-      const full = [...w.path, w.dp.name]
-        .map((v) => (v.kind === "text" ? v.text : `[${v.sheet}!${v.address}]`))
-        .join(" / ");
-      return keyFor(full);
-    }))];
+    const allKeys = [
+      ...new Set(
+        walked.map((w) => {
+          const full = [...w.path, w.dp.name]
+            .map((v) => (v.kind === "text" ? v.text : `[${v.sheet}!${v.address}]`))
+            .join(" / ");
+          return keyFor(full);
+        }),
+      ),
+    ];
     const activeKeys = seriesFilter ? allKeys.filter((k) => seriesFilter.includes(k)) : allKeys;
     const series = activeKeys.map((key) => ({ key, tol: tolFor.get(key) }));
 
@@ -125,7 +138,10 @@ export function TestChart({
   const sorted = [...allValues].sort((a, b) => a - b);
   const pct = (p: number) => {
     if (sorted.length === 0) return 0;
-    const idx = Math.min(sorted.length - 1, Math.max(0, Math.round((p / 100) * (sorted.length - 1))));
+    const idx = Math.min(
+      sorted.length - 1,
+      Math.max(0, Math.round((p / 100) * (sorted.length - 1))),
+    );
     return sorted[idx];
   };
   let yMin = sorted.length <= 4 ? (sorted[0] ?? 0) : pct(5);
@@ -157,7 +173,17 @@ export function TestChart({
   // Decimal precision adapts to the visible range, not the magnitude of a single value.
   const visibleSpan = yMax - yMin;
   const decimals =
-    visibleSpan >= 100 ? 0 : visibleSpan >= 10 ? 1 : visibleSpan >= 1 ? 2 : visibleSpan >= 0.1 ? 3 : visibleSpan >= 0.01 ? 4 : 5;
+    visibleSpan >= 100
+      ? 0
+      : visibleSpan >= 10
+        ? 1
+        : visibleSpan >= 1
+          ? 2
+          : visibleSpan >= 0.1
+            ? 3
+            : visibleSpan >= 0.01
+              ? 4
+              : 5;
   const fmtAxis = (v: number) => {
     if (!isFinite(v)) return "";
     const abs = Math.abs(v);
@@ -209,7 +235,12 @@ export function TestChart({
               strokeWidth={2}
               dot={false}
               activeDot={(props: unknown) => {
-                const { cx, cy, payload, key } = props as { cx?: number; cy?: number; payload: Record<string, unknown>; key?: string };
+                const { cx, cy, payload, key } = props as {
+                  cx?: number;
+                  cy?: number;
+                  payload: Record<string, unknown>;
+                  key?: string;
+                };
                 const v = payload[s.key];
                 if (cx == null || cy == null || typeof v !== "number") return <g key={key} />;
                 const ok = evaluateTolerance(s.tol, v).inTolerance;
@@ -232,7 +263,9 @@ export function TestChart({
         </LineChart>
       </ResponsiveContainer>
       {hasOOT && (
-        <p className="mt-1 text-[10px] font-medium text-destructive">⚠ Punto(s) fuera de tolerancia</p>
+        <p className="mt-1 text-[10px] font-medium text-destructive">
+          ⚠ Punto(s) fuera de tolerancia
+        </p>
       )}
     </div>
   );

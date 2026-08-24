@@ -150,7 +150,9 @@ export function SettingsMenu() {
             </section>
 
             <section className="space-y-2">
-              <h3 className="text-xs font-semibold uppercase text-muted-foreground">Zona peligrosa</h3>
+              <h3 className="text-xs font-semibold uppercase text-muted-foreground">
+                Zona peligrosa
+              </h3>
               <Button
                 variant="destructive"
                 className="w-full justify-start"
@@ -166,7 +168,13 @@ export function SettingsMenu() {
         </SheetContent>
       </Sheet>
 
-      <Dialog open={wipeOpen} onOpenChange={(v) => { setWipeOpen(v); if (!v) setPassword(""); }}>
+      <Dialog
+        open={wipeOpen}
+        onOpenChange={(v) => {
+          setWipeOpen(v);
+          if (!v) setPassword("");
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>¿Borrar todos los datos?</DialogTitle>
@@ -308,7 +316,8 @@ function DatabaseEditor({
     }
     await updateMeasurement({ ...m, value: v, date: d.date });
     setDrafts((cur) => {
-      const { [m.id]: _omit, ...rest } = cur;
+      const rest = { ...cur };
+      delete rest[m.id];
       return rest;
     });
     toast.success("Medida actualizada");
@@ -533,7 +542,8 @@ function DatabaseEditor({
                               variant="ghost"
                               onClick={() =>
                                 setDrafts((cur) => {
-                                  const { [m.id]: _omit, ...rest } = cur;
+                                  const rest = { ...cur };
+                                  delete rest[m.id];
                                   return rest;
                                 })
                               }
@@ -612,10 +622,15 @@ function EditSeriesDialog({
       for (const test of t.tests) if (!seen.has(test.id)) seen.set(test.id, test.name);
     }
     if (!seen.has(MPC_TEST_ID)) seen.set(MPC_TEST_ID, MPC_TEST_NAME);
-    return [...seen.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+    return [...seen.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [machineTemplates.data]);
 
-  const label = segments.map((s) => s.trim()).filter(Boolean).join(" / ");
+  const label = segments
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join(" / ");
 
   function setSegment(i: number, v: string) {
     setSegments((prev) => prev.map((s, j) => (j === i ? v : s)));
@@ -689,7 +704,9 @@ function EditSeriesDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {testOptions.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
