@@ -2,7 +2,7 @@ import { Link, Outlet, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { Upload, Settings2, LineChart, LogOut, Users, Menu } from "lucide-react";
+import { Upload, Settings2, LineChart, LogOut, Users, Menu, Terminal } from "lucide-react";
 import { SettingsMenu } from "./SettingsMenu";
 import { ChangePasswordDialog } from "./ChangePasswordDialog";
 import { ThemeToggle } from "./ThemeToggle";
@@ -37,9 +37,12 @@ export function AppShell() {
     <>
       <NavLink to="/" label="Panel QA" />
       <NavLink to="/visualization" icon={<LineChart className="size-4" />} label="Visualización" />
+      <NavLink to="/python" icon={<Terminal className="size-4" />} label="Python" />
       <NavLink to="/imports" icon={<Upload className="size-4" />} label="Importaciones" />
       <NavLink to="/templates" icon={<Settings2 className="size-4" />} label="Plantillas" />
-      {me.data?.isAdmin && <NavLink to="/admin" icon={<Users className="size-4" />} label="Usuarios" />}
+      {me.data?.isAdmin && (
+        <NavLink to="/admin" icon={<Users className="size-4" />} label="Usuarios" />
+      )}
       {me.data?.isAdmin && (
         <NavLink to="/admin/machines" icon={<Settings2 className="size-4" />} label="Máquinas" />
       )}
@@ -60,17 +63,18 @@ export function AppShell() {
               <SheetHeader className="border-b px-4 py-3">
                 <SheetTitle className="text-left">
                   <span className="text-2xl font-bold tracking-tight text-primary">QA</span>
-                  <span className="text-base font-semibold tracking-wide text-foreground/80">ULE</span>
+                  <span className="text-base font-semibold tracking-wide text-foreground/80">
+                    ULE
+                  </span>
                 </SheetTitle>
               </SheetHeader>
-              <nav
-                className="flex flex-col gap-1 p-3 text-sm"
-                onClick={() => setOpen(false)}
-              >
+              <nav className="flex flex-col gap-1 p-3 text-sm" onClick={() => setOpen(false)}>
                 {links}
               </nav>
               {user.data?.email && (
-                <p className="truncate px-4 pt-2 text-xs text-muted-foreground">{user.data.email}</p>
+                <p className="truncate px-4 pt-2 text-xs text-muted-foreground">
+                  {user.data.email}
+                </p>
               )}
             </SheetContent>
           </Sheet>
@@ -120,4 +124,3 @@ function NavLink({ to, icon, label }: { to: string; icon?: React.ReactNode; labe
     </Link>
   );
 }
-

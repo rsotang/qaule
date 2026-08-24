@@ -12,7 +12,7 @@ let serverEntryPromise: Promise<ServerEntry> | undefined;
 async function getServerEntry(): Promise<ServerEntry> {
   if (!serverEntryPromise) {
     serverEntryPromise = import("@tanstack/react-start/server-entry").then(
-      (m) => ((m as { default?: ServerEntry }).default ?? (m as unknown as ServerEntry)),
+      (m) => (m as { default?: ServerEntry }).default ?? (m as unknown as ServerEntry),
     );
   }
   return serverEntryPromise;
@@ -22,6 +22,24 @@ function brandedErrorResponse(): Response {
   return new Response(renderErrorPage(), {
     status: 500,
     headers: { "content-type": "text/html; charset=utf-8" },
+  });
+}
+
+const RUNNER_PATH = "/python-runner";
+
+// El motor Python (iframe) necesita un agente de aislamiento cruzado
+// (crossOriginIsolated) para que numpy/scipy usen WASM threads
+// (SharedArrayBuffer). Solo esa ruta lleva COOP/COEP — aplicar COEP a toda
+// la app rompería las llamadas a Supabase/PyPI, que no envían CORP.
+function isolateRunner(response: Response): Response {
+  const headers = new Headers(response.headers);
+  headers.set("Cross-Origin-Opener-Policy", "same-origin");
+  headers.set("Cross-Origin-Embedder-Policy", "require-corp");
+  headers.set("Cross-Origin-Resource-Policy", "same-origin");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
   });
 }
 
@@ -71,7 +89,11 @@ export default {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      const normalized = await normalizeCatastrophicSsrResponse(response);
+      const url = new URL(request.url);
+      return url.pathname === RUNNER_PATH || url.pathname.startsWith(`${RUNNER_PATH}/`)
+        ? isolateRunner(normalized)
+        : normalized;
     } catch (error) {
       console.error(error);
       return brandedErrorResponse();
