@@ -1,44 +1,42 @@
+# Revisión de código: errores detectados y correcciones
 
-# Multi-user QAULE on Lovable Cloud
+He revisado tipos, lint, base de datos y errores de ejecución. La compilación de TypeScript pasa sin errores. Estos son los problemas reales encontrados, por orden de gravedad.
 
-Today every browser keeps its own copy of the data in IndexedDB (`src/lib/qa/db.ts`), so two computers can never see each other's measurements, templates, or calendar. We'll move all persistence to Lovable Cloud (managed Postgres + auth) and add login. The local IndexedDB code path will be removed; everyone starts fresh and re-imports from Excel into the cloud.
+## 1. La página Python no puede guardar scripts (crítico)
 
-## What changes for the user
+La tabla `python_scripts` no existe en la base de datos: la migración `20260824000000_python_scripts.sql` está en el proyecto pero nunca se aplicó. Cualquier intento de listar, guardar o borrar un script en `/python` falla.
 
-- A login screen appears before the app. No public signup — an **admin creates accounts** for staff from inside the app.
-- The first user to register becomes the admin automatically (bootstrap). After that, only admins can add new users.
-- Once logged in, everyone sees the **same shared data**: machines, templates, measurements, and the QA calendar. Edits made on one computer appear on others (refresh-based; no live websocket sync in v1).
-- An "Admin" page lists users, lets the admin invite a new one (email + temporary password) or remove one.
-- Existing local data is **not migrated** — re-import Excel files into the cloud.
+Corrección:
+- Aplicar la migración (crear tabla, RLS y políticas ya definidas).
+- Añadir el permiso que falta para el rol de servicio (`grant all ... to service_role`), obligatorio en tablas del esquema público.
 
-## What changes under the hood (technical section)
+## 2. Segundo cliente de base de datos duplicado (alto)
 
-1. **Enable Lovable Cloud** (Supabase-backed). Adds auth + Postgres.
-2. **Schema** (one shared dataset, no per-user scoping):
-   - `machines` (id text PK, name, kind) — seeded with the 7 current machines (TB1/2/3, IMG1/2/3, CTSIM).
-   - `templates` (id uuid, machine_id, name, payload jsonb, updated_at, updated_by).
-   - `measurements` (id uuid, machine_id, test_name, value numeric, unit, tolerance jsonb, reference numeric, performed_at, performer, created_by, created_at).
-   - `calendar_entries` (id uuid, year int, test_name, performer, scheduled_dates jsonb, scheduled_months jsonb).
-   - `profiles` (id uuid → auth.users, display_name, created_at).
-   - `user_roles` (user_id, role enum `admin|user`) + `has_role()` security-definer function — per project rules, never store roles on profiles.
-   - RLS: all four data tables → `SELECT/INSERT/UPDATE/DELETE` to any `authenticated` user (fully shared). `user_roles` writes restricted to admins via `has_role`. Standard `GRANT`s on every public table.
-   - Trigger: on first `auth.users` insert, if `user_roles` is empty → grant `admin`; else grant `user`. Always create a `profiles` row.
-3. **Auth UI**:
-   - `/auth` route: email + password sign-in only (no public signup form). Uses `supabase.auth.signInWithPassword`.
-   - `_authenticated` layout already managed by the integration — move every existing route (`/`, `/imports`, `/visualization`, `/templates/*`) under it.
-   - Sign-out button in `AppShell`.
-4. **Admin page** `/admin` (gated by `has_role(admin)`):
-   - List users (from `profiles` + role).
-   - "Add user" form → server function using `supabaseAdmin.auth.admin.createUser({ email, password, email_confirm: true })`, then assigns `user` role. Caller authorization checked with `requireSupabaseAuth` + `has_role` (per project rules).
-   - "Remove user" → admin server function deletes auth user.
-5. **Data layer rewrite**: replace `src/lib/qa/db.ts` (IndexedDB) with `src/lib/qa/cloud.ts` exposing the same function names (`getTemplates`, `saveTemplate`, `getMeasurements`, `saveMeasurements`, `getCalendar`, `saveCalendar`, etc.) but backed by the browser Supabase client. Call sites in `routes/index.tsx`, `routes/imports.tsx`, `routes/visualization.tsx`, `routes/templates.*.tsx` keep working with minimal changes (async stays async). Delete IndexedDB code and the version-bump logic.
-6. **Seed**: a migration inserts the 7 machines so they exist for everyone without any client-side seeding.
-7. **Bootstrap admin**: since signup is disabled in the UI, we keep `supabase.auth.signUp` available **only on first run** — the auth page detects "no users yet" (via a public RPC `public_has_any_user()` returning bool) and shows a one-time "Create first admin" form; otherwise shows login only.
+`src/lib/python/scripts.ts` crea su propio cliente en vez de reutilizar el compartido. Consecuencias: aviso en consola de "múltiples instancias de autenticación", riesgo de sesión inconsistente entre pestañas y lectura de variables de entorno en el momento de importar el módulo (fuente del fallo de arranque que ya has visto).
 
-## Out of scope for this round
-- Real-time sync (Supabase Realtime) — refresh to see others' changes.
-- Per-user data isolation, per-machine permissions, audit log UI.
-- Migrating existing IndexedDB content into the cloud.
-- Password reset flow (admin can re-create or update password from `/admin`).
+Corrección: usar el cliente generado de la app y tipar la tabla nueva aparte, sin crear un cliente adicional.
 
-Approve and I'll implement.
+## 3. Aviso de hidratación en la pantalla de acceso (medio)
+
+La ruta `/auth` produce un desajuste entre el HTML del servidor y el del navegador. No rompe la app, pero regenera el árbol y provoca un parpadeo.
+
+Corrección: dejar que la pantalla renderice un contenido estable inicial mientras se resuelve la comprobación de sesión.
+
+## 4. Defectos menores de lógica en hooks (bajo)
+
+- `src/routes/_authenticated/index.tsx`: un cálculo memorizado omite `tasks` en sus dependencias, así que el resumen mensual puede mostrar datos obsoletos hasta que algo más fuerce el repintado.
+- `src/components/qa/CalendarMapper.tsx`: dependencia inestable en un cálculo memorizado que lo recalcula en cada render.
+
+Corrección: ajustar las dependencias de ambos.
+
+## 5. Limpieza (bajo, sin impacto funcional)
+
+- 12 escapes innecesarios en expresiones regulares (`excel.ts`, `calendar-excel.ts`, `types.ts`).
+- 7 variables declaradas como reasignables sin serlo, 2 variables sin usar en `SettingsMenu.tsx`, 1 comentario de lint obsoleto en `db.ts`.
+- 827 avisos de formato (Prettier) en varios ficheros; se corrigen automáticamente.
+
+## Notas técnicas
+
+- Migración: nueva migración idempotente que crea `python_scripts` con RLS y los `GRANT` completos (`authenticated` + `service_role`); tras aplicarla se regeneran los tipos y se elimina el tipo `ExtendedDatabase` improvisado.
+- `scripts.ts` pasa a importar `supabase` de `@/integrations/supabase/client`.
+- No se toca la lógica de importación, plantillas ni visualización.
