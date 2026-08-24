@@ -49,7 +49,8 @@ export function CalendarMapper({
     initial?.defaultYear ?? new Date().getFullYear(),
   );
 
-  const grid = sheets[sheetName] ?? [];
+  const sheetGrid = sheets[sheetName];
+  const grid = useMemo(() => sheetGrid ?? [], [sheetGrid]);
   const colCount = useMemo(
     () => grid.reduce((max, r) => Math.max(max, r?.length ?? 0), 0),
     [grid],
