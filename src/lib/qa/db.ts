@@ -373,7 +373,6 @@ export async function listMeasurements(machineId?: string): Promise<Measurement[
   const all: Measurement[] = [];
   const pageSize = 1000;
   let from = 0;
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     let q = supabase.from("measurements").select("*").range(from, from + pageSize - 1);
     if (machineId) q = q.eq("machine_id", machineId);

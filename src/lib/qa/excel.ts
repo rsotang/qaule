@@ -70,9 +70,10 @@ export function readDate(parsed: ParsedWorkbook, ref: CellRef): string | null {
   if (typeof v === "string") {
     const iso = new Date(v);
     if (!isNaN(iso.getTime())) return iso.toISOString().slice(0, 10);
-    const m = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+    const m = v.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
     if (m) {
-      let [, d, mo, y] = m;
+      const [, d, mo] = m;
+      let y = m[3];
       if (y.length === 2) y = "20" + y;
       return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`;
     }

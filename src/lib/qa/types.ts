@@ -527,7 +527,7 @@ export function parseToleranceText(text: string): Tolerance {
   if (!t) return { type: "none" };
 
   // "nominal ± delta"  →  { type: "pm", nominal, delta }
-  const pmFull = t.match(/^(-?\d+(?:\.\d+)?)\s*[±+\-]\s*(\d+(?:\.\d+)?)$/);
+  const pmFull = t.match(/^(-?\d+(?:\.\d+)?)\s*[±+-]\s*(\d+(?:\.\d+)?)$/);
   if (pmFull) return { type: "pm", nominal: parseFloat(pmFull[1]), delta: parseFloat(pmFull[2]) };
 
   // "min - max" or "min a max"
@@ -539,7 +539,7 @@ export function parseToleranceText(text: string): Tolerance {
   if (le) return { type: "abs", delta: parseFloat(le[1]) };
 
   // "±5" or plain "5"
-  const pmSimple = t.match(/^[±+\-]?\s*(\d+(?:\.\d+)?)$/);
+  const pmSimple = t.match(/^[±+-]?\s*(\d+(?:\.\d+)?)$/);
   if (pmSimple) return { type: "abs", delta: parseFloat(pmSimple[1]) };
 
   return { type: "none" };

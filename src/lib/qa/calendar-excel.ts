@@ -37,16 +37,17 @@ function parseHeader(raw: string | number | null, defaultYear: number): Col | nu
   const isoM = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (isoM) return { kind: "date", iso: `${isoM[1]}-${isoM[2].padStart(2, "0")}-${isoM[3].padStart(2, "0")}` };
   // D/M/Y
-  const dmy = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+  const dmy = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$/);
   if (dmy) {
-    let [, d, m, y] = dmy;
+    const [, d, m] = dmy;
+    let y = dmy[3];
     if (y.length === 2) y = "20" + y;
     return { kind: "date", iso: `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}` };
   }
   // Year-month
-  const ym = s.match(/^(\d{4})[-\/](\d{1,2})$/);
+  const ym = s.match(/^(\d{4})[-/](\d{1,2})$/);
   if (ym) return { kind: "month", ym: `${ym[1]}-${ym[2].padStart(2, "0")}` };
-  const my = s.match(/^(\d{1,2})[-\/](\d{4})$/);
+  const my = s.match(/^(\d{1,2})[-/](\d{4})$/);
   if (my) return { kind: "month", ym: `${my[2]}-${my[1].padStart(2, "0")}` };
   // Month name (optionally with year)
   const nameYear = s.match(/^([a-záéíóú]+)\.?\s*(\d{4})?$/);
@@ -171,9 +172,10 @@ export function parseCalendarGrid(
           continue;
         }
       } else {
-        const dm = s.match(/^(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?$/);
+        const dm = s.match(/^(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?$/);
         if (dm) {
-          let [, d, m, y] = dm;
+          const [, d, m] = dm;
+          let y = dm[3];
           if (!y) y = col.kind === "date" ? col.iso.slice(0, 4) : col.ym.slice(0, 4);
           if (y.length === 2) y = "20" + y;
           dates.add(`${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`);
