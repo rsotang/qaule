@@ -79,7 +79,6 @@ import micropip
 await micropip.install(${JSON.stringify(LOCAL_WHEELS)}, deps=False)
 `);
 
-
         pyodide.FS.mkdirTree("/userfiles");
         pyodide.FS.mkdirTree("/out");
         readyRef.current = true;

@@ -104,7 +104,6 @@ async function initRunner(
 
   window.removeEventListener("message", bootLog);
 
-
   const api: RunnerApi = {
     run(code, context, files) {
       return new Promise((resolve, reject) => {

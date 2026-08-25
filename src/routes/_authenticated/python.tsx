@@ -236,7 +236,6 @@ function PythonPage() {
             {motor.detail && motor.status !== "ready" ? (
               <span className="max-w-[220px] truncate opacity-80">· {motor.detail}</span>
             ) : null}
-
           </Badge>
           {motor.status !== "ready" && motor.status !== "running" && (
             <Button size="sm" onClick={ensureMotor} disabled={booting}>
