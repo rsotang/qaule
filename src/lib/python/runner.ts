@@ -56,21 +56,54 @@ async function initRunner(
   callbacks: RunnerCallbacks,
 ): Promise<{ iframe: HTMLIFrameElement; api: RunnerApi }> {
   const iframe = document.createElement("iframe");
-  iframe.src = RUNNER_PATH;
   iframe.style.display = "none";
   iframe.setAttribute("aria-hidden", "true");
   document.body.appendChild(iframe);
 
-  const statusMsg = await waitForMessage<RunnerToParent>(
-    iframe.contentWindow,
-    "status",
-    BOOT_TIMEOUT_MS,
-    (m) => m.type === "status" && m.status === "ready",
-  ).catch((err) => {
+  // Reenvía TODOS los estados/salidas del iframe durante el arranque para que
+  // la UI no se quede congelada en "Arrancando runtime".
+  const bootLog = (ev: MessageEvent) => {
+    if (!isFromRunner(ev, iframe.contentWindow)) return;
+    const data = ev.data as RunnerToParent | undefined;
+    if (!data || typeof data !== "object" || !("type" in data)) return;
+    if (data.type === "status") callbacks.onStatus(data.status, data.detail);
+    else if (data.type === "stdout") callbacks.onStdout(data.text);
+    else if (data.type === "stderr") callbacks.onStderr(data.text);
+  };
+  window.addEventListener("message", bootLog);
+
+  // Un fallo dentro del iframe llega como status "error": conviértelo en rechazo
+  // en vez de esperar al timeout completo.
+  const failure = new Promise<never>((_, reject) => {
+    const onErr = (ev: MessageEvent) => {
+      if (!isFromRunner(ev, iframe.contentWindow)) return;
+      const data = ev.data as RunnerToParent | undefined;
+      if (data && typeof data === "object" && data.type === "status" && data.status === "error") {
+        window.removeEventListener("message", onErr);
+        reject(new Error(data.detail ?? "Fallo al arrancar el motor Python"));
+      }
+    };
+    window.addEventListener("message", onErr);
+  });
+
+  iframe.src = RUNNER_PATH;
+
+  await Promise.race([
+    waitForMessage<RunnerToParent>(
+      iframe.contentWindow,
+      "status",
+      BOOT_TIMEOUT_MS,
+      (m) => m.type === "status" && m.status === "ready",
+    ),
+    failure,
+  ]).catch((err) => {
+    window.removeEventListener("message", bootLog);
     iframe.remove();
     throw err;
   });
-  void statusMsg;
+
+  window.removeEventListener("message", bootLog);
+
 
   const api: RunnerApi = {
     run(code, context, files) {
