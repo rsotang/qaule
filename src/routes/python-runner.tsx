@@ -60,12 +60,14 @@ function PythonRunner() {
         if (cancelled) return;
         pyRef.current = pyodide;
 
-        post({
-          type: "status",
-          status: "installing",
-          detail: "Paquetes núcleo (numpy, scipy, matplotlib…)",
-        });
+        let i = 0;
         for (const p of CORE_PACKAGES) {
+          i += 1;
+          post({
+            type: "status",
+            status: "installing",
+            detail: `Paquete ${i}/${CORE_PACKAGES.length}: ${p}`,
+          });
           await pyodide.loadPackage([p]);
         }
 
