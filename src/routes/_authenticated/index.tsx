@@ -64,6 +64,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { MachineGlyph } from "@/components/qa/MachineGlyph";
+import { useMeRole } from "@/hooks/use-me-role";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/")({ component: Dashboard });
@@ -89,6 +90,7 @@ const STATE_META: Record<MachineState, { label: string; cls: string; Icon: typeo
 
 function Dashboard() {
   const qc = useQueryClient();
+  const { isViewer } = useMeRole();
   const catalog = useMachineCatalog();
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
   const templates = useQuery({ queryKey: ["templates-all"], queryFn: () => listTemplates() });
@@ -164,6 +166,7 @@ function Dashboard() {
             onToggle={() => toggleExpand(m.id)}
             onSetState={setState}
             onDeleted={() => qc.invalidateQueries({ queryKey: ["machines"] })}
+            readOnly={isViewer}
           />
         ))}
       </div>
@@ -172,8 +175,8 @@ function Dashboard() {
         calendar={calendar.data}
         templates={templates.data ?? []}
         measurements={measurements.data ?? []}
+        readOnly={isViewer}
       />
-
       <OOTPanel
         templates={templates.data ?? []}
         machines={machines.data ?? []}
@@ -196,6 +199,7 @@ function MachineCard({
   onToggle,
   onSetState,
   onDeleted,
+  readOnly,
 }: {
   machineId: MachineId;
   machineName: string;
@@ -208,6 +212,7 @@ function MachineCard({
   onToggle: () => void;
   onSetState: (id: MachineId, s: MachineState) => void;
   onDeleted: () => void;
+  readOnly?: boolean;
 }) {
   const isCustom = !MACHINES.some((m) => m.id === machineId);
   const catalog = useMachineCatalog();
@@ -270,7 +275,7 @@ function MachineCard({
                 <Badge variant="outline" className={`gap-1 px-1.5 py-0 text-[9px] ${meta.cls}`}>
                   <meta.Icon className="size-2.5" /> {meta.label}
                 </Badge>
-                {isCustom && (
+                {isCustom && !readOnly && (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -345,7 +350,11 @@ function MachineCard({
 
             <div>
               <p className="text-[9px] uppercase text-muted-foreground">Estado de la máquina</p>
-              <Select value={state} onValueChange={(v) => onSetState(machineId, v as MachineState)}>
+              <Select
+                value={state}
+                onValueChange={(v) => onSetState(machineId, v as MachineState)}
+                disabled={readOnly}
+              >
                 <SelectTrigger className="h-7 text-xs">
                   <SelectValue />
                 </SelectTrigger>
@@ -535,10 +544,12 @@ function MonthlySummary({
   calendar,
   templates,
   measurements,
+  readOnly,
 }: {
   calendar?: CalendarRecord;
   templates: Template[];
   measurements: Measurement[];
+  readOnly?: boolean;
 }) {
   const today = new Date();
   const [ym, setYm] = useState<string>(
@@ -780,6 +791,7 @@ function MonthlySummary({
                                   <Checkbox
                                     id={`m-${r.taskId}`}
                                     checked={measured}
+                                    disabled={readOnly}
                                     onCheckedChange={(v: boolean | "indeterminate") =>
                                       setTaskState(r.entry.testName, r.entry.machineId, {
                                         measured: v === true,
@@ -798,6 +810,7 @@ function MonthlySummary({
                                   <Checkbox
                                     id={`a-${r.taskId}`}
                                     checked={analyzed}
+                                    disabled={readOnly}
                                     onCheckedChange={(v: boolean | "indeterminate") =>
                                       setTaskState(r.entry.testName, r.entry.machineId, {
                                         analyzed: v === true,

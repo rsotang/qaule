@@ -14,6 +14,10 @@ async function assertAdmin(userId: string) {
   if (!data) throw new Error("Forbidden");
 }
 
+// El rol "viewer" se añade con la migración 20260824020000_viewer_role.sql y aún no
+// existe en los tipos generados de Supabase; casteo explícito a los valores conocidos.
+const VIEWER_ROLE = "viewer" as "user" | "admin";
+
 export const listUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -57,6 +61,7 @@ export const createUser = createServerFn({ method: "POST" })
         password: z.string().min(6),
         displayName: z.string().optional(),
         admin: z.boolean().optional(),
+        viewer: z.boolean().optional(),
       })
       .parse(input),
   )
@@ -76,6 +81,12 @@ export const createUser = createServerFn({ method: "POST" })
       await supabaseAdmin
         .from("user_roles")
         .upsert({ user_id: userId, role: "admin" }, { onConflict: "user_id,role" });
+    } else if (data.viewer) {
+      // El trigger de bootstrap asigna 'user'; lo reemplazamos por 'viewer' (solo lectura).
+      await supabaseAdmin.from("user_roles").delete().eq("user_id", userId).eq("role", "user");
+      await supabaseAdmin
+        .from("user_roles")
+        .upsert({ user_id: userId, role: VIEWER_ROLE }, { onConflict: "user_id,role" });
     }
     return { id: userId };
   });
@@ -115,6 +126,40 @@ export const setUserRole = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const setViewerRole = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ userId: z.string().uuid(), viewer: z.boolean() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (data.viewer) {
+      if (data.userId === context.userId)
+        throw new Error("No puedes convertirte a ti mismo en demo");
+      // Quitar roles escribibles y dejar solo 'viewer'.
+      await supabaseAdmin
+        .from("user_roles")
+        .delete()
+        .eq("user_id", data.userId)
+        .in("role", ["admin", "user"]);
+      await supabaseAdmin
+        .from("user_roles")
+        .upsert({ user_id: data.userId, role: VIEWER_ROLE }, { onConflict: "user_id,role" });
+    } else {
+      // Volver a usuario normal (rol 'user').
+      await supabaseAdmin
+        .from("user_roles")
+        .delete()
+        .eq("user_id", data.userId)
+        .eq("role", VIEWER_ROLE);
+      await supabaseAdmin
+        .from("user_roles")
+        .upsert({ user_id: data.userId, role: "user" }, { onConflict: "user_id,role" });
+    }
+    return { ok: true };
+  });
+
 export const meIsAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -126,4 +171,20 @@ export const meIsAdmin = createServerFn({ method: "GET" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     return { isAdmin: !!data };
+  });
+
+export type MeRole = "admin" | "user" | "viewer";
+
+export const meRole = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    const roles = (data ?? []).map((r) => r.role) as string[];
+    if (roles.includes("admin")) return { role: "admin" as MeRole };
+    if (roles.includes(VIEWER_ROLE)) return { role: "viewer" as MeRole };
+    return { role: "user" as MeRole };
   });

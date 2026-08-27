@@ -31,6 +31,7 @@ import {
 import { getRunner, disposeRunner, type RunnerCallbacks } from "@/lib/python/runner";
 import { buildQaContext } from "@/lib/python/bridge";
 import { listScripts, saveScript, deleteScript } from "@/lib/python/scripts";
+import { useMeRole } from "@/hooks/use-me-role";
 import type { RunnerStatus } from "@/lib/python/types";
 
 export const Route = createFileRoute("/_authenticated/python")({ component: PythonPage });
@@ -212,6 +213,8 @@ function statusLabel(s: RunnerStatus | "idle"): {
 
 function PythonPage() {
   const qc = useQueryClient();
+  const { isViewer } = useMeRole();
+  const readOnly = isViewer;
   const [motor, setMotor] = useState<{ status: RunnerStatus | "idle"; detail?: string }>({
     status: "idle",
   });
@@ -431,30 +434,31 @@ function PythonPage() {
               </Button>
             ))}
           </div>
-          {addAnalysis ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <Input
-                value={analysisName}
-                onChange={(e) => setAnalysisName(e.target.value)}
-                placeholder="Nombre del análisis"
-                className="h-8 max-w-56"
-              />
-              <Button
-                size="sm"
-                onClick={() => saveAnalysisMut.mutate()}
-                disabled={!analysisName.trim() || saveAnalysisMut.isPending}
-              >
-                <Save className="size-4" /> Guardar análisis
+          {!readOnly &&
+            (addAnalysis ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  value={analysisName}
+                  onChange={(e) => setAnalysisName(e.target.value)}
+                  placeholder="Nombre del análisis"
+                  className="h-8 max-w-56"
+                />
+                <Button
+                  size="sm"
+                  onClick={() => saveAnalysisMut.mutate()}
+                  disabled={!analysisName.trim() || saveAnalysisMut.isPending}
+                >
+                  <Save className="size-4" /> Guardar análisis
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setAddAnalysis(false)}>
+                  Cancelar
+                </Button>
+              </div>
+            ) : (
+              <Button size="sm" variant="outline" onClick={() => setAddAnalysis(true)}>
+                <Plus className="size-4" /> Añadir análisis
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => setAddAnalysis(false)}>
-                Cancelar
-              </Button>
-            </div>
-          ) : (
-            <Button size="sm" variant="outline" onClick={() => setAddAnalysis(true)}>
-              <Plus className="size-4" /> Añadir análisis
-            </Button>
-          )}
+            ))}
         </CardContent>
       </Card>
 
@@ -504,7 +508,7 @@ function PythonPage() {
                 size="sm"
                 variant="outline"
                 onClick={() => saveMut.mutate()}
-                disabled={saveMut.isPending}
+                disabled={saveMut.isPending || readOnly}
               >
                 <Save className="size-4" /> Guardar
               </Button>
@@ -517,7 +521,7 @@ function PythonPage() {
                     window.confirm("¿Eliminar este script para todo el equipo?") &&
                     deleteMut.mutate()
                   }
-                  disabled={deleteMut.isPending}
+                  disabled={deleteMut.isPending || readOnly}
                 >
                   <Trash2 className="size-4" />
                 </Button>

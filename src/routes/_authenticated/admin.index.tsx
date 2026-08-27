@@ -17,9 +17,17 @@ import {
 } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Trash2, UserPlus } from "lucide-react";
+import { Trash2, UserPlus, EyeOff, UserRound } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { listUsers, createUser, deleteUser, setUserRole, meIsAdmin } from "@/lib/admin.functions";
+import {
+  listUsers,
+  createUser,
+  deleteUser,
+  setUserRole,
+  setViewerRole,
+  meIsAdmin,
+} from "@/lib/admin.functions";
+import { useMeRole } from "@/hooks/use-me-role";
 
 export const Route = createFileRoute("/_authenticated/admin/")({ component: AdminPage });
 
@@ -29,28 +37,35 @@ function AdminPage() {
   const createFn = useServerFn(createUser);
   const deleteFn = useServerFn(deleteUser);
   const setRoleFn = useServerFn(setUserRole);
+  const setViewerFn = useServerFn(setViewerRole);
   const meFn = useServerFn(meIsAdmin);
+  const { isViewer } = useMeRole();
 
   const me = useQuery({ queryKey: ["me-admin"], queryFn: () => meFn() });
   const users = useQuery({
     queryKey: ["admin-users"],
     queryFn: () => listFn(),
-    enabled: me.data?.isAdmin === true,
+    enabled: me.data?.isAdmin === true || isViewer,
   });
 
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [makeAdmin, setMakeAdmin] = useState(false);
+  const [makeViewer, setMakeViewer] = useState(false);
 
   const create = useMutation({
-    mutationFn: () => createFn({ data: { email, password, displayName, admin: makeAdmin } }),
+    mutationFn: () =>
+      createFn({
+        data: { email, password, displayName, admin: makeAdmin, viewer: makeViewer },
+      }),
     onSuccess: () => {
       toast.success("Usuario creado");
       setEmail("");
       setDisplayName("");
       setPassword("");
       setMakeAdmin(false);
+      setMakeViewer(false);
       qc.invalidateQueries({ queryKey: ["admin-users"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -71,8 +86,14 @@ function AdminPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const toggleViewer = useMutation({
+    mutationFn: (p: { userId: string; viewer: boolean }) => setViewerFn({ data: p }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   if (me.isLoading) return <p className="p-8 text-sm text-muted-foreground">Cargando…</p>;
-  if (!me.data?.isAdmin) {
+  if (!me.data?.isAdmin && !isViewer) {
     return (
       <Card>
         <CardHeader>
@@ -96,59 +117,85 @@ function AdminPage() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <UserPlus className="size-4" /> Añadir usuario
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form
-            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:items-end"
-            onSubmit={(e) => {
-              e.preventDefault();
-              create.mutate();
-            }}
-          >
-            <div className="space-y-1.5">
-              <Label htmlFor="em">Email</Label>
-              <Input
-                id="em"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="dn">Nombre</Label>
-              <Input id="dn" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="pw">Contraseña temporal</Label>
-              <Input
-                id="pw"
-                type="password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Switch id="ad" checked={makeAdmin} onCheckedChange={setMakeAdmin} />
-                <Label htmlFor="ad" className="text-sm">
-                  Administrador
-                </Label>
+      {!isViewer && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <UserPlus className="size-4" /> Añadir usuario
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form
+              className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:items-end"
+              onSubmit={(e) => {
+                e.preventDefault();
+                create.mutate();
+              }}
+            >
+              <div className="space-y-1.5">
+                <Label htmlFor="em">Email</Label>
+                <Input
+                  id="em"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
               </div>
-              <Button type="submit" disabled={create.isPending} className="ml-auto">
-                {create.isPending ? "Creando…" : "Crear"}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+              <div className="space-y-1.5">
+                <Label htmlFor="dn">Nombre</Label>
+                <Input
+                  id="dn"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="pw">Contraseña temporal</Label>
+                <Input
+                  id="pw"
+                  type="password"
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="ad"
+                    checked={makeAdmin}
+                    onCheckedChange={(v) => {
+                      setMakeAdmin(v);
+                      if (v) setMakeViewer(false);
+                    }}
+                  />
+                  <Label htmlFor="ad" className="text-sm">
+                    Administrador
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="dv"
+                    checked={makeViewer}
+                    onCheckedChange={(v) => {
+                      setMakeViewer(v);
+                      if (v) setMakeAdmin(false);
+                    }}
+                  />
+                  <Label htmlFor="dv" className="text-sm">
+                    Demo (solo lectura)
+                  </Label>
+                </div>
+                <Button type="submit" disabled={create.isPending} className="ml-auto">
+                  {create.isPending ? "Creando…" : "Crear"}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="pb-2">
@@ -171,28 +218,60 @@ function AdminPage() {
               <TableBody>
                 {users.data?.map((u) => {
                   const isAdmin = u.roles.includes("admin");
+                  const isDemo = u.roles.includes("viewer");
                   return (
                     <TableRow key={u.id}>
                       <TableCell className="text-sm">{u.email}</TableCell>
                       <TableCell className="text-sm">{u.displayName ?? "—"}</TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          {isAdmin ? <Badge>Admin</Badge> : <Badge variant="outline">User</Badge>}
-                          <Switch
-                            checked={isAdmin}
-                            onCheckedChange={async (v) => {
-                              if (!v) {
-                                const { data: authData } = await supabase.auth.getUser();
-                                if (authData.user?.id === u.id) {
-                                  toast.error(
-                                    "No puedes quitarte a ti mismo el rol de administrador",
-                                  );
-                                  return;
+                        <div className="flex flex-wrap items-center gap-2">
+                          {isDemo ? (
+                            <Badge
+                              variant="outline"
+                              className="border-amber-500/40 bg-amber-500/15 text-amber-700"
+                            >
+                              <EyeOff className="size-3" /> Demo
+                            </Badge>
+                          ) : isAdmin ? (
+                            <Badge>Admin</Badge>
+                          ) : (
+                            <Badge variant="outline">
+                              <UserRound className="size-3" /> User
+                            </Badge>
+                          )}
+                          {!isViewer && (
+                            <Switch
+                              checked={isAdmin}
+                              onCheckedChange={async (v) => {
+                                if (!v) {
+                                  const { data: authData } = await supabase.auth.getUser();
+                                  if (authData.user?.id === u.id) {
+                                    toast.error(
+                                      "No puedes quitarte a ti mismo el rol de administrador",
+                                    );
+                                    return;
+                                  }
                                 }
+                                toggleAdmin.mutate({ userId: u.id, admin: v });
+                              }}
+                              aria-label="Alternar administrador"
+                            />
+                          )}
+                          {!isViewer && !isAdmin && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 px-2 text-[10px]"
+                              onClick={() => toggleViewer.mutate({ userId: u.id, viewer: !isDemo })}
+                              title={
+                                isDemo
+                                  ? "Convertir en usuario normal"
+                                  : "Convertir en demo (solo lectura)"
                               }
-                              toggleAdmin.mutate({ userId: u.id, admin: v });
-                            }}
-                          />
+                            >
+                              {isDemo ? "Quitar demo" : "Hacer demo"}
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
@@ -202,6 +281,7 @@ function AdminPage() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          disabled={isViewer}
                           onClick={() => {
                             if (confirm(`¿Eliminar a ${u.email}?`)) remove.mutate(u.id);
                           }}

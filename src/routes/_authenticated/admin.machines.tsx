@@ -37,7 +37,7 @@ import {
   listTemplates,
 } from "@/lib/qa/db";
 import { useMachineCatalog } from "@/hooks/use-machine-catalog";
-import { useIsAdmin } from "@/hooks/use-is-admin";
+import { useMeRole } from "@/hooks/use-me-role";
 import { MACHINE_ICONS } from "@/lib/qa/types";
 
 export const Route = createFileRoute("/_authenticated/admin/machines")({
@@ -45,9 +45,9 @@ export const Route = createFileRoute("/_authenticated/admin/machines")({
 });
 
 function MachinesAdminPage() {
-  const { isAdmin } = useIsAdmin();
+  const { isAdmin, isViewer } = useMeRole();
   const catalog = useMachineCatalog();
-  if (!isAdmin) {
+  if (!isAdmin && !isViewer) {
     return (
       <Card>
         <CardHeader>
@@ -61,6 +61,7 @@ function MachinesAdminPage() {
       </Card>
     );
   }
+  const readOnly = isViewer;
   return (
     <div className="space-y-6">
       <div>
@@ -79,16 +80,16 @@ function MachinesAdminPage() {
           </p>
         </div>
       )}
-      <MachinesSection />
-      <MachineKindsSection catalogUnavailable={catalog.isError} />
-      <CategoriesSection catalogUnavailable={catalog.isError} />
+      <MachinesSection readOnly={readOnly} />
+      <MachineKindsSection readOnly={readOnly} catalogUnavailable={catalog.isError} />
+      <CategoriesSection readOnly={readOnly} catalogUnavailable={catalog.isError} />
     </div>
   );
 }
 
 // ---------------- Machines ----------------
 
-function MachinesSection() {
+function MachinesSection({ readOnly }: { readOnly: boolean }) {
   const qc = useQueryClient();
   const catalog = useMachineCatalog();
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
@@ -145,55 +146,57 @@ function MachinesSection() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <form
-          className="flex flex-wrap items-end gap-2 rounded-md border bg-muted/30 p-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const machineId = newId.trim().toUpperCase().replace(/\s+/g, "");
-            if (!machineId) {
-              toast.error("El identificador no puede quedar vacío");
-              return;
-            }
-            if (newId.trim() && newName.trim()) create.mutate();
-          }}
-        >
-          <div className="space-y-1">
-            <Label className="text-xs">Identificador</Label>
-            <Input
-              className="h-8 w-24"
-              placeholder="TB4"
-              value={newId}
-              onChange={(e) => setNewId(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Nombre</Label>
-            <Input
-              className="h-8 w-48"
-              placeholder="TrueBeam 4"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Tipo</Label>
-            <Select value={newKind} onValueChange={setNewKind}>
-              <SelectTrigger className="h-8 w-44 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {catalog.kinds.map((k) => (
-                  <SelectItem key={k.id} value={k.id}>
-                    {k.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button type="submit" size="sm" disabled={create.isPending}>
-            <Plus className="size-4" /> Añadir
-          </Button>
-        </form>
+        {!readOnly && (
+          <form
+            className="flex flex-wrap items-end gap-2 rounded-md border bg-muted/30 p-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const machineId = newId.trim().toUpperCase().replace(/\s+/g, "");
+              if (!machineId) {
+                toast.error("El identificador no puede quedar vacío");
+                return;
+              }
+              if (newId.trim() && newName.trim()) create.mutate();
+            }}
+          >
+            <div className="space-y-1">
+              <Label className="text-xs">Identificador</Label>
+              <Input
+                className="h-8 w-24"
+                placeholder="TB4"
+                value={newId}
+                onChange={(e) => setNewId(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Nombre</Label>
+              <Input
+                className="h-8 w-48"
+                placeholder="TrueBeam 4"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Tipo</Label>
+              <Select value={newKind} onValueChange={setNewKind}>
+                <SelectTrigger className="h-8 w-44 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {catalog.kinds.map((k) => (
+                    <SelectItem key={k.id} value={k.id}>
+                      {k.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit" size="sm" disabled={create.isPending}>
+              <Plus className="size-4" /> Añadir
+            </Button>
+          </form>
+        )}
 
         <Table>
           <TableHeader>
@@ -201,13 +204,13 @@ function MachinesSection() {
               <TableHead>ID</TableHead>
               <TableHead>Nombre</TableHead>
               <TableHead>Tipo</TableHead>
-              <TableHead />
+              {!readOnly && <TableHead />}
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.map((m) => (
               <TableRow key={m.id}>
-                {editId === m.id ? (
+                {!readOnly && editId === m.id ? (
                   <>
                     <TableCell className="text-xs font-mono">{m.id}</TableCell>
                     <TableCell>
@@ -258,38 +261,40 @@ function MachinesSection() {
                     <TableCell className="text-xs font-mono">{m.id}</TableCell>
                     <TableCell className="text-sm">{m.name}</TableCell>
                     <TableCell className="text-xs">{catalog.kindName(m.kind)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="size-7"
-                          onClick={() => {
-                            setEditId(m.id);
-                            setEditName(m.name);
-                            setEditKind(m.kind ?? "other");
-                          }}
-                        >
-                          <Pencil className="size-3" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="size-7"
-                          onClick={() => {
-                            if (
-                              confirm(
-                                `¿Eliminar la máquina ${m.id}? Las plantillas y datos asociados dejarán de mostrarse.`,
-                              )
-                            ) {
-                              remove.mutate(m.id);
-                            }
-                          }}
-                        >
-                          <Trash2 className="size-3 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
+                    {!readOnly && (
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="size-7"
+                            onClick={() => {
+                              setEditId(m.id);
+                              setEditName(m.name);
+                              setEditKind(m.kind ?? "other");
+                            }}
+                          >
+                            <Pencil className="size-3" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="size-7"
+                            onClick={() => {
+                              if (
+                                confirm(
+                                  `¿Eliminar la máquina ${m.id}? Las plantillas y datos asociados dejarán de mostrarse.`,
+                                )
+                              ) {
+                                remove.mutate(m.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="size-3 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
                   </>
                 )}
               </TableRow>
@@ -342,7 +347,13 @@ function IconPicker({
   );
 }
 
-function MachineKindsSection({ catalogUnavailable }: { catalogUnavailable: boolean }) {
+function MachineKindsSection({
+  readOnly,
+  catalogUnavailable,
+}: {
+  readOnly: boolean;
+  catalogUnavailable: boolean;
+}) {
   const qc = useQueryClient();
   const catalog = useMachineCatalog();
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
@@ -420,55 +431,57 @@ function MachineKindsSection({ catalogUnavailable }: { catalogUnavailable: boole
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <form
-          className="flex flex-wrap items-end gap-2 rounded-md border bg-muted/30 p-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const kindId = newId
-              .trim()
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, "-")
-              .replace(/^-|-$/g, "");
-            if (!kindId) {
-              toast.error("El identificador no puede quedar vacío");
-              return;
-            }
-            if (newId.trim() && newName.trim()) create.mutate();
-          }}
-        >
-          <div className="space-y-1">
-            <Label className="text-xs">Identificador</Label>
-            <Input
-              className="h-8 w-40"
-              placeholder="brachy"
-              value={newId}
-              onChange={(e) => setNewId(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Nombre</Label>
-            <Input
-              className="h-8 w-48"
-              placeholder="Braquiterapia"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Icono (resumen QA)</Label>
-            <IconPicker value={newIcon} onChange={setNewIcon} />
-          </div>
-          <Button type="submit" size="sm" disabled={create.isPending || catalogUnavailable}>
-            <Plus className="size-4" /> Añadir tipo
-          </Button>
-        </form>
+        {!readOnly && (
+          <form
+            className="flex flex-wrap items-end gap-2 rounded-md border bg-muted/30 p-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const kindId = newId
+                .trim()
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/^-|-$/g, "");
+              if (!kindId) {
+                toast.error("El identificador no puede quedar vacío");
+                return;
+              }
+              if (newId.trim() && newName.trim()) create.mutate();
+            }}
+          >
+            <div className="space-y-1">
+              <Label className="text-xs">Identificador</Label>
+              <Input
+                className="h-8 w-40"
+                placeholder="brachy"
+                value={newId}
+                onChange={(e) => setNewId(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Nombre</Label>
+              <Input
+                className="h-8 w-48"
+                placeholder="Braquiterapia"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Icono (resumen QA)</Label>
+              <IconPicker value={newIcon} onChange={setNewIcon} />
+            </div>
+            <Button type="submit" size="sm" disabled={create.isPending || catalogUnavailable}>
+              <Plus className="size-4" /> Añadir tipo
+            </Button>
+          </form>
+        )}
 
         <div className="space-y-2">
           {rows.map((k) => {
             const inUse = machines.data?.filter((m) => m.kind === k.id).length ?? 0;
             return (
               <div key={k.id} className="rounded-md border p-3">
-                {editId === k.id ? (
+                {!readOnly && editId === k.id ? (
                   <div className="space-y-3">
                     <div className="flex flex-wrap items-end gap-2">
                       <div className="space-y-1">
@@ -559,20 +572,22 @@ function MachineKindsSection({ catalogUnavailable }: { catalogUnavailable: boole
                           {inUse} máquina{inUse > 1 ? "s" : ""}
                         </span>
                       )}
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="size-7"
-                        onClick={() => {
-                          setEditId(k.id);
-                          setEditName(k.name);
-                          setEditIcon(k.icon ?? null);
-                          setEditCats(k.categories);
-                        }}
-                      >
-                        <Pencil className="size-3" />
-                      </Button>
-                      {!k.builtin && (
+                      {!readOnly && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="size-7"
+                          onClick={() => {
+                            setEditId(k.id);
+                            setEditName(k.name);
+                            setEditIcon(k.icon ?? null);
+                            setEditCats(k.categories);
+                          }}
+                        >
+                          <Pencil className="size-3" />
+                        </Button>
+                      )}
+                      {!readOnly && !k.builtin && (
                         <Button
                           size="icon"
                           variant="ghost"
@@ -604,7 +619,13 @@ function MachineKindsSection({ catalogUnavailable }: { catalogUnavailable: boole
 
 // ---------------- Categories ----------------
 
-function CategoriesSection({ catalogUnavailable }: { catalogUnavailable: boolean }) {
+function CategoriesSection({
+  readOnly,
+  catalogUnavailable,
+}: {
+  readOnly: boolean;
+  catalogUnavailable: boolean;
+}) {
   const qc = useQueryClient();
   const catalog = useMachineCatalog();
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
@@ -685,44 +706,46 @@ function CategoriesSection({ catalogUnavailable }: { catalogUnavailable: boolean
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <form
-          className="flex flex-wrap items-end gap-2 rounded-md border bg-muted/30 p-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const catId = newId
-              .trim()
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, "_")
-              .replace(/^_+|_+$/g, "");
-            if (!catId) {
-              toast.error("El identificador no puede quedar vacío");
-              return;
-            }
-            if (newId.trim() && newName.trim()) create.mutate();
-          }}
-        >
-          <div className="space-y-1">
-            <Label className="text-xs">Identificador</Label>
-            <Input
-              className="h-8 w-48"
-              placeholder="brachy_dosimetric"
-              value={newId}
-              onChange={(e) => setNewId(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Nombre</Label>
-            <Input
-              className="h-8 w-48"
-              placeholder="Dosimétrico Braquiterapia"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-            />
-          </div>
-          <Button type="submit" size="sm" disabled={create.isPending || catalogUnavailable}>
-            <Plus className="size-4" /> Añadir categoría
-          </Button>
-        </form>
+        {!readOnly && (
+          <form
+            className="flex flex-wrap items-end gap-2 rounded-md border bg-muted/30 p-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const catId = newId
+                .trim()
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "_")
+                .replace(/^_+|_+$/g, "");
+              if (!catId) {
+                toast.error("El identificador no puede quedar vacío");
+                return;
+              }
+              if (newId.trim() && newName.trim()) create.mutate();
+            }}
+          >
+            <div className="space-y-1">
+              <Label className="text-xs">Identificador</Label>
+              <Input
+                className="h-8 w-48"
+                placeholder="brachy_dosimetric"
+                value={newId}
+                onChange={(e) => setNewId(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Nombre</Label>
+              <Input
+                className="h-8 w-48"
+                placeholder="Dosimétrico Braquiterapia"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+              />
+            </div>
+            <Button type="submit" size="sm" disabled={create.isPending || catalogUnavailable}>
+              <Plus className="size-4" /> Añadir categoría
+            </Button>
+          </form>
+        )}
 
         <Table>
           <TableHeader>
@@ -730,7 +753,7 @@ function CategoriesSection({ catalogUnavailable }: { catalogUnavailable: boolean
               <TableHead>ID</TableHead>
               <TableHead>Nombre</TableHead>
               <TableHead>Usada por</TableHead>
-              <TableHead />
+              {!readOnly && <TableHead />}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -742,7 +765,7 @@ function CategoriesSection({ catalogUnavailable }: { catalogUnavailable: boolean
                 .join(", ");
               return (
                 <TableRow key={c.id}>
-                  {editId === c.id ? (
+                  {!readOnly && editId === c.id ? (
                     <>
                       <TableCell className="text-xs font-mono">{c.id}</TableCell>
                       <TableCell>
@@ -801,18 +824,20 @@ function CategoriesSection({ catalogUnavailable }: { catalogUnavailable: boolean
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="size-7"
-                            onClick={() => {
-                              setEditId(c.id);
-                              setEditName(c.name);
-                            }}
-                          >
-                            <Pencil className="size-3" />
-                          </Button>
-                          {!c.builtin && (
+                          {!readOnly && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="size-7"
+                              onClick={() => {
+                                setEditId(c.id);
+                                setEditName(c.name);
+                              }}
+                            >
+                              <Pencil className="size-3" />
+                            </Button>
+                          )}
+                          {!readOnly && !c.builtin && (
                             <Button
                               size="icon"
                               variant="ghost"

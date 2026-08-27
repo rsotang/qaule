@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
 import { meIsAdmin } from "@/lib/admin.functions";
+import { useMeRole } from "@/hooks/use-me-role";
+import { EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import logoAsset from "@/assets/trebol_radiacion.svg.asset.json";
 
@@ -18,6 +20,7 @@ export function AppShell() {
   const qc = useQueryClient();
   const meFn = useServerFn(meIsAdmin);
   const me = useQuery({ queryKey: ["me-admin"], queryFn: () => meFn() });
+  const { isViewer, isAdmin } = useMeRole();
   const [open, setOpen] = useState(false);
 
   const user = useQuery({
@@ -33,6 +36,8 @@ export function AppShell() {
     navigate({ to: "/auth", replace: true });
   }
 
+  const canSeeAdmin = isAdmin || isViewer;
+
   const links = (
     <>
       <NavLink to="/" label="Panel QA" />
@@ -40,10 +45,8 @@ export function AppShell() {
       <NavLink to="/python" icon={<Terminal className="size-4" />} label="Python" />
       <NavLink to="/imports" icon={<Upload className="size-4" />} label="Importaciones" />
       <NavLink to="/templates" icon={<Settings2 className="size-4" />} label="Plantillas" />
-      {me.data?.isAdmin && (
-        <NavLink to="/admin" icon={<Users className="size-4" />} label="Usuarios" />
-      )}
-      {me.data?.isAdmin && (
+      {canSeeAdmin && <NavLink to="/admin" icon={<Users className="size-4" />} label="Usuarios" />}
+      {canSeeAdmin && (
         <NavLink to="/admin/machines" icon={<Settings2 className="size-4" />} label="Máquinas" />
       )}
     </>
@@ -51,6 +54,12 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      {isViewer && (
+        <div className="flex items-center justify-center gap-2 border-b border-amber-500/30 bg-amber-500/15 px-3 py-1.5 text-xs font-medium text-amber-700">
+          <EyeOff className="size-3.5" />
+          Modo demo — solo lectura: puedes ver todo, pero los cambios están deshabilitados.
+        </div>
+      )}
       <header className="border-b bg-card">
         <div className="flex w-full items-center gap-3 px-3 py-3 sm:gap-6 sm:px-6 lg:px-8">
           <Sheet open={open} onOpenChange={setOpen}>

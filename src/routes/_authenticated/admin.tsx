@@ -3,18 +3,20 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, Settings2 } from "lucide-react";
+import { Users, Settings2, EyeOff } from "lucide-react";
 import { meIsAdmin } from "@/lib/admin.functions";
+import { useMeRole } from "@/hooks/use-me-role";
 
 export const Route = createFileRoute("/_authenticated/admin")({ component: AdminLayout });
 
 function AdminLayout() {
   const meFn = useServerFn(meIsAdmin);
   const me = useQuery({ queryKey: ["me-admin"], queryFn: () => meFn() });
+  const { isViewer } = useMeRole();
   const { pathname } = useLocation();
 
   if (me.isLoading) return <p className="p-8 text-sm text-muted-foreground">Cargando…</p>;
-  if (!me.data?.isAdmin) {
+  if (!me.data?.isAdmin && !isViewer) {
     return (
       <Card>
         <CardHeader>
@@ -36,6 +38,12 @@ function AdminLayout() {
 
   return (
     <div className="space-y-6">
+      {isViewer && (
+        <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/15 px-3 py-2 text-xs font-medium text-amber-700">
+          <EyeOff className="size-4" />
+          Modo demo — esta sección se muestra en solo lectura; las acciones están deshabilitadas.
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         {tabs.map((t) => {
           const active = pathname === t.to || (t.to !== "/admin" && pathname.startsWith(t.to));

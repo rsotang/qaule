@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+﻿import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMachineList } from "@/hooks/use-machine-list";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState, type DragEvent } from "react";
@@ -58,6 +58,7 @@ import {
 } from "@/lib/qa/calendar-excel";
 import { CalendarMapper } from "@/components/qa/CalendarMapper";
 import type { MachineId, Measurement, CalendarEntry } from "@/lib/qa/types";
+import { useMeRole } from "@/hooks/use-me-role";
 import { evaluateTolerance } from "@/lib/qa/types";
 import {
   buildMpcTemplate,
@@ -104,6 +105,8 @@ interface Preview {
 
 function ImportsPage() {
   const qc = useQueryClient();
+  const { isViewer } = useMeRole();
+  const readOnly = isViewer;
   const [machineId, setMachineId] = useState<MachineId>("TB1");
   const [previews, setPreviews] = useState<Preview[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -161,7 +164,7 @@ function ImportsPage() {
         const date = resolveImportDate(tpl, parsed) ?? new Date().toISOString().slice(0, 10);
         const values = extractFromTemplate(tpl, parsed);
         const rows = values
-          // no guardamos celdas vacías / N/A / errores de Excel
+          // no guardamos celdas vacÃ­as / N/A / errores de Excel
           .filter((v) => v.value != null && Number.isFinite(v.value))
           .map((v) => {
             const test = tpl.tests.find((t) => t.id === v.testId)!;
@@ -222,7 +225,7 @@ function ImportsPage() {
 
   async function handleDelete(id: string) {
     await deleteImport(id);
-    toast.success("Importación eliminada");
+    toast.success("ImportaciÃ³n eliminada");
     // If we just deleted the last row of the current page, step back one page.
     if (importsRows.length === 1 && importsPage > 0) {
       setImportsPage((p) => p - 1);
@@ -241,7 +244,7 @@ function ImportsPage() {
     }
     if (withResults.length > MPC_MAX_FOLDERS) {
       toast.error(
-        `Se detectaron ${withResults.length} carpetas. Selecciona solo la carpeta del mes a importar (máx. ${MPC_MAX_FOLDERS}).`,
+        `Se detectaron ${withResults.length} carpetas. Selecciona solo la carpeta del mes a importar (mÃ¡x. ${MPC_MAX_FOLDERS}).`,
       );
       return;
     }
@@ -419,7 +422,7 @@ function ImportsPage() {
     try {
       const m = JSON.parse(await file.text()) as CalendarMapping;
       if (!m || typeof m.sheetName !== "string" || typeof m.headerRow !== "number")
-        throw new Error("Plantilla no válida");
+        throw new Error("Plantilla no vÃ¡lida");
       setMapping(m);
       localStorage.setItem(MAPPING_KEY, JSON.stringify(m));
       toast.success("Plantilla de calendario cargada");
@@ -461,7 +464,9 @@ function ImportsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold sm:text-2xl">Importaciones</h1>
-          <p className="text-sm text-muted-foreground">Sube un archivo .xlsm mensual por máquina</p>
+          <p className="text-sm text-muted-foreground">
+            Sube un archivo .xlsm mensual por mÃ¡quina
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleBackup}>
@@ -470,6 +475,7 @@ function ImportsPage() {
           <label className="cursor-pointer">
             <input
               type="file"
+              disabled={readOnly}
               accept=".json"
               className="hidden"
               onChange={(e) => e.target.files?.[0] && handleRestore(e.target.files[0])}
@@ -485,12 +491,12 @@ function ImportsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Nueva importación</CardTitle>
+          <CardTitle className="text-base">Nueva importaciÃ³n</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
             <div className="w-full space-y-1 sm:w-auto">
-              <label className="text-xs text-muted-foreground">Máquina</label>
+              <label className="text-xs text-muted-foreground">MÃ¡quina</label>
               <Select value={machineId} onValueChange={(v) => setMachineId(v as MachineId)}>
                 <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue />
@@ -498,7 +504,7 @@ function ImportsPage() {
                 <SelectContent>
                   {machineList.map((m) => (
                     <SelectItem key={m.id} value={m.id}>
-                      {m.id} — {m.name}
+                      {m.id} â€” {m.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -511,6 +517,7 @@ function ImportsPage() {
               <Input
                 ref={fileRef}
                 type="file"
+                disabled={readOnly}
                 multiple
                 accept=".xlsm,.xlsx,.xls"
                 onChange={(e) => {
@@ -526,15 +533,15 @@ function ImportsPage() {
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
-                  {previews.length} archivo(s) · {previews.reduce((n, p) => n + p.rows.length, 0)}{" "}
-                  valores válidos
+                  {previews.length} archivo(s) Â· {previews.reduce((n, p) => n + p.rows.length, 0)}{" "}
+                  valores vÃ¡lidos
                 </p>
                 <div className="flex gap-2">
                   <Button variant="ghost" size="sm" onClick={() => setPreviews([])}>
                     Cancelar
                   </Button>
-                  <Button size="sm" onClick={commitPreviews}>
-                    Confirmar importación ({previews.length})
+                  <Button size="sm" onClick={commitPreviews} disabled={readOnly}>
+                    Confirmar importaciÃ³n ({previews.length})
                   </Button>
                 </div>
               </div>
@@ -548,8 +555,8 @@ function ImportsPage() {
                     <div>
                       <p className="text-sm font-medium">{preview.fileName}</p>
                       <p className="text-xs text-muted-foreground">
-                        {preview.machineId} • fecha: {preview.sourceDate} • {preview.rows.length}{" "}
-                        valores extraídos
+                        {preview.machineId} â€¢ fecha: {preview.sourceDate} â€¢{" "}
+                        {preview.rows.length} valores extraÃ­dos
                       </p>
                     </div>
                     <Button
@@ -581,18 +588,18 @@ function ImportsPage() {
                             </TableCell>
                             <TableCell className="text-right text-xs font-mono">
                               {r.value == null ? (
-                                <span className="text-muted-foreground">—</span>
+                                <span className="text-muted-foreground">â€”</span>
                               ) : (
                                 r.value.toFixed(4)
                               )}
                             </TableCell>
                             <TableCell>
                               {r.inTol === null ? (
-                                <span className="text-xs text-muted-foreground">—</span>
+                                <span className="text-xs text-muted-foreground">â€”</span>
                               ) : r.inTol ? (
-                                <span className="text-xs text-green-600">✓</span>
+                                <span className="text-xs text-green-600">âœ“</span>
                               ) : (
-                                <span className="text-xs font-medium text-destructive">✗</span>
+                                <span className="text-xs font-medium text-destructive">âœ—</span>
                               )}
                             </TableCell>
                           </TableRow>
@@ -610,18 +617,18 @@ function ImportsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <FolderUp className="size-4" /> Importación MPC (Varian)
+            <FolderUp className="size-4" /> ImportaciÃ³n MPC (Varian)
           </CardTitle>
           <p className="text-xs text-muted-foreground">
             Importa una o varias carpetas a la vez (mes completo con sus Check.xml y Results.csv).
-            Se importan todas las medidas y quedan disponibles en Visualización como test «MPC
-            (Varian)» → energía → grupo → parámetro.
+            Se importan todas las medidas y quedan disponibles en VisualizaciÃ³n como test Â«MPC
+            (Varian)Â» â†’ energÃ­a â†’ grupo â†’ parÃ¡metro.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
             <div className="w-full space-y-1 sm:w-auto">
-              <label className="text-xs text-muted-foreground">Máquina</label>
+              <label className="text-xs text-muted-foreground">MÃ¡quina</label>
               <Select value={mpcMachineId} onValueChange={(v) => setMpcMachineId(v as MachineId)}>
                 <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue />
@@ -629,7 +636,7 @@ function ImportsPage() {
                 <SelectContent>
                   {machineList.map((m) => (
                     <SelectItem key={m.id} value={m.id}>
-                      {m.id} — {m.name}
+                      {m.id} â€” {m.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -652,7 +659,7 @@ function ImportsPage() {
               >
                 <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
                   <FolderUp className="size-4 shrink-0" />
-                  <span className="truncate">Arrastra aquí las carpetas MPC</span>
+                  <span className="truncate">Arrastra aquÃ­ las carpetas MPC</span>
                 </div>
                 <Button
                   variant="outline"
@@ -665,9 +672,10 @@ function ImportsPage() {
                 <Input
                   ref={mpcFolderRef}
                   type="file"
+                  disabled={readOnly}
                   multiple
                   className="hidden"
-                  // @ts-expect-error webkitdirectory no está tipado en React
+                  // @ts-expect-error webkitdirectory no estÃ¡ tipado en React
                   webkitdirectory=""
                   onChange={(e) => {
                     const fs = Array.from(e.target.files ?? []);
@@ -682,15 +690,15 @@ function ImportsPage() {
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
-                  {mpcPreviews.length} carpeta(s) ·{" "}
-                  {mpcPreviews.reduce((n, p) => n + p.rows.length, 0)} medidas válidas
+                  {mpcPreviews.length} carpeta(s) Â·{" "}
+                  {mpcPreviews.reduce((n, p) => n + p.rows.length, 0)} medidas vÃ¡lidas
                 </p>
                 <div className="flex gap-2">
                   <Button variant="ghost" size="sm" onClick={() => setMpcPreviews([])}>
                     Cancelar
                   </Button>
                   <Button size="sm" onClick={commitMpc}>
-                    Confirmar importación ({mpcPreviews.length})
+                    Confirmar importaciÃ³n ({mpcPreviews.length})
                   </Button>
                 </div>
               </div>
@@ -711,12 +719,12 @@ function ImportsPage() {
                           {[
                             preview.serial ? `SN${preview.serial}` : null,
                             preview.date ? `fecha: ${preview.date}` : null,
-                            preview.energy ? `energía: ${preview.energy}` : null,
+                            preview.energy ? `energÃ­a: ${preview.energy}` : null,
                             preview.templateId,
                           ]
                             .filter(Boolean)
-                            .join(" • ")}{" "}
-                          · {preview.rows.length} valores
+                            .join(" â€¢ ")}{" "}
+                          Â· {preview.rows.length} valores
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -729,7 +737,7 @@ function ImportsPage() {
                             }`}
                           >
                             {preview.evaluation}
-                            {preview.isBaseline ? " · Baseline" : ""}
+                            {preview.isBaseline ? " Â· Baseline" : ""}
                           </span>
                         )}
                         {fails > 0 && (
@@ -754,7 +762,7 @@ function ImportsPage() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Parámetro</TableHead>
+                            <TableHead>ParÃ¡metro</TableHead>
                             <TableHead className="text-right">Valor</TableHead>
                             <TableHead className="text-right">Umbral</TableHead>
                             <TableHead className="text-center">Estado</TableHead>
@@ -770,15 +778,15 @@ function ImportsPage() {
                                   {r.value.toFixed(4)}
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                                  {r.threshold == null ? "—" : r.threshold.toFixed(4)}
+                                  {r.threshold == null ? "â€”" : r.threshold.toFixed(4)}
                                 </TableCell>
                                 <TableCell className="text-center text-xs">
                                   {r.threshold == null ? (
-                                    <span className="text-muted-foreground">—</span>
+                                    <span className="text-muted-foreground">â€”</span>
                                   ) : ok ? (
-                                    <span className="text-emerald-600">✓</span>
+                                    <span className="text-emerald-600">âœ“</span>
                                   ) : (
-                                    <span className="font-medium text-destructive">✗</span>
+                                    <span className="font-medium text-destructive">âœ—</span>
                                   )}
                                 </TableCell>
                               </TableRow>
@@ -802,7 +810,7 @@ function ImportsPage() {
           </CardTitle>
           <p className="text-xs text-muted-foreground">
             Sube una hoja con los tests programados (filas = test, columnas = meses o fechas).
-            Calendario compartido por todas las máquinas.
+            Calendario compartido por todas las mÃ¡quinas.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -811,7 +819,7 @@ function ImportsPage() {
               <div className="text-xs">
                 <p className="font-medium">{calendar.data.fileName ?? "Calendario actual"}</p>
                 <p className="text-muted-foreground">
-                  {calendar.data.entries.length} tests · actualizado{" "}
+                  {calendar.data.entries.length} tests Â· actualizado{" "}
                   {new Date(calendar.data.updatedAt).toLocaleString()}
                 </p>
               </div>
@@ -819,22 +827,27 @@ function ImportsPage() {
                 <Button variant="outline" size="sm" onClick={exportCalendarJson}>
                   <Download className="size-4" /> Exportar JSON
                 </Button>
-                <Button variant="ghost" size="sm" onClick={handleDeleteCalendar}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDeleteCalendar}
+                  disabled={readOnly}
+                >
                   <Trash2 className="size-4 text-destructive" /> Eliminar
                 </Button>
               </div>
             </div>
           )}
 
-          {/* Plantilla de importación del calendario */}
+          {/* Plantilla de importaciÃ³n del calendario */}
           <div className="space-y-2 rounded-md border p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="text-xs">
-                <p className="font-medium">Plantilla de importación</p>
+                <p className="font-medium">Plantilla de importaciÃ³n</p>
                 <p className="text-muted-foreground">
                   {mapping
-                    ? `${mapping.name ?? "Plantilla"} · hoja "${mapping.sheetName}" · cabecera fila ${mapping.headerRow + 1}`
-                    : "Sin plantilla: se detectan cabeceras automáticamente."}
+                    ? `${mapping.name ?? "Plantilla"} Â· hoja "${mapping.sheetName}" Â· cabecera fila ${mapping.headerRow + 1}`
+                    : "Sin plantilla: se detectan cabeceras automÃ¡ticamente."}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-1">
@@ -865,6 +878,7 @@ function ImportsPage() {
             <input
               ref={mapSrcRef}
               type="file"
+              disabled={readOnly}
               accept=".xlsx,.xls,.xlsm"
               className="hidden"
               onChange={(e) => e.target.files?.[0] && handleMapperSource(e.target.files[0])}
@@ -872,6 +886,7 @@ function ImportsPage() {
             <input
               ref={mapJsonRef}
               type="file"
+              disabled={readOnly}
               accept=".json"
               className="hidden"
               onChange={(e) => e.target.files?.[0] && handleMappingJson(e.target.files[0])}
@@ -889,7 +904,7 @@ function ImportsPage() {
 
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
             <div className="w-full space-y-1 sm:w-auto">
-              <label className="text-xs text-muted-foreground">Año por defecto</label>
+              <label className="text-xs text-muted-foreground">AÃ±o por defecto</label>
               <Input
                 type="number"
                 value={calYear}
@@ -904,6 +919,7 @@ function ImportsPage() {
               <Input
                 ref={calFileRef}
                 type="file"
+                disabled={readOnly}
                 accept=".xlsx,.xls,.xlsm"
                 onChange={(e) => e.target.files?.[0] && handleCalendarFile(e.target.files[0])}
                 className="w-full sm:w-[320px]"
@@ -914,6 +930,7 @@ function ImportsPage() {
               <Input
                 ref={calJsonRef}
                 type="file"
+                disabled={readOnly}
                 accept=".json"
                 onChange={(e) => e.target.files?.[0] && handleCalendarJson(e.target.files[0])}
                 className="w-full sm:w-[260px]"
@@ -927,15 +944,15 @@ function ImportsPage() {
                 <div>
                   <p className="text-sm font-medium">{calFileName}</p>
                   <p className="text-xs text-muted-foreground">
-                    Hoja: {calPreview.sheetName} · {calPreview.detectedColumns.length} columnas
-                    detectadas · {calPreview.entries.length} tests
+                    Hoja: {calPreview.sheetName} Â· {calPreview.detectedColumns.length} columnas
+                    detectadas Â· {calPreview.entries.length} tests
                   </p>
                 </div>
                 <div className="flex gap-2">
                   <Button variant="ghost" size="sm" onClick={() => setCalPreview(null)}>
                     Cancelar
                   </Button>
-                  <Button size="sm" onClick={commitCalendar}>
+                  <Button size="sm" onClick={commitCalendar} disabled={readOnly}>
                     Guardar calendario
                   </Button>
                 </div>
@@ -944,10 +961,10 @@ function ImportsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Máquina</TableHead>
+                      <TableHead>MÃ¡quina</TableHead>
                       <TableHead>Test</TableHead>
-                      <TableHead>Programación</TableHead>
-                      <TableHead>Paciente · Curso · Plan</TableHead>
+                      <TableHead>ProgramaciÃ³n</TableHead>
+                      <TableHead>Paciente Â· Curso Â· Plan</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -968,10 +985,10 @@ function ImportsPage() {
                           )}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
-                          {[...e.months.map((m) => `mes ${m}`), ...e.dates].join(" · ") || "—"}
+                          {[...e.months.map((m) => `mes ${m}`), ...e.dates].join(" Â· ") || "â€”"}
                         </TableCell>
                         <TableCell className="text-xs">
-                          {[e.patientId, e.course, e.plan].filter(Boolean).join(" · ") || "—"}
+                          {[e.patientId, e.course, e.plan].filter(Boolean).join(" Â· ") || "â€”"}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -990,7 +1007,7 @@ function ImportsPage() {
         <CardContent>
           {importsTotal === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
-              No hay importaciones todavía.{" "}
+              No hay importaciones todavÃ­a.{" "}
               <Link to="/templates" className="text-primary underline">
                 Configura una plantilla
               </Link>{" "}
@@ -1002,7 +1019,7 @@ function ImportsPage() {
                 <span>
                   {importsTotal} importaciones
                   {importsTotal > IMPORTS_PAGE_SIZE &&
-                    ` · página ${importsPage + 1} de ${importsPageCount}`}
+                    ` Â· pÃ¡gina ${importsPage + 1} de ${importsPageCount}`}
                 </span>
                 {importsPageCount > 1 && (
                   <div className="flex items-center gap-1">
@@ -1028,7 +1045,7 @@ function ImportsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Máquina</TableHead>
+                    <TableHead>MÃ¡quina</TableHead>
                     <TableHead>Fecha datos</TableHead>
                     <TableHead>Archivo</TableHead>
                     <TableHead>Importado</TableHead>
@@ -1047,16 +1064,16 @@ function ImportsPage() {
                       <TableCell className="text-right">
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" disabled={readOnly}>
                               <Trash2 className="size-4 text-destructive" />
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>¿Eliminar esta importación?</AlertDialogTitle>
+                              <AlertDialogTitle>Â¿Eliminar esta importaciÃ³n?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Se borrarán todas las medidas de «{i.fileName}» ({i.machineId} ·{" "}
-                                {i.sourceDate}). Esta acción no se puede deshacer.
+                                Se borrarÃ¡n todas las medidas de Â«{i.fileName}Â» ({i.machineId} Â·{" "}
+                                {i.sourceDate}). Esta acciÃ³n no se puede deshacer.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
