@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-60 -60 120 120">
+  <!-- Trébol de radiación estándar ISO 361 -->
+  <!-- Proporciones: círculo central R=1, radio interior palas=1.5R, radio exterior=5R -->
+  <!-- Palas de 60° separadas 60°, orientadas a 90° (arriba), 210°, 330° -->
+  <g fill="#0093c5">
+    <!-- Círculo central (R = 10) -->
+    <circle cx="0" cy="0" r="10"/>
+    <!-- Pala superior: centrada en -90° (arriba). Radio interior 15, exterior 50 -->
+    <!-- Extremos a ±30° del eje vertical -->
+    <path d="M 7.5 -12.990 A 15 15 0 0 1 -7.5 -12.990
+             L -25 -43.301 A 50 50 0 0 1 25 -43.301 Z"/>
+    <!-- Pala inferior izquierda (rotada 120°) -->
+    <path d="M 7.5 -12.990 A 15 15 0 0 1 -7.5 -12.990
+             L -25 -43.301 A 50 50 0 0 1 25 -43.301 Z"
+          transform="rotate(120)"/>
+    <!-- Pala inferior derecha (rotada 240°) -->
+    <path d="M 7.5 -12.990 A 15 15 0 0 1 -7.5 -12.990
+             L -25 -43.301 A 50 50 0 0 1 25 -43.301 Z"
+          transform="rotate(240)"/>
+  </g>
+</svg>
