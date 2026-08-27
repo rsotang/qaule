@@ -35,3 +35,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Carpeta local con material de Pylinac (no debe subirse al repo)
+Pylinac QAULE/
