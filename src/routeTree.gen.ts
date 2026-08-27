@@ -9,23 +9,22 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as PythonRunnerRouteImport } from './routes/python-runner'
-import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as PythonRunnerRouteImport } from './routes/python-runner'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
-import { Route as AuthenticatedVisualizationRouteImport } from './routes/_authenticated/visualization'
-import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authenticated/templates'
-import { Route as AuthenticatedPythonRouteImport } from './routes/_authenticated/python'
-import { Route as AuthenticatedImportsRouteImport } from './routes/_authenticated/imports'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
-import { Route as AuthenticatedTemplatesIndexRouteImport } from './routes/_authenticated/templates.index'
+import { Route as AuthenticatedImportsRouteImport } from './routes/_authenticated/imports'
+import { Route as AuthenticatedPythonRouteImport } from './routes/_authenticated/python'
+import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authenticated/templates'
+import { Route as AuthenticatedVisualizationRouteImport } from './routes/_authenticated/visualization'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
-import { Route as AuthenticatedTemplatesMachineRouteImport } from './routes/_authenticated/templates.$machine'
 import { Route as AuthenticatedAdminMachinesRouteImport } from './routes/_authenticated/admin.machines'
+import { Route as AuthenticatedTemplatesIndexRouteImport } from './routes/_authenticated/templates.index'
+import { Route as AuthenticatedTemplatesMachineRouteImport } from './routes/_authenticated/templates.$machine'
 
-const PythonRunnerRoute = PythonRunnerRouteImport.update({
-  id: '/python-runner',
-  path: '/python-runner',
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -33,13 +32,34 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
-  id: '/_authenticated',
+const PythonRunnerRoute = PythonRunnerRouteImport.update({
+  id: '/python-runner',
+  path: '/python-runner',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedImportsRoute = AuthenticatedImportsRouteImport.update({
+  id: '/imports',
+  path: '/imports',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPythonRoute = AuthenticatedPythonRouteImport.update({
+  id: '/python',
+  path: '/python',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedTemplatesRoute = AuthenticatedTemplatesRouteImport.update({
+  id: '/templates',
+  path: '/templates',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedVisualizationRoute =
@@ -48,48 +68,28 @@ const AuthenticatedVisualizationRoute =
     path: '/visualization',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedTemplatesRoute = AuthenticatedTemplatesRouteImport.update({
-  id: '/templates',
-  path: '/templates',
-  getParentRoute: () => AuthenticatedRouteRoute,
+const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
-const AuthenticatedPythonRoute = AuthenticatedPythonRouteImport.update({
-  id: '/python',
-  path: '/python',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedImportsRoute = AuthenticatedImportsRouteImport.update({
-  id: '/imports',
-  path: '/imports',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
+const AuthenticatedAdminMachinesRoute =
+  AuthenticatedAdminMachinesRouteImport.update({
+    id: '/machines',
+    path: '/machines',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedTemplatesIndexRoute =
   AuthenticatedTemplatesIndexRouteImport.update({
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedTemplatesRoute,
   } as any)
-const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AuthenticatedAdminRoute,
-} as any)
 const AuthenticatedTemplatesMachineRoute =
   AuthenticatedTemplatesMachineRouteImport.update({
     id: '/$machine',
     path: '/$machine',
     getParentRoute: () => AuthenticatedTemplatesRoute,
-  } as any)
-const AuthenticatedAdminMachinesRoute =
-  AuthenticatedAdminMachinesRouteImport.update({
-    id: '/machines',
-    path: '/machines',
-    getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -186,11 +186,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/python-runner': {
-      id: '/python-runner'
-      path: '/python-runner'
-      fullPath: '/python-runner'
-      preLoaderRoute: typeof PythonRunnerRouteImport
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -200,11 +200,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated': {
-      id: '/_authenticated'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+    '/python-runner': {
+      id: '/python-runner'
+      path: '/python-runner'
+      fullPath: '/python-runner'
+      preLoaderRoute: typeof PythonRunnerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/': {
@@ -214,25 +214,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/visualization': {
-      id: '/_authenticated/visualization'
-      path: '/visualization'
-      fullPath: '/visualization'
-      preLoaderRoute: typeof AuthenticatedVisualizationRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/templates': {
-      id: '/_authenticated/templates'
-      path: '/templates'
-      fullPath: '/templates'
-      preLoaderRoute: typeof AuthenticatedTemplatesRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/python': {
-      id: '/_authenticated/python'
-      path: '/python'
-      fullPath: '/python'
-      preLoaderRoute: typeof AuthenticatedPythonRouteImport
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/imports': {
@@ -242,19 +228,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedImportsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/admin': {
-      id: '/_authenticated/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+    '/_authenticated/python': {
+      id: '/_authenticated/python'
+      path: '/python'
+      fullPath: '/python'
+      preLoaderRoute: typeof AuthenticatedPythonRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/templates/': {
-      id: '/_authenticated/templates/'
-      path: '/'
-      fullPath: '/templates/'
-      preLoaderRoute: typeof AuthenticatedTemplatesIndexRouteImport
-      parentRoute: typeof AuthenticatedTemplatesRoute
+    '/_authenticated/templates': {
+      id: '/_authenticated/templates'
+      path: '/templates'
+      fullPath: '/templates'
+      preLoaderRoute: typeof AuthenticatedTemplatesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/visualization': {
+      id: '/_authenticated/visualization'
+      path: '/visualization'
+      fullPath: '/visualization'
+      preLoaderRoute: typeof AuthenticatedVisualizationRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/admin/': {
       id: '/_authenticated/admin/'
@@ -263,19 +256,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
-    '/_authenticated/templates/$machine': {
-      id: '/_authenticated/templates/$machine'
-      path: '/$machine'
-      fullPath: '/templates/$machine'
-      preLoaderRoute: typeof AuthenticatedTemplatesMachineRouteImport
-      parentRoute: typeof AuthenticatedTemplatesRoute
-    }
     '/_authenticated/admin/machines': {
       id: '/_authenticated/admin/machines'
       path: '/machines'
       fullPath: '/admin/machines'
       preLoaderRoute: typeof AuthenticatedAdminMachinesRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/templates/': {
+      id: '/_authenticated/templates/'
+      path: '/'
+      fullPath: '/templates/'
+      preLoaderRoute: typeof AuthenticatedTemplatesIndexRouteImport
+      parentRoute: typeof AuthenticatedTemplatesRoute
+    }
+    '/_authenticated/templates/$machine': {
+      id: '/_authenticated/templates/$machine'
+      path: '/$machine'
+      fullPath: '/templates/$machine'
+      preLoaderRoute: typeof AuthenticatedTemplatesMachineRouteImport
+      parentRoute: typeof AuthenticatedTemplatesRoute
     }
   }
 }

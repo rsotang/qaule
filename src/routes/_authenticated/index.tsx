@@ -1,6 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useLayoutEffect,
+  useCallback,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   listImports,
   listMachines,
@@ -110,6 +118,16 @@ function Dashboard() {
     );
   }, [machines.data]);
 
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpand = useCallback((id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -121,7 +139,13 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div
+        className={
+          expanded.size > 0
+            ? "grid gap-3 transition-[grid-template-columns] duration-200 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            : "grid gap-2 transition-[grid-template-columns] duration-200 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6"
+        }
+      >
         {machineList.map((m) => (
           <MachineCard
             key={m.id}
@@ -132,6 +156,8 @@ function Dashboard() {
             templates={templates.data ?? []}
             imports={imports.data ?? []}
             measurements={measurements.data ?? []}
+            expanded={expanded.has(m.id)}
+            onToggle={() => toggleExpand(m.id)}
             onSetState={setState}
             onDeleted={() => qc.invalidateQueries({ queryKey: ["machines"] })}
           />
@@ -162,6 +188,8 @@ function MachineCard({
   templates,
   imports,
   measurements,
+  expanded,
+  onToggle,
   onSetState,
   onDeleted,
 }: {
@@ -172,6 +200,8 @@ function MachineCard({
   templates: Template[];
   imports: ImportRecord[];
   measurements: Measurement[];
+  expanded: boolean;
+  onToggle: () => void;
   onSetState: (id: MachineId, s: MachineState) => void;
   onDeleted: () => void;
 }) {
@@ -210,110 +240,173 @@ function MachineCard({
   const meta = STATE_META[state];
 
   return (
-    <Card>
-      <CardHeader className="pb-1.5 pt-2.5">
-        <div className="flex items-start justify-between gap-1.5">
-          <div className="flex items-center gap-1.5">
-            <MachineGlyph
-              machineId={machineId}
-              kind={machineKind}
-              className="h-14 w-16 shrink-0 rounded-md bg-primary/10 object-contain p-1"
-            />
+    <AnimatedHeight open={expanded}>
+      {expanded ? (
+        <Card>
+          <CardHeader className="pb-1.5 pt-2.5">
+            <div className="flex items-start justify-between gap-1.5">
+              <div className="flex items-center gap-1.5">
+                <MachineGlyph
+                  machineId={machineId}
+                  kind={machineKind}
+                  className="h-14 w-16 shrink-0 rounded-md bg-primary/10 object-contain p-1"
+                />
 
+                <div>
+                  <CardTitle className="text-xs">{machineId}</CardTitle>
+                  <p className="text-[10px] text-muted-foreground">{machineName}</p>
+                  {machineKind && (
+                    <p className="text-[9px] text-muted-foreground">
+                      {catalog.kindName(machineKind)}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-0.5">
+                <Badge variant="outline" className={`gap-1 px-1.5 py-0 text-[9px] ${meta.cls}`}>
+                  <meta.Icon className="size-2.5" /> {meta.label}
+                </Badge>
+                {isCustom && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-6"
+                    title="Eliminar máquina"
+                    onClick={async () => {
+                      if (
+                        !confirm(
+                          `¿Eliminar la máquina ${machineId}? Las plantillas y datos asociados dejarán de mostrarse.`,
+                        )
+                      )
+                        return;
+                      try {
+                        await deleteMachine(machineId);
+                        toast.success("Máquina eliminada");
+                        onDeleted();
+                      } catch (e) {
+                        toast.error((e as Error).message);
+                      }
+                    }}
+                  >
+                    <Trash2 className="size-3 text-destructive" />
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-6"
+                  title="Minimizar panel"
+                  aria-label="Minimizar panel"
+                  onClick={onToggle}
+                >
+                  <ChevronUp className="size-3" />
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-1.5 pt-1">
             <div>
-              <CardTitle className="text-xs">{machineId}</CardTitle>
-              <p className="text-[10px] text-muted-foreground">{machineName}</p>
-              {machineKind && (
-                <p className="text-[9px] text-muted-foreground">{catalog.kindName(machineKind)}</p>
+              <p className="text-[9px] uppercase text-muted-foreground">Plantilla activa</p>
+              <p className="truncate text-xs font-medium">{tpl?.name ?? "—"}</p>
+              {tpl ? (
+                <p className="text-[10px] text-muted-foreground">
+                  {freq.total} tests · M:{freq.monthly} · T:{freq.quarterly} · S:{freq.semiannual} ·
+                  A:{freq.annual}
+                </p>
+              ) : (
+                <Link to="/templates" className="text-[10px] text-primary underline">
+                  Crear plantilla
+                </Link>
               )}
             </div>
-          </div>
-          <div className="flex items-center gap-0.5">
-            <Badge variant="outline" className={`gap-1 px-1.5 py-0 text-[9px] ${meta.cls}`}>
-              <meta.Icon className="size-2.5" /> {meta.label}
-            </Badge>
-            {isCustom && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-6"
-                title="Eliminar máquina"
-                onClick={async () => {
-                  if (
-                    !confirm(
-                      `¿Eliminar la máquina ${machineId}? Las plantillas y datos asociados dejarán de mostrarse.`,
-                    )
-                  )
-                    return;
-                  try {
-                    await deleteMachine(machineId);
-                    toast.success("Máquina eliminada");
-                    onDeleted();
-                  } catch (e) {
-                    toast.error((e as Error).message);
-                  }
-                }}
-              >
-                <Trash2 className="size-3 text-destructive" />
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-1.5 pt-1">
-        <div>
-          <p className="text-[9px] uppercase text-muted-foreground">Plantilla activa</p>
-          <p className="truncate text-xs font-medium">{tpl?.name ?? "—"}</p>
-          {tpl ? (
-            <p className="text-[10px] text-muted-foreground">
-              {freq.total} tests · M:{freq.monthly} · T:{freq.quarterly} · S:{freq.semiannual} · A:
-              {freq.annual}
-            </p>
-          ) : (
-            <Link to="/templates" className="text-[10px] text-primary underline">
-              Crear plantilla
-            </Link>
-          )}
-        </div>
 
-        <div>
-          <p className="text-[9px] uppercase text-muted-foreground">Última importación</p>
-          {lastImport ? (
-            <>
-              <p className="text-xs font-medium">{lastImport.sourceDate}</p>
-              <p className="truncate text-[10px] text-muted-foreground">{lastImport.fileName}</p>
-              <p
-                className={`text-[10px] font-medium ${ootCount > 0 ? "text-destructive" : "text-emerald-600"}`}
-              >
-                {ootCount > 0 ? `${ootCount} fuera de tolerancia` : "Todo en tolerancia"}
-              </p>
-            </>
-          ) : (
-            <p className="text-xs text-muted-foreground">Sin importaciones</p>
-          )}
-        </div>
+            <div>
+              <p className="text-[9px] uppercase text-muted-foreground">Última importación</p>
+              {lastImport ? (
+                <>
+                  <p className="text-xs font-medium">{lastImport.sourceDate}</p>
+                  <p className="truncate text-[10px] text-muted-foreground">
+                    {lastImport.fileName}
+                  </p>
+                  <p
+                    className={`text-[10px] font-medium ${ootCount > 0 ? "text-destructive" : "text-emerald-600"}`}
+                  >
+                    {ootCount > 0 ? `${ootCount} fuera de tolerancia` : "Todo en tolerancia"}
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground">Sin importaciones</p>
+              )}
+            </div>
 
-        <div>
-          <p className="text-[9px] uppercase text-muted-foreground">Estado de la máquina</p>
-          <Select value={state} onValueChange={(v) => onSetState(machineId, v as MachineState)}>
-            <SelectTrigger className="h-7 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ok" className="text-xs">
-                OK
-              </SelectItem>
-              <SelectItem value="warning" className="text-xs">
-                Aviso
-              </SelectItem>
-              <SelectItem value="critical" className="text-xs">
-                Crítico
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </CardContent>
-    </Card>
+            <div>
+              <p className="text-[9px] uppercase text-muted-foreground">Estado de la máquina</p>
+              <Select value={state} onValueChange={(v) => onSetState(machineId, v as MachineState)}>
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ok" className="text-xs">
+                    OK
+                  </SelectItem>
+                  <SelectItem value="warning" className="text-xs">
+                    Aviso
+                  </SelectItem>
+                  <SelectItem value="critical" className="text-xs">
+                    Crítico
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={false}
+          title="Expandir panel"
+          className="flex w-full items-center gap-2 rounded-lg border bg-card p-2 text-left shadow-sm transition-colors hover:bg-accent"
+        >
+          <MachineGlyph
+            machineId={machineId}
+            kind={machineKind}
+            className="h-14 w-16 shrink-0 rounded-md bg-primary/10 object-contain p-1"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-semibold">{machineId}</p>
+            <p className="truncate text-[10px] text-muted-foreground">{machineName}</p>
+          </div>
+          <Badge variant="outline" className={`shrink-0 gap-1 px-1.5 py-0 text-[9px] ${meta.cls}`}>
+            <meta.Icon className="size-2.5" /> {meta.label}
+          </Badge>
+        </button>
+      )}
+    </AnimatedHeight>
+  );
+}
+
+function AnimatedHeight({ open, children }: { open: boolean; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [maxH, setMaxH] = useState<number | "none">(() => (open ? "none" : 0));
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    setMaxH(open ? el.scrollHeight : 0);
+  }, [open]);
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        maxHeight: maxH === "none" ? undefined : `${maxH}px`,
+        transition: "max-height 200ms ease",
+        overflow: "hidden",
+      }}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -443,12 +536,11 @@ function MonthlySummary({
     queryKey: ["calendar-tasks", ym],
     queryFn: () => listCalendarTasks(ym),
   });
-  const tasksData = tasks.data;
   const taskById = useMemo(() => {
-    const m = new Map<string, NonNullable<typeof tasksData>[number]>();
-    for (const t of tasksData ?? []) m.set(t.id, t);
+    const m = new Map<string, NonNullable<typeof tasks.data>[number]>();
+    for (const t of tasks.data ?? []) m.set(t.id, t);
     return m;
-  }, [tasksData]);
+  }, [tasks.data]);
 
   async function setTaskState(
     testName: string,
