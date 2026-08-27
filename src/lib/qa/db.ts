@@ -450,6 +450,20 @@ export async function updateMeasurement(m: Measurement) {
   if (error) throw new Error(error.message);
 }
 
+// RPC security definer (migración 20260824030000_update_measurement_date.sql):
+// permite corregir SOLO la fecha de una medición a cualquier usuario con rol
+// (incluido el viewer/demo). No está en los tipos generados de Supabase.
+type UpdateDateRpc = (
+  fn: string,
+  args: { p_id: string; p_date: string },
+) => Promise<{ error: { message: string } | null }>;
+
+export async function updateMeasurementDate(id: string, date: string) {
+  const rpc = supabase.rpc as unknown as UpdateDateRpc;
+  const { error } = await rpc("update_measurement_date", { p_id: id, p_date: date });
+  if (error) throw new Error(error.message);
+}
+
 export async function deleteMeasurement(id: string) {
   const { error } = await supabase.from("measurements").delete().eq("id", id);
   if (error) throw new Error(error.message);

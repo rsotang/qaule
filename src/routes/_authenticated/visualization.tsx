@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMachineList } from "@/hooks/use-machine-list";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useCallback, useState } from "react";
 import {
   CartesianGrid,
@@ -13,7 +13,7 @@ import {
   YAxis,
   Legend,
 } from "recharts";
-import { listMeasurements, listTemplates } from "@/lib/qa/db";
+import { listMeasurements, listTemplates, updateMeasurementDate } from "@/lib/qa/db";
 import { MPC_TEST_NAME, MPC_CATEGORY } from "@/lib/qa/mpc";
 import { useMachineCatalog } from "@/hooks/use-machine-catalog";
 import {
@@ -43,7 +43,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Pencil, X, Check } from "lucide-react";
+import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -926,6 +927,30 @@ function TestSnapshot({
   measurements: Measurement[];
   templates: Template[];
 }) {
+  const qc = useQueryClient();
+  // Edición de la fecha de una medición en la tabla. Permitida a todos los roles,
+  // incluido el viewer/demo: la RPC update_measurement_date solo cambia la fecha.
+  const [editingDateId, setEditingDateId] = useState<string | null>(null);
+  const [draftDate, setDraftDate] = useState("");
+
+  async function saveMeasurementDate(id: string) {
+    if (!draftDate) return;
+    try {
+      await updateMeasurementDate(id, draftDate);
+      toast.success("Fecha actualizada");
+      qc.invalidateQueries({ queryKey: ["measurements-all"] });
+    } catch (e) {
+      toast.error(`No se pudo actualizar la fecha: ${(e as Error).message}`);
+    } finally {
+      setEditingDateId(null);
+    }
+  }
+
+  function startEditDate(id: string, date: string) {
+    setEditingDateId(id);
+    setDraftDate(date);
+  }
+
   const machineList = useMachineList();
   const catalog = useMachineCatalog();
   const [machineId, setMachineId] = useState<MachineId | "">("");
@@ -1153,7 +1178,54 @@ function TestSnapshot({
                       return (
                         <TableRow key={m.id}>
                           <TableCell className="text-xs">{m.cellLabel}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{m.date}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {editingDateId === m.id ? (
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="date"
+                                  value={draftDate}
+                                  onChange={(e) => setDraftDate(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") void saveMeasurementDate(m.id);
+                                    if (e.key === "Escape") setEditingDateId(null);
+                                  }}
+                                  className="h-7 w-36 text-xs"
+                                  autoFocus
+                                />
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="size-6"
+                                  title="Guardar fecha"
+                                  onClick={() => void saveMeasurementDate(m.id)}
+                                >
+                                  <Check className="size-3" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="size-6"
+                                  title="Cancelar"
+                                  onClick={() => setEditingDateId(null)}
+                                >
+                                  <X className="size-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1">
+                                <span>{m.date}</span>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="size-5 text-muted-foreground hover:text-foreground"
+                                  title="Editar fecha"
+                                  onClick={() => startEditDate(m.id, m.date)}
+                                >
+                                  <Pencil className="size-3" />
+                                </Button>
+                              </div>
+                            )}
+                          </TableCell>
                           <TableCell
                             className={`text-right font-mono text-xs tabular-nums ${ok ? "" : "text-destructive font-medium"}`}
                           >
