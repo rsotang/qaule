@@ -33,8 +33,13 @@ const LOCAL_WHEELS = [
   "/pyodide/quaac-1.0.2-py3-none-any.whl",
   "/pyodide/email_validator-2.3.0-py3-none-any.whl",
   "/pyodide/eval_type_backport-0.4.0-py3-none-any.whl",
-  "/pyodide/pylinac-3.47.0-py3-none-any.whl",
+  // Versión personalizada del servicio (LinaQA): pylinac 3.38.0 + módulos modificados
+  "/pyodide/linaqa/pylinac-3.38.0-py3-none-any.whl",
 ];
+
+// Módulos de pylinac sobrescritos con las versiones personalizadas del servicio.
+const LINAQA_MODS = ["picketfence.py", "ct.py", "vmat.py", "winston_lutz.py"];
+const LINAQA_LIBS = ["pylinac_subclasses.py", "linaqa_settings.py"];
 
 function post(msg: RunnerToParent) {
   // targetOrigin "*": el iframe no conoce de forma fiable el origin del padre
@@ -45,6 +50,28 @@ function post(msg: RunnerToParent) {
 function safeBaseName(name: string): string {
   const base = name.split(/[\\/]/).pop() ?? "file";
   return base.replace(/[^A-Za-z0-9._-]/g, "_");
+}
+
+async function applyLinaqa(pyodide: PyodideInterface) {
+  // Sobrescribir los módulos de pylinac instalados con las versiones del servicio.
+  const purelib = pyodide.runPython("import sysconfig; sysconfig.get_paths()['purelib']") as string;
+  for (const mod of LINAQA_MODS) {
+    const text = await (await fetch(`${INDEX_URL}linaqa/${mod}`)).text();
+    pyodide.FS.writeFile(`${purelib}/pylinac/${mod}`, text);
+  }
+  // Librerías LinaQA en /linaqa y en sys.path.
+  pyodide.FS.mkdirTree("/linaqa");
+  for (const lib of LINAQA_LIBS) {
+    const text = await (await fetch(`${INDEX_URL}linaqa/${lib}`)).text();
+    pyodide.FS.writeFile(`/linaqa/${lib}`, text);
+  }
+  await pyodide.runPythonAsync(`
+import sys
+sys.path.insert(0, "/linaqa")
+import pylinac_subclasses  # aplica el monkey-patch y expone las subclases
+import pylinac
+print(f"Stack LinaQA activo: pylinac {pylinac.__version__}")
+`);
 }
 
 function PythonRunner() {
@@ -71,13 +98,20 @@ function PythonRunner() {
           await pyodide.loadPackage([p]);
         }
 
-        post({ type: "status", status: "installing", detail: "pylinac y dependencias" });
+        post({ type: "status", status: "installing", detail: "pylinac 3.38.0 y dependencias" });
         pyodide.setStdout({ batched: (s) => post({ type: "stdout", text: s }) });
         pyodide.setStderr({ batched: (s) => post({ type: "stderr", text: s }) });
         await pyodide.runPythonAsync(`
 import micropip
 await micropip.install(${JSON.stringify(LOCAL_WHEELS)}, deps=False)
 `);
+
+        post({
+          type: "status",
+          status: "installing",
+          detail: "Aplicando personalizaciones LinaQA",
+        });
+        await applyLinaqa(pyodide);
 
         pyodide.FS.mkdirTree("/userfiles");
         pyodide.FS.mkdirTree("/out");

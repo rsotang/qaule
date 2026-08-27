@@ -26,6 +26,7 @@ import {
   Terminal,
   Loader2,
   Download,
+  Plus,
 } from "lucide-react";
 import { getRunner, disposeRunner, type RunnerCallbacks } from "@/lib/python/runner";
 import { buildQaContext } from "@/lib/python/bridge";
@@ -62,6 +63,127 @@ print("Figura guardada en /out/ejemplo.png");
 # pylinac está disponible:
 # from pylinac import PicketFence, Starshot, WinstonLutz, ...
 `;
+
+// Helper común: results_data es property en pylinac 3.38 y método en versiones nuevas.
+const RESULTS_HELPER = `def resultados(obj):
+    rd = obj.results_data
+    return rd() if callable(rd) else rd
+
+def listar_ficheros():
+    import os
+    return [f for f in sorted(os.listdir("/userfiles")) if not f.startswith(".")]
+`;
+
+const ANALYSIS_TEMPLATES: { id: string; label: string; code: string }[] = [
+  {
+    id: "picketfence",
+    label: "Picket Fence",
+    code: `# Análisis Picket Fence — pylinac 3.38.0 personalizado del servicio.
+# El nombre del acelerador se extrae automáticamente del DICOM (Radiation Machine Name).
+${RESULTS_HELPER}
+import os
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from pylinac import PicketFence
+
+files = listar_ficheros()
+print("Ficheros en /userfiles:", files)
+if not files:
+    raise SystemExit("Sube un DICOM de Picket Fence antes de ejecutar.")
+
+pf = PicketFence(os.path.join("/userfiles", files[0]))
+pf.analyze()
+print(resultados(pf))
+
+pf.plot(show=False)
+plt.savefig("/out/picketfence.png", dpi=100, bbox_inches="tight")
+print("Figura guardada en /out/picketfence.png")
+`,
+  },
+  {
+    id: "vmat",
+    label: "VMAT",
+    code: `# Análisis VMAT (DRGS / DRMLC / DRCS) — pylinac 3.38.0 personalizado del servicio.
+# Requiere 2 imágenes: open y MLC. Prueba por defecto: DRMLC (cambia la clase si procede).
+${RESULTS_HELPER}
+import os
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from pylinac.vmat import DRMLC
+
+files = listar_ficheros()
+print("Ficheros en /userfiles:", files)
+if len(files) < 2:
+    raise SystemExit("Sube 2 imágenes DICOM (open y MLC) antes de ejecutar.")
+
+paths = [os.path.join("/userfiles", f) for f in files]
+# DRMLC(mlc_image, open_image) — usa el módulo vmat personalizado
+test = DRMLC(paths[1], paths[0])
+test.analyze()
+print(resultados(test))
+
+test.plot(show=False)
+plt.savefig("/out/vmat.png", dpi=100, bbox_inches="tight")
+print("Figura guardada en /out/vmat.png")
+`,
+  },
+  {
+    id: "winston-lutz",
+    label: "Winston-Lutz",
+    code: `# Análisis Winston-Lutz — pylinac 3.38.0 personalizado del servicio.
+# Usa todos los ficheros de /userfiles (imágenes EPID + caja de BB).
+${RESULTS_HELPER}
+import os
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from pylinac import WinstonLutz
+
+files = listar_ficheros()
+print("Ficheros en /userfiles:", files)
+if not files:
+    raise SystemExit("Sube las imágenes de Winston-Lutz antes de ejecutar.")
+
+paths = [os.path.join("/userfiles", f) for f in files]
+wl = WinstonLutz(paths)
+wl.analyze()
+print(resultados(wl))
+
+wl.plot(show=False)
+plt.savefig("/out/winston_lutz.png", dpi=100, bbox_inches="tight")
+print("Figura guardada en /out/winston_lutz.png")
+`,
+  },
+  {
+    id: "ct",
+    label: "CT / CatPhan",
+    code: `# Análisis CT / CatPhan — pylinac 3.38.0 personalizado del servicio.
+# Usa todos los ficheros de /userfiles (serie DICOM del CatPhan).
+${RESULTS_HELPER}
+import os
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from pylinac import CatPhan604
+
+files = listar_ficheros()
+print("Ficheros en /userfiles:", files)
+if not files:
+    raise SystemExit("Sube la serie de imágenes CT antes de ejecutar.")
+
+paths = [os.path.join("/userfiles", f) for f in files]
+cp = CatPhan604(paths)
+cp.analyze()
+print(resultados(cp))
+
+cp.plot(show=False)
+plt.savefig("/out/catphan.png", dpi=100, bbox_inches="tight")
+print("Figura guardada en /out/catphan.png")
+`,
+  },
+];
 
 interface ConsoleLine {
   kind: "out" | "err" | "info";
@@ -103,9 +225,15 @@ function PythonPage() {
   const [includeContext, setIncludeContext] = useState(true);
   const [uploaded, setUploaded] = useState<{ name: string; bytes: ArrayBuffer }[]>([]);
   const [booting, setBooting] = useState(false);
+  const [addAnalysis, setAddAnalysis] = useState(false);
+  const [analysisName, setAnalysisName] = useState("");
   const consoleRef = useRef<HTMLDivElement>(null);
 
-  const scripts = useQuery({ queryKey: ["python-scripts"], queryFn: listScripts });
+  const scripts = useQuery({ queryKey: ["python-scripts"], queryFn: () => listScripts("script") });
+  const analyses = useQuery({
+    queryKey: ["python-analyses"],
+    queryFn: () => listScripts("analysis"),
+  });
 
   const appendLine = useCallback((kind: ConsoleLine["kind"], text: string) => {
     setConsoleLines((prev) => {
@@ -189,6 +317,27 @@ function PythonPage() {
     onError: (e) => toast.error(`No se pudo borrar: ${String(e)}`),
   });
 
+  const saveAnalysisMut = useMutation({
+    mutationFn: () =>
+      saveScript({ name: analysisName.trim() || "Análisis sin título", code, kind: "analysis" }),
+    onSuccess: (saved) => {
+      setAddAnalysis(false);
+      setAnalysisName("");
+      qc.invalidateQueries({ queryKey: ["python-analyses"] });
+      toast.success(`Análisis "${saved.name}" guardado (compartido con el equipo)`);
+    },
+    onError: (e) => toast.error(`No se pudo guardar el análisis: ${String(e)}`),
+  });
+
+  function loadTemplate(name: string, script: string) {
+    if (code !== DEFAULT_SCRIPT && code !== "" && code !== script) {
+      if (!window.confirm("Se descartarán los cambios del editor. ¿Continuar?")) return;
+    }
+    setSelectedId("");
+    setScriptName(name);
+    setCode(script);
+  }
+
   function selectScript(id: string) {
     if (id === selectedId) return;
     if (code !== DEFAULT_SCRIPT && code !== "") {
@@ -245,6 +394,69 @@ function PythonPage() {
           )}
         </div>
       </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <CardTitle className="text-base">Análisis LinaQA</CardTitle>
+            <Badge variant="secondary" className="text-[10px]">
+              pylinac 3.38.0 personalizado (picketfence · ct · vmat · winston_lutz)
+            </Badge>
+            <p className="w-full text-xs text-muted-foreground">
+              Pulsa un análisis para cargar su script en el editor, sube los ficheros y ejecuta. Los
+              análisis que añadas con «Añadir análisis» también aparecen como botones aquí.
+            </p>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {ANALYSIS_TEMPLATES.map((a) => (
+              <Button
+                key={a.id}
+                size="sm"
+                variant="outline"
+                onClick={() => loadTemplate(a.label, a.code)}
+              >
+                {a.label}
+              </Button>
+            ))}
+            {(analyses.data ?? []).map((s) => (
+              <Button
+                key={s.id}
+                size="sm"
+                variant="outline"
+                onClick={() => loadTemplate(s.name, s.code)}
+              >
+                {s.name}
+              </Button>
+            ))}
+          </div>
+          {addAnalysis ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                value={analysisName}
+                onChange={(e) => setAnalysisName(e.target.value)}
+                placeholder="Nombre del análisis"
+                className="h-8 max-w-56"
+              />
+              <Button
+                size="sm"
+                onClick={() => saveAnalysisMut.mutate()}
+                disabled={!analysisName.trim() || saveAnalysisMut.isPending}
+              >
+                <Save className="size-4" /> Guardar análisis
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setAddAnalysis(false)}>
+                Cancelar
+              </Button>
+            </div>
+          ) : (
+            <Button size="sm" variant="outline" onClick={() => setAddAnalysis(true)}>
+              <Plus className="size-4" /> Añadir análisis
+            </Button>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="flex flex-col">
