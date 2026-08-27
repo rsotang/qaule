@@ -89,6 +89,7 @@ const STATE_META: Record<MachineState, { label: string; cls: string; Icon: typeo
 
 function Dashboard() {
   const qc = useQueryClient();
+  const catalog = useMachineCatalog();
   const machines = useQuery({ queryKey: ["machines"], queryFn: listMachines });
   const templates = useQuery({ queryKey: ["templates-all"], queryFn: () => listTemplates() });
   const imports = useQuery({ queryKey: ["imports-all"], queryFn: () => listImports() });
@@ -103,7 +104,7 @@ function Dashboard() {
     qc.invalidateQueries({ queryKey: ["machines"] });
   }
 
-  /** DB machines take priority; fall back to the seeded list when empty. Linacs first, then imaging, ct, other. */
+  /** DB machines take priority; fall back to the seeded list when empty. Builtin kinds in catalog order, custom kinds last. */
   const machineList = useMemo(() => {
     const rows = machines.data ?? [];
     const out = rows.map((r) => ({
@@ -112,11 +113,14 @@ function Dashboard() {
       kind: r.kind ?? MACHINES.find((m) => m.id === r.id)?.kind ?? "other",
     }));
     for (const m of MACHINES) if (!out.some((o) => o.id === m.id)) out.push({ ...m });
-    const kindOrder: Record<string, number> = { linac: 0, imaging: 1, ct: 2, other: 3 };
+    const kindOrder: Record<string, number> = {};
+    catalog.kinds.forEach((k, i) => {
+      kindOrder[k.id] = i;
+    });
     return out.sort(
-      (a, b) => (kindOrder[a.kind] ?? 9) - (kindOrder[b.kind] ?? 9) || a.id.localeCompare(b.id),
+      (a, b) => (kindOrder[a.kind] ?? 99) - (kindOrder[b.kind] ?? 99) || a.id.localeCompare(b.id),
     );
-  }, [machines.data]);
+  }, [machines.data, catalog.kinds]);
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggleExpand = useCallback((id: string) => {

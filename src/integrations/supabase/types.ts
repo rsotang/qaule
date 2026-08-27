@@ -183,18 +183,21 @@ export type Database = {
         Row: {
           builtin: boolean
           created_at: string
+          icon: string | null
           id: string
           name: string
         }
         Insert: {
           builtin?: boolean
           created_at?: string
+          icon?: string | null
           id: string
           name: string
         }
         Update: {
           builtin?: boolean
           created_at?: string
+          icon?: string | null
           id?: string
           name?: string
         }

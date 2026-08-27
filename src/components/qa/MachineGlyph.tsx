@@ -1,37 +1,32 @@
+import { useMachineCatalog } from "@/hooks/use-machine-catalog";
+import { machineIconUrl, MACHINE_ICONS } from "@/lib/qa/types";
 import type { MachineId, MachineKind } from "@/lib/qa/types";
-import linacAsset from "@/assets/linac.png.asset.json";
-import ctAsset from "@/assets/ct.png.asset.json";
 
-function resolveSrc(kind: MachineKind | undefined, machineId: MachineId) {
-  if (kind) {
-    if (kind === "linac") return linacAsset.url;
-    if (kind === "imaging") return ctAsset.url;
-    return ctAsset.url;
-  }
-  return machineId === "TB1" || machineId === "TB2" || machineId === "TB3"
-    ? linacAsset.url
-    : ctAsset.url;
-}
+const ICON_IDS = new Set(MACHINE_ICONS.map((i) => i.id));
 
-function resolveAlt(kind: MachineKind | undefined) {
-  if (kind === "linac") return "Acelerador lineal";
-  if (kind === "imaging") return "Sistema de imagen";
-  return "Equipo";
-}
-
+/**
+ * Icono de una máquina según su tipo. Resuelve el icono del tipo desde el
+ * catálogo (BD con fallback a fábrica); si el tipo no tiene icono, usa el
+ * genérico de TC. También permite forzar un icono explícito.
+ */
 export function MachineGlyph({
   machineId,
   kind,
+  icon,
   className,
 }: {
   machineId: MachineId;
   kind?: MachineKind;
+  icon?: string | null;
   className?: string;
 }) {
+  const catalog = useMachineCatalog();
+  const kindIcon = kind ? catalog.kindById(kind)?.icon : undefined;
+  const iconId = icon ?? kindIcon ?? (kind && ICON_IDS.has(kind) ? kind : undefined);
   return (
     <img
-      src={resolveSrc(kind, machineId)}
-      alt={resolveAlt(kind)}
+      src={machineIconUrl(iconId)}
+      alt={kind ? catalog.kindName(kind) : machineId}
       className={className}
       loading="lazy"
       onError={(e) => {

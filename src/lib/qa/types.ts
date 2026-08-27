@@ -16,6 +16,31 @@ export interface MachineKindDef {
   name: string;
   builtin: boolean;
   categories: string[];
+  /** Identificador del icono que se muestra en el panel QA (nombre del archivo en /iconos/, sin extensión). */
+  icon?: string | null;
+}
+
+/** Iconos disponibles para los tipos de máquina (archivos en public/iconos/). */
+export const MACHINE_ICONS: { id: string; label: string }[] = [
+  { id: "linac", label: "Acelerador lineal" },
+  { id: "ct", label: "TC" },
+  { id: "arco-quirurgico", label: "Arco quirúrgico" },
+  { id: "cbct-dental", label: "CBCT dental" },
+  { id: "cbctlinac", label: "CBCT en linac" },
+  { id: "dental", label: "Dental" },
+  { id: "generalrx", label: "RX general" },
+  { id: "hdr", label: "HDR" },
+  { id: "mamo", label: "Mamografía" },
+  { id: "mr", label: "Resonancia" },
+  { id: "pet", label: "PET" },
+  { id: "portatilrx", label: "RX portátil" },
+  { id: "spect", label: "SPECT" },
+  { id: "us", label: "Ecografía" },
+];
+
+/** URL del icono de un tipo de máquina; fallback al icono genérico de TC. */
+export function machineIconUrl(icon: string | null | undefined): string {
+  return `/iconos/${icon || "ct"}.png`;
 }
 
 /** Una categoría de prueba del catálogo (persistida en la BD). */
@@ -31,6 +56,7 @@ export const BUILTIN_KINDS: MachineKindDef[] = [
     id: "linac",
     name: "Acelerador lineal",
     builtin: true,
+    icon: "linac",
     categories: [
       "mechanical_unit",
       "mechanical_table",
@@ -45,6 +71,7 @@ export const BUILTIN_KINDS: MachineKindDef[] = [
     id: "imaging",
     name: "Sistema de imagen",
     builtin: true,
+    icon: "ct",
     categories: [
       "image_geometry",
       "image_registration",
@@ -57,6 +84,7 @@ export const BUILTIN_KINDS: MachineKindDef[] = [
     id: "ct",
     name: "TC / Simulador",
     builtin: true,
+    icon: "ct",
     categories: [
       "mechanical_unit",
       "mechanical_table",
@@ -71,6 +99,7 @@ export const BUILTIN_KINDS: MachineKindDef[] = [
     id: "other",
     name: "Otro",
     builtin: true,
+    icon: "ct",
     categories: [
       "mechanical_unit",
       "mechanical_table",
@@ -79,6 +108,164 @@ export const BUILTIN_KINDS: MachineKindDef[] = [
       "dosimetric_photon",
       "dosimetric_electron",
       "monitor_system",
+    ],
+  },
+  {
+    id: "arco-quirurgico",
+    name: "Arco quirúrgico",
+    builtin: true,
+    icon: "arco-quirurgico",
+    categories: [
+      "image_geometry",
+      "image_registration",
+      "image_quality_mv",
+      "image_quality_cbct",
+      "image_sgrt",
+    ],
+  },
+  {
+    id: "cbct-dental",
+    name: "CBCT dental",
+    builtin: true,
+    icon: "cbct-dental",
+    categories: [
+      "image_geometry",
+      "image_registration",
+      "image_quality_mv",
+      "image_quality_cbct",
+      "image_sgrt",
+    ],
+  },
+  {
+    id: "cbctlinac",
+    name: "CBCT en linac",
+    builtin: true,
+    icon: "cbctlinac",
+    categories: [
+      "image_geometry",
+      "image_registration",
+      "image_quality_mv",
+      "image_quality_cbct",
+      "image_sgrt",
+      "mpc",
+    ],
+  },
+  {
+    id: "dental",
+    name: "Dental (RX)",
+    builtin: true,
+    icon: "dental",
+    categories: [
+      "image_geometry",
+      "image_registration",
+      "image_quality_mv",
+      "image_quality_cbct",
+      "image_sgrt",
+    ],
+  },
+  {
+    id: "generalrx",
+    name: "RX general",
+    builtin: true,
+    icon: "generalrx",
+    categories: [
+      "image_geometry",
+      "image_registration",
+      "image_quality_mv",
+      "image_quality_cbct",
+      "image_sgrt",
+    ],
+  },
+  {
+    id: "hdr",
+    name: "HDR (Braquiterapia)",
+    builtin: true,
+    icon: "hdr",
+    categories: [
+      "mechanical_unit",
+      "mechanical_table",
+      "geometric",
+      "dosimetric_photon",
+      "dosimetric_electron",
+      "monitor_system",
+    ],
+  },
+  {
+    id: "mamo",
+    name: "Mamografía",
+    builtin: true,
+    icon: "mamo",
+    categories: [
+      "image_geometry",
+      "image_registration",
+      "image_quality_mv",
+      "image_quality_cbct",
+      "image_sgrt",
+    ],
+  },
+  {
+    id: "mr",
+    name: "Resonancia magnética",
+    builtin: true,
+    icon: "mr",
+    categories: [
+      "image_geometry",
+      "image_registration",
+      "image_quality_mv",
+      "image_quality_cbct",
+      "image_sgrt",
+    ],
+  },
+  {
+    id: "pet",
+    name: "PET",
+    builtin: true,
+    icon: "pet",
+    categories: [
+      "image_geometry",
+      "image_registration",
+      "image_quality_mv",
+      "image_quality_cbct",
+      "image_sgrt",
+    ],
+  },
+  {
+    id: "portatilrx",
+    name: "RX portátil",
+    builtin: true,
+    icon: "portatilrx",
+    categories: [
+      "image_geometry",
+      "image_registration",
+      "image_quality_mv",
+      "image_quality_cbct",
+      "image_sgrt",
+    ],
+  },
+  {
+    id: "spect",
+    name: "SPECT",
+    builtin: true,
+    icon: "spect",
+    categories: [
+      "image_geometry",
+      "image_registration",
+      "image_quality_mv",
+      "image_quality_cbct",
+      "image_sgrt",
+    ],
+  },
+  {
+    id: "us",
+    name: "Ecografía",
+    builtin: true,
+    icon: "us",
+    categories: [
+      "image_geometry",
+      "image_registration",
+      "image_quality_mv",
+      "image_quality_cbct",
+      "image_sgrt",
     ],
   },
 ];
@@ -152,6 +339,92 @@ export const CATEGORIES_BY_KIND: Partial<Record<MachineKind, Category[]>> = {
     "dosimetric_electron",
     "monitor_system",
   ],
+  "arco-quirurgico": [
+    "image_geometry",
+    "image_registration",
+    "image_quality_mv",
+    "image_quality_cbct",
+    "image_sgrt",
+  ],
+  "cbct-dental": [
+    "image_geometry",
+    "image_registration",
+    "image_quality_mv",
+    "image_quality_cbct",
+    "image_sgrt",
+  ],
+  cbctlinac: [
+    "image_geometry",
+    "image_registration",
+    "image_quality_mv",
+    "image_quality_cbct",
+    "image_sgrt",
+    "mpc",
+  ],
+  dental: [
+    "image_geometry",
+    "image_registration",
+    "image_quality_mv",
+    "image_quality_cbct",
+    "image_sgrt",
+  ],
+  generalrx: [
+    "image_geometry",
+    "image_registration",
+    "image_quality_mv",
+    "image_quality_cbct",
+    "image_sgrt",
+  ],
+  hdr: [
+    "mechanical_unit",
+    "mechanical_table",
+    "geometric",
+    "dosimetric_photon",
+    "dosimetric_electron",
+    "monitor_system",
+  ],
+  mamo: [
+    "image_geometry",
+    "image_registration",
+    "image_quality_mv",
+    "image_quality_cbct",
+    "image_sgrt",
+  ],
+  mr: [
+    "image_geometry",
+    "image_registration",
+    "image_quality_mv",
+    "image_quality_cbct",
+    "image_sgrt",
+  ],
+  pet: [
+    "image_geometry",
+    "image_registration",
+    "image_quality_mv",
+    "image_quality_cbct",
+    "image_sgrt",
+  ],
+  portatilrx: [
+    "image_geometry",
+    "image_registration",
+    "image_quality_mv",
+    "image_quality_cbct",
+    "image_sgrt",
+  ],
+  spect: [
+    "image_geometry",
+    "image_registration",
+    "image_quality_mv",
+    "image_quality_cbct",
+    "image_sgrt",
+  ],
+  us: [
+    "image_geometry",
+    "image_registration",
+    "image_quality_mv",
+    "image_quality_cbct",
+    "image_sgrt",
+  ],
 };
 
 /** Nombre de un tipo de máquina; si no existe, devuelve el id. */
@@ -186,6 +459,18 @@ export const MACHINES: { id: MachineId; name: string; kind: MachineKind }[] = [
   { id: "IMG2", name: "Sistema de Imagen TB2", kind: "imaging" },
   { id: "IMG3", name: "Sistema de Imagen TB3", kind: "imaging" },
   { id: "CTSIM", name: "CT Simulador", kind: "ct" },
+  { id: "ARCO1", name: "Arco Quirúrgico 1", kind: "arco-quirurgico" },
+  { id: "CBCTD1", name: "CBCT Dental 1", kind: "cbct-dental" },
+  { id: "CBCTL1", name: "CBCT Linac 1", kind: "cbctlinac" },
+  { id: "DENTAL1", name: "Dental 1", kind: "dental" },
+  { id: "RXG1", name: "RX General 1", kind: "generalrx" },
+  { id: "HDR1", name: "HDR 1", kind: "hdr" },
+  { id: "MAMO1", name: "Mamografía 1", kind: "mamo" },
+  { id: "MR1", name: "RM 1", kind: "mr" },
+  { id: "PET1", name: "PET 1", kind: "pet" },
+  { id: "RXP1", name: "RX Portátil 1", kind: "portatilrx" },
+  { id: "SPECT1", name: "SPECT 1", kind: "spect" },
+  { id: "US1", name: "Ecógrafo 1", kind: "us" },
 ];
 
 export type Frequency = "monthly" | "quarterly" | "semiannual" | "annual";

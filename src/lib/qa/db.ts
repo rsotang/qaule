@@ -197,13 +197,14 @@ export async function updateMachine(
 export async function listMachineKinds(): Promise<MachineKindDef[]> {
   const { data, error } = await supabase
     .from("machine_kinds")
-    .select("id, name, builtin, machine_kind_categories(category_id)")
+    .select("id, name, builtin, icon, machine_kind_categories(category_id)")
     .order("id");
   if (error) throw new Error(error.message);
   return (data ?? []).map((r) => ({
     id: r.id,
     name: r.name,
     builtin: r.builtin,
+    icon: r.icon ?? null,
     categories: (r.machine_kind_categories ?? []).map((c) => c.category_id),
   }));
 }
@@ -212,8 +213,11 @@ export async function createMachineKind(rec: {
   id: string;
   name: string;
   categories: string[];
+  icon?: string | null;
 }): Promise<void> {
-  const { error } = await supabase.from("machine_kinds").insert({ id: rec.id, name: rec.name });
+  const { error } = await supabase
+    .from("machine_kinds")
+    .insert({ id: rec.id, name: rec.name, icon: rec.icon ?? null });
   if (error) throw new Error(error.message);
   if (rec.categories.length > 0) {
     const { error: linkErr } = await supabase
@@ -225,13 +229,13 @@ export async function createMachineKind(rec: {
 
 export async function updateMachineKind(
   id: string,
-  patch: { name?: string; categories?: string[] },
+  patch: { name?: string; categories?: string[]; icon?: string | null },
 ): Promise<void> {
-  if (patch.name !== undefined) {
-    const { error } = await supabase
-      .from("machine_kinds")
-      .update({ name: patch.name })
-      .eq("id", id);
+  if (patch.name !== undefined || patch.icon !== undefined) {
+    const fields: { name?: string; icon?: string | null } = {};
+    if (patch.name !== undefined) fields.name = patch.name;
+    if (patch.icon !== undefined) fields.icon = patch.icon;
+    const { error } = await supabase.from("machine_kinds").update(fields).eq("id", id);
     if (error) throw new Error(error.message);
   }
   if (patch.categories !== undefined) {

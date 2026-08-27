@@ -38,6 +38,7 @@ import {
 } from "@/lib/qa/db";
 import { useMachineCatalog } from "@/hooks/use-machine-catalog";
 import { useIsAdmin } from "@/hooks/use-is-admin";
+import { MACHINE_ICONS } from "@/lib/qa/types";
 
 export const Route = createFileRoute("/_authenticated/admin/machines")({
   component: MachinesAdminPage,
@@ -302,6 +303,45 @@ function MachinesSection() {
 
 // ---------------- Machine kinds ----------------
 
+/** Selector del icono que se muestra en el resumen QA para un tipo de máquina. */
+function IconPicker({
+  value,
+  onChange,
+}: {
+  value: string | null;
+  onChange: (v: string | null) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      <button
+        type="button"
+        onClick={() => onChange(null)}
+        title="Sin icono (usa el genérico)"
+        className={`rounded-md border px-2 py-1 text-[10px] transition-colors ${
+          value === null
+            ? "border-primary bg-primary/10 text-primary"
+            : "text-muted-foreground hover:bg-accent"
+        }`}
+      >
+        Sin icono
+      </button>
+      {MACHINE_ICONS.map((ic) => (
+        <button
+          key={ic.id}
+          type="button"
+          title={ic.label}
+          onClick={() => onChange(ic.id)}
+          className={`rounded-md border p-0.5 transition-colors ${
+            value === ic.id ? "border-primary ring-1 ring-primary" : "border-border hover:bg-accent"
+          }`}
+        >
+          <img src={`/iconos/${ic.id}.png`} alt={ic.label} className="h-7 w-8 object-contain" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function MachineKindsSection({ catalogUnavailable }: { catalogUnavailable: boolean }) {
   const qc = useQueryClient();
   const catalog = useMachineCatalog();
@@ -309,8 +349,10 @@ function MachineKindsSection({ catalogUnavailable }: { catalogUnavailable: boole
 
   const [newId, setNewId] = useState("");
   const [newName, setNewName] = useState("");
+  const [newIcon, setNewIcon] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [editIcon, setEditIcon] = useState<string | null>(null);
   const [editCats, setEditCats] = useState<string[]>([]);
 
   const create = useMutation({
@@ -323,18 +365,25 @@ function MachineKindsSection({ catalogUnavailable }: { catalogUnavailable: boole
           .replace(/^-|-$/g, ""),
         name: newName.trim(),
         categories: [],
+        icon: newIcon,
       }),
     onSuccess: () => {
       toast.success("Tipo creado (sin categorías; edítalo para asignarlas)");
       setNewId("");
       setNewName("");
+      setNewIcon(null);
       qc.invalidateQueries({ queryKey: ["machine-kinds"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const saveEdit = useMutation({
-    mutationFn: () => updateMachineKind(editId!, { name: editName.trim(), categories: editCats }),
+    mutationFn: () =>
+      updateMachineKind(editId!, {
+        name: editName.trim(),
+        categories: editCats,
+        icon: editIcon,
+      }),
     onSuccess: () => {
       toast.success("Tipo actualizado");
       setEditId(null);
@@ -405,6 +454,10 @@ function MachineKindsSection({ catalogUnavailable }: { catalogUnavailable: boole
               onChange={(e) => setNewName(e.target.value)}
             />
           </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Icono (resumen QA)</Label>
+            <IconPicker value={newIcon} onChange={setNewIcon} />
+          </div>
           <Button type="submit" size="sm" disabled={create.isPending || catalogUnavailable}>
             <Plus className="size-4" /> Añadir tipo
           </Button>
@@ -438,6 +491,10 @@ function MachineKindsSection({ catalogUnavailable }: { catalogUnavailable: boole
                       </Button>
                     </div>
                     <div>
+                      <p className="mb-1 text-xs font-medium">Icono (resumen QA)</p>
+                      <IconPicker value={editIcon} onChange={setEditIcon} />
+                    </div>
+                    <div>
                       <p className="mb-1 text-xs font-medium">Categorías de prueba</p>
                       <div className="flex flex-wrap gap-1.5">
                         {catalog.categories.map((c) => {
@@ -464,6 +521,14 @@ function MachineKindsSection({ catalogUnavailable }: { catalogUnavailable: boole
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
+                        <img
+                          src={`/iconos/${k.icon || "ct"}.png`}
+                          alt=""
+                          className="h-6 w-7 shrink-0 rounded object-contain"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = "none";
+                          }}
+                        />
                         <span className="text-sm font-medium">{k.name}</span>
                         {k.builtin && (
                           <Badge variant="outline" className="text-[9px]">
@@ -501,6 +566,7 @@ function MachineKindsSection({ catalogUnavailable }: { catalogUnavailable: boole
                         onClick={() => {
                           setEditId(k.id);
                           setEditName(k.name);
+                          setEditIcon(k.icon ?? null);
                           setEditCats(k.categories);
                         }}
                       >
