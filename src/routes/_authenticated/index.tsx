@@ -240,8 +240,8 @@ function MachineCard({
   const meta = STATE_META[state];
 
   return (
-    <AnimatedHeight open={expanded}>
-      {expanded ? (
+    <div>
+      <AnimatedHeight open={expanded}>
         <Card>
           <CardHeader className="pb-1.5 pt-2.5">
             <div className="flex items-start justify-between gap-1.5">
@@ -360,7 +360,8 @@ function MachineCard({
             </div>
           </CardContent>
         </Card>
-      ) : (
+      </AnimatedHeight>
+      <AnimatedHeight open={!expanded}>
         <button
           type="button"
           onClick={onToggle}
@@ -381,8 +382,8 @@ function MachineCard({
             <meta.Icon className="size-2.5" /> {meta.label}
           </Badge>
         </button>
-      )}
-    </AnimatedHeight>
+      </AnimatedHeight>
+    </div>
   );
 }
 
@@ -394,6 +395,16 @@ function AnimatedHeight({ open, children }: { open: boolean; children: ReactNode
     const el = ref.current;
     if (!el) return;
     setMaxH(open ? el.scrollHeight : 0);
+  }, [open]);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      setMaxH(open ? el.scrollHeight : 0);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
   }, [open]);
 
   return (
