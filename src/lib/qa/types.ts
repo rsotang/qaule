@@ -459,18 +459,6 @@ export const MACHINES: { id: MachineId; name: string; kind: MachineKind }[] = [
   { id: "IMG2", name: "Sistema de Imagen TB2", kind: "imaging" },
   { id: "IMG3", name: "Sistema de Imagen TB3", kind: "imaging" },
   { id: "CTSIM", name: "CT Simulador", kind: "ct" },
-  { id: "ARCO1", name: "Arco Quirúrgico 1", kind: "arco-quirurgico" },
-  { id: "CBCTD1", name: "CBCT Dental 1", kind: "cbct-dental" },
-  { id: "CBCTL1", name: "CBCT Linac 1", kind: "cbctlinac" },
-  { id: "DENTAL1", name: "Dental 1", kind: "dental" },
-  { id: "RXG1", name: "RX General 1", kind: "generalrx" },
-  { id: "HDR1", name: "HDR 1", kind: "hdr" },
-  { id: "MAMO1", name: "Mamografía 1", kind: "mamo" },
-  { id: "MR1", name: "RM 1", kind: "mr" },
-  { id: "PET1", name: "PET 1", kind: "pet" },
-  { id: "RXP1", name: "RX Portátil 1", kind: "portatilrx" },
-  { id: "SPECT1", name: "SPECT 1", kind: "spect" },
-  { id: "US1", name: "Ecógrafo 1", kind: "us" },
 ];
 
 export type Frequency = "monthly" | "quarterly" | "semiannual" | "annual";
