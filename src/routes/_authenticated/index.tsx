@@ -37,6 +37,8 @@ import {
   type ImportRecord,
   type Measurement,
   type CalendarRecord,
+  type CalendarEntry,
+  type CalendarTask,
 } from "@/lib/qa/types";
 import { entryIsInMonth, entryDatesInMonth } from "@/lib/qa/calendar-excel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -540,6 +542,16 @@ const MONTH_NAMES_ES = [
   "Diciembre",
 ];
 
+type MonthlyRow = {
+  entry: CalendarEntry;
+  taskId: string;
+  scheduleLabel: string;
+  status: "done" | "pending";
+  inTolerance: boolean | null;
+  doneDate?: string;
+  matched: boolean;
+};
+
 function MonthlySummary({
   calendar,
   templates,
@@ -583,7 +595,7 @@ function MonthlySummary({
     setYm(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
   }
 
-  const rows = useMemo(() => {
+  const rows = useMemo<MonthlyRow[]>(() => {
     if (!calendar) return [];
     const scheduled = calendar.entries.filter((e) => entryIsInMonth(e, ym));
     // Build a name -> {test, template} index across all templates
@@ -595,7 +607,7 @@ function MonthlySummary({
       }
     }
 
-    return scheduled.map((entry) => {
+    return scheduled.map((entry): MonthlyRow => {
       const match = testIndex.get(entry.testName.trim().toLowerCase());
       const monthStart = `${ym}-01`;
       const [y, m] = ym.split("-").map((n) => parseInt(n, 10));
@@ -775,134 +787,15 @@ function MonthlySummary({
                   </button>
                   {isOpen && (
                     <ul className="divide-y border-t">
-                      {g.items.map((r, i) => {
-                        const task = taskById.get(r.taskId);
-                        const measured = task?.measured ?? false;
-                        const analyzed = task?.analyzed ?? false;
-                        const done = measured && analyzed;
-                        return (
-                          <li
-                            key={i}
-                            className="flex flex-col gap-2 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
-                          >
-                            <div className="flex min-w-0 items-start gap-2">
-                              <div className="mt-0.5 flex flex-col gap-1">
-                                <div className="flex items-center gap-1.5">
-                                  <Checkbox
-                                    id={`m-${r.taskId}`}
-                                    checked={measured}
-                                    disabled={readOnly}
-                                    onCheckedChange={(v: boolean | "indeterminate") =>
-                                      setTaskState(r.entry.testName, r.entry.machineId, {
-                                        measured: v === true,
-                                      })
-                                    }
-                                    aria-label={`Marcar ${r.entry.testName} como medido`}
-                                  />
-                                  <label
-                                    htmlFor={`m-${r.taskId}`}
-                                    className="text-xs text-muted-foreground"
-                                  >
-                                    Medido
-                                  </label>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                  <Checkbox
-                                    id={`a-${r.taskId}`}
-                                    checked={analyzed}
-                                    disabled={readOnly}
-                                    onCheckedChange={(v: boolean | "indeterminate") =>
-                                      setTaskState(r.entry.testName, r.entry.machineId, {
-                                        analyzed: v === true,
-                                      })
-                                    }
-                                    aria-label={`Marcar ${r.entry.testName} como analizado`}
-                                  />
-                                  <label
-                                    htmlFor={`a-${r.taskId}`}
-                                    className="text-xs text-muted-foreground"
-                                  >
-                                    Analizado
-                                  </label>
-                                </div>
-                              </div>
-                              <div className="min-w-0">
-                                <p
-                                  className={`truncate font-medium ${done ? "line-through opacity-70" : ""}`}
-                                >
-                                  {r.entry.testName}
-                                  {!r.matched && (
-                                    <span className="ml-2 text-[10px] text-muted-foreground">
-                                      (no asociado a plantilla)
-                                    </span>
-                                  )}
-                                </p>
-                                <p className="truncate text-xs text-muted-foreground">
-                                  {r.entry.category ? `${r.entry.category} · ` : ""}
-                                  {r.scheduleLabel}
-                                  {r.entry.detail ? ` · nota: ${r.entry.detail}` : ""}
-                                  {r.entry.patientId ? ` · paciente ${r.entry.patientId}` : ""}
-                                  {r.entry.course ? ` · curso ${r.entry.course}` : ""}
-                                  {r.entry.plan ? ` · plan ${r.entry.plan}` : ""}
-                                  {r.doneDate ? ` · datos ${r.doneDate}` : ""}
-                                </p>
-                                {measured && task?.measuredAt && (
-                                  <p className="truncate text-xs text-emerald-700">
-                                    Medido por {task.measuredByName ?? "usuario"} el{" "}
-                                    {new Date(task.measuredAt).toLocaleString()}
-                                  </p>
-                                )}
-                                {analyzed && task?.analyzedAt && (
-                                  <p className="truncate text-xs text-sky-700">
-                                    Analizado por {task.analyzedByName ?? "usuario"} el{" "}
-                                    {new Date(task.analyzedAt).toLocaleString()}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              {done ? (
-                                <Badge
-                                  variant="outline"
-                                  className="gap-1 border-emerald-500/30 bg-emerald-500/15 text-emerald-700"
-                                >
-                                  <CheckCircle2 className="size-3" /> Completado
-                                </Badge>
-                              ) : r.status === "done" ? (
-                                <Badge
-                                  variant="outline"
-                                  className="gap-1 border-sky-500/30 bg-sky-500/15 text-sky-700"
-                                >
-                                  Con datos
-                                </Badge>
-                              ) : (
-                                <Badge
-                                  variant="outline"
-                                  className="gap-1 border-amber-500/30 bg-amber-500/15 text-amber-700"
-                                >
-                                  Pendiente
-                                </Badge>
-                              )}
-                              {r.inTolerance === true && (
-                                <Badge
-                                  variant="outline"
-                                  className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
-                                >
-                                  En tolerancia
-                                </Badge>
-                              )}
-                              {r.inTolerance === false && (
-                                <Badge
-                                  variant="outline"
-                                  className="border-destructive/30 bg-destructive/10 text-destructive"
-                                >
-                                  Fuera
-                                </Badge>
-                              )}
-                            </div>
-                          </li>
-                        );
-                      })}
+                      {g.items.map((r, i) => (
+                        <MonthlyTaskRow
+                          key={`${r.taskId}-${i}`}
+                          item={r}
+                          task={taskById.get(r.taskId)}
+                          readOnly={readOnly}
+                          onSetState={setTaskState}
+                        />
+                      ))}
                     </ul>
                   )}
                 </div>
@@ -912,5 +805,179 @@ function MonthlySummary({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** Fila del resumen mensual: textos con clamp y "Ver más" solo cuando desbordan. */
+function MonthlyTaskRow({
+  item,
+  task,
+  readOnly,
+  onSetState,
+}: {
+  item: MonthlyRow;
+  task?: CalendarTask;
+  readOnly?: boolean;
+  onSetState: (
+    testName: string,
+    machineId: string | undefined,
+    patch: { measured?: boolean; analyzed?: boolean },
+  ) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [overflowing, setOverflowing] = useState(false);
+  const textRef = useRef<HTMLDivElement>(null);
+
+  const measured = task?.measured ?? false;
+  const analyzed = task?.analyzed ?? false;
+  const done = measured && analyzed;
+  const meta = [
+    item.entry.category,
+    item.scheduleLabel,
+    item.entry.detail ? `nota: ${item.entry.detail}` : null,
+    item.entry.patientId ? `paciente ${item.entry.patientId}` : null,
+    item.entry.course ? `curso ${item.entry.course}` : null,
+    item.entry.plan ? `plan ${item.entry.plan}` : null,
+    item.doneDate ? `datos ${item.doneDate}` : null,
+  ]
+    .filter((v): v is string => Boolean(v))
+    .join(" · ");
+
+  // Mostrar "Ver más" solo si el texto clampado desborda a este ancho.
+  useEffect(() => {
+    if (expanded) return;
+    const el = textRef.current;
+    if (!el) return;
+    const check = () => {
+      const nodes = el.querySelectorAll<HTMLElement>("[data-clamp]");
+      setOverflowing(Array.from(nodes).some((n) => n.scrollHeight > n.clientHeight + 1));
+    };
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [expanded, meta, item.entry.testName]);
+
+  return (
+    <li className="flex flex-col gap-2 px-3 py-2 text-sm sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex min-w-0 items-start gap-2">
+        <div className="mt-0.5 flex flex-col gap-1">
+          <div className="flex items-center gap-1.5">
+            <Checkbox
+              id={`m-${item.taskId}`}
+              checked={measured}
+              disabled={readOnly}
+              onCheckedChange={(v: boolean | "indeterminate") =>
+                onSetState(item.entry.testName, item.entry.machineId, { measured: v === true })
+              }
+              aria-label={`Marcar ${item.entry.testName} como medido`}
+            />
+            <label htmlFor={`m-${item.taskId}`} className="text-xs text-muted-foreground">
+              Medido
+            </label>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Checkbox
+              id={`a-${item.taskId}`}
+              checked={analyzed}
+              disabled={readOnly}
+              onCheckedChange={(v: boolean | "indeterminate") =>
+                onSetState(item.entry.testName, item.entry.machineId, { analyzed: v === true })
+              }
+              aria-label={`Marcar ${item.entry.testName} como analizado`}
+            />
+            <label htmlFor={`a-${item.taskId}`} className="text-xs text-muted-foreground">
+              Analizado
+            </label>
+          </div>
+        </div>
+        <div ref={textRef} className="min-w-0">
+          <p
+            title={item.entry.testName}
+            data-clamp={expanded ? undefined : ""}
+            className={`font-medium break-words ${done ? "line-through opacity-70" : ""} ${expanded ? "" : "line-clamp-2"}`}
+          >
+            {item.entry.testName}
+            {!item.matched && (
+              <span className="ml-2 text-[10px] text-muted-foreground">
+                (no asociado a plantilla)
+              </span>
+            )}
+          </p>
+          <p
+            title={meta}
+            data-clamp={expanded ? undefined : ""}
+            className={`text-xs text-muted-foreground break-words ${expanded ? "" : "line-clamp-2"}`}
+          >
+            {meta}
+          </p>
+          {measured && task?.measuredAt && (
+            <p
+              data-clamp={expanded ? undefined : ""}
+              className={`text-xs text-emerald-700 break-words ${expanded ? "" : "line-clamp-1"}`}
+            >
+              Medido por {task.measuredByName ?? "usuario"} el{" "}
+              {new Date(task.measuredAt).toLocaleString()}
+            </p>
+          )}
+          {analyzed && task?.analyzedAt && (
+            <p
+              data-clamp={expanded ? undefined : ""}
+              className={`text-xs text-sky-700 break-words ${expanded ? "" : "line-clamp-1"}`}
+            >
+              Analizado por {task.analyzedByName ?? "usuario"} el{" "}
+              {new Date(task.analyzedAt).toLocaleString()}
+            </p>
+          )}
+          {overflowing && (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={expanded}
+              className="mt-0.5 text-[11px] font-medium text-primary hover:underline"
+            >
+              {expanded ? "Ver menos" : "Ver más"}
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {done ? (
+          <Badge
+            variant="outline"
+            className="gap-1 border-emerald-500/30 bg-emerald-500/15 text-emerald-700"
+          >
+            <CheckCircle2 className="size-3" /> Completado
+          </Badge>
+        ) : item.status === "done" ? (
+          <Badge variant="outline" className="gap-1 border-sky-500/30 bg-sky-500/15 text-sky-700">
+            Con datos
+          </Badge>
+        ) : (
+          <Badge
+            variant="outline"
+            className="gap-1 border-amber-500/30 bg-amber-500/15 text-amber-700"
+          >
+            Pendiente
+          </Badge>
+        )}
+        {item.inTolerance === true && (
+          <Badge
+            variant="outline"
+            className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
+          >
+            En tolerancia
+          </Badge>
+        )}
+        {item.inTolerance === false && (
+          <Badge
+            variant="outline"
+            className="border-destructive/30 bg-destructive/10 text-destructive"
+          >
+            Fuera
+          </Badge>
+        )}
+      </div>
+    </li>
   );
 }
